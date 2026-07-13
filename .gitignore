@@ -1,0 +1,86 @@
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+*.local.env
+secrets/
+credentials/
+private/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.csr
+
+# Sensitive exports and operational data
+*.dump
+*.sql.gz
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+logs/
+*.log
+evidence/
+exports/
+backups/
+face-db/
+camera-exports/
+
+# Datasets, model artifacts, and generated AI output
+datasets/
+training-data/
+runs/
+models/
+artifacts/
+checkpoints/
+*.onnx
+*.pt
+*.pth
+*.engine
+*.weights
+
+# Large/reference media requires explicit review or Git LFS policy
+assets/videos/
+tmp/
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Node, Web, and Mobile
+node_modules/
+.next/
+.expo/
+coverage/
+android/.gradle/
+android/app/build/
+ios/Pods/
+
+# IDE and operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local tool caches
+.cache/
+.tmp/\n
