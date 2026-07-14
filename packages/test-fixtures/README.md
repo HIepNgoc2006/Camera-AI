@@ -1,11 +1,12 @@
 # Synthetic test fixtures
 
 Only deterministic, reviewable fake data belongs here. Every data filename must contain
-`.synthetic.` or `.sanitized.`, and every file must include the exact marker
-`SYNTHETIC_TEST_DATA_ONLY`.
+`.synthetic.` or `.sanitized.`. Every JSON file must contain the exact top-level field
+`"_fixture": "SYNTHETIC_TEST_DATA_ONLY"`.
 
-Allowed fixtures are small UTF-8 JSON/JSONL/YAML/TOML/CSV/TXT/SQL files with fake IDs prefixed by
-`test_` or containing `_test_`. Use reserved `.invalid` domains if an email or URL is essential.
+Allowed fixtures are small UTF-8 JSON/JSONL/YAML/TOML/CSV/TXT/SQL files. JSON fields ending in `_id`
+must use fake values prefixed by `test_`, containing `_test_`, or ending in `_test`. Use reserved
+`.invalid` domains if an email or URL is essential.
 
 Never add names or profiles resembling real people, student/parent/staff data, face images,
 embeddings, camera frames, base64 media, credentials, RTSP URLs, private media URLs, raw ANSVIS

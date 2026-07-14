@@ -52,6 +52,7 @@ FORBIDDEN_PATTERNS = (
 
 EMAIL_PATTERN = re.compile(r"(?i)\b[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})\b")
 URL_HOST_PATTERN = re.compile(r"(?i)\bhttps?://([^\s/:@]+)")
+SEED_LIKE_NAME_PATTERN = re.compile(r"(?i)(?:^|[._-])seeds?(?:[._-]|$)")
 
 
 def normalized_path(path: str) -> PurePosixPath:
@@ -65,9 +66,39 @@ def is_fixture_path(path: str) -> bool:
     pure_path = normalized_path(path)
     parts = tuple(part.lower() for part in pure_path.parts)
     name = pure_path.name.lower()
-    return any(part in FIXTURE_DIRECTORY_NAMES for part in parts[:-1]) or any(
-        token in name for token in (".fixture.", ".sanitized.", ".synthetic.")
+    return (
+        any(part in FIXTURE_DIRECTORY_NAMES for part in parts[:-1])
+        or any(token in name for token in (".fixture.", ".sanitized.", ".synthetic."))
+        or SEED_LIKE_NAME_PATTERN.search(name) is not None
     )
+
+
+def synthetic_identifier(value: str) -> bool:
+    lowered = value.lower()
+    return lowered.startswith("test_") or "_test_" in lowered or lowered.endswith("_test")
+
+
+def validate_json_fixture(value: object) -> list[str]:
+    violations: list[str] = []
+    if not isinstance(value, dict) or value.get("_fixture") != SYNTHETIC_MARKER:
+        violations.append("invalid-synthetic-marker")
+
+    def walk(item: object) -> None:
+        if isinstance(item, dict):
+            for key, child in item.items():
+                if (
+                    key.lower().endswith("_id")
+                    and isinstance(child, str)
+                    and not synthetic_identifier(child)
+                ):
+                    violations.append("non-synthetic-identifier")
+                walk(child)
+        elif isinstance(item, list):
+            for child in item:
+                walk(child)
+
+    walk(value)
+    return sorted(set(violations))
 
 
 def inspect_fixture(path: Path, relative_path: str) -> list[str]:
@@ -107,7 +138,7 @@ def inspect_fixture(path: Path, relative_path: str) -> list[str]:
         violations.append("unreadable-fixture")
         return sorted(set(violations))
 
-    if SYNTHETIC_MARKER not in content:
+    if path.suffix.lower() != ".json" and SYNTHETIC_MARKER not in content:
         violations.append("missing-synthetic-marker")
 
     for category, pattern in FORBIDDEN_PATTERNS:
@@ -126,7 +157,8 @@ def inspect_fixture(path: Path, relative_path: str) -> list[str]:
 
     if path.suffix.lower() == ".json":
         try:
-            json.loads(content)
+            parsed = json.loads(content)
+            violations.extend(validate_json_fixture(parsed))
         except json.JSONDecodeError:
             violations.append("invalid-json-fixture")
 

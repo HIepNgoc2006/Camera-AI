@@ -12,4 +12,5 @@ Runbook hiện có:
 
 - `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
 - `security/fixture-safety.md`: quy tắc fake fixture/seed, scanner và incident response.
+- `security/repository-protection.md`: branch protection và required-check baseline.
 - `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.

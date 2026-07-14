@@ -20,6 +20,8 @@ environment is ignored by Git and must not contain project secrets or real data 
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/quality.py repository
+.\.venv\Scripts\python.exe scripts/quality.py foundation
+.\.venv\Scripts\python.exe scripts/quality.py compose
 .\.venv\Scripts\python.exe scripts/quality.py fixtures
 .\.venv\Scripts\python.exe scripts/quality.py lint
 .\.venv\Scripts\python.exe scripts/quality.py typecheck
@@ -31,10 +33,12 @@ environment is ignored by Git and must not contain project secrets or real data 
 non-zero exit status. The unit suite contains a synthetic negative test proving failure propagation;
 it uses no customer, student, biometric, camera, event, or credential data.
 
-The current gates cover tracked-path safety, synthetic fixture/seed safety, Python lint/format,
-strict type checking, and unit tests for repository scripts. Add backend unit/integration/contract
-commands when backend packages exist. Add Web and Mobile lint/typecheck/test commands only when
-each app scaffold exists.
+The current gates cover tracked-path safety, repository structure/local links/ignore/defaults,
+static Docker Compose safety, synthetic fixture/seed safety, Python lint/format, strict type
+checking, and unit tests for repository scripts. The `compose` gate requires Docker Compose but does
+not start, stop, reset, or delete containers. Add backend unit/integration/contract commands when
+backend packages exist. Add Web and Mobile lint/typecheck/test commands only when each app scaffold
+exists.
 
 ## CI behavior
 
