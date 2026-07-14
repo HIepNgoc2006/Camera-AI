@@ -1,0 +1,22 @@
+title = "AI Camera repository secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "credentialed-rtsp-url"
+description = "RTSP URL containing inline credentials"
+regex = '''(?i)rtsp://[^/\s:@]+:([^@\s/]+)@'''
+secretGroup = 1
+keywords = ["rtsp://"]
+
+[[rules]]
+id = "ansvis-credential-assignment"
+description = "ANSVIS credential assigned in source or configuration"
+regex = '''(?i)ANSVIS[A-Z0-9_-]*(?:TOKEN|SECRET|PASSWORD|API[_-]?KEY)\s*[:=]\s*["']?([A-Za-z0-9_./+=-]{8,})'''
+secretGroup = 1
+keywords = ["ansvis"]
+
+[rules.allowlist]
+description = "Placeholder-only values are allowed in tracked examples"
+regexes = ['''(?i)^replace_with_[a-z0-9_]+$''']
