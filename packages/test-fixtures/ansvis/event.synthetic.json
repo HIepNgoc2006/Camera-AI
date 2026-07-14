@@ -1,0 +1,10 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "schema_version": "1.0",
+  "event_id": "event_test_ansvis_0001",
+  "source_id": "source_test_ansvis_0001",
+  "camera_id": "camera_test_0001",
+  "event_type": "camera_health",
+  "occurred_at": "2030-01-01T00:00:00Z",
+  "status": "online"
+}
