@@ -18,7 +18,8 @@ Compose pins each image by exact version and digest. PostgreSQL is under the `te
 Use placeholder values from the tracked example. Never copy production values into the workspace.
 
 ```powershell
-rtk docker compose --env-file .env.example -f compose.yml config --quiet
+rtk docker compose --env-file .env.example -f compose.yml --profile test-db config --quiet
+rtk python scripts/quality.py compose
 ```
 
 ## Start and verify

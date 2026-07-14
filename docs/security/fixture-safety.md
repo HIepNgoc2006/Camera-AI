@@ -9,9 +9,10 @@ prohibited in source control, CI, demos, screenshots, and test reports.
 
 Use `packages/test-fixtures/` for shared contracts. A future service may use
 `services/<service>/tests/fixtures/`; a seed may use a scoped `seeds/` directory. Data filenames must
-contain `.synthetic.` or `.sanitized.` and content must include `SYNTHETIC_TEST_DATA_ONLY`.
+contain `.synthetic.` or `.sanitized.`. JSON content must contain the exact top-level field
+`"_fixture": "SYNTHETIC_TEST_DATA_ONLY"`; a marker hidden in another field is rejected.
 
-IDs must be visibly fake and deterministic, such as `school_test_0001`. Avoid realistic names,
+Fields ending in `_id` must be visibly fake and deterministic, such as `school_test_0001`. Avoid realistic names,
 birth dates, addresses, phone numbers, identity numbers, or profiles. If a contract truly needs an
 email or URL, use an IANA-reserved `.invalid` domain and never include credentials or private hosts.
 
@@ -19,7 +20,7 @@ email or URL, use an IANA-reserved `.invalid` domain and never include credentia
 
 `python scripts/quality.py fixtures` checks tracked fixture/seed paths. It rejects:
 
-- files over 256 KiB, unsupported/binary/media types, unsafe names, or missing markers;
+- files over 256 KiB, unsupported/binary/media types, unsafe names, or invalid markers/identifiers;
 - password, secret, token, API/private-key fields and credentialed URLs;
 - RTSP streams, base64 image/media fields, face embeddings, and embedded image data;
 - realistic person-profile fields, non-`.invalid` email addresses/URLs, and private media URLs;

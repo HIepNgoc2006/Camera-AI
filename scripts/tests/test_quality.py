@@ -13,6 +13,8 @@ def test_all_expands_each_supported_gate_in_order() -> None:
 
     assert selected_commands("all", "python") == (
         *commands["repository"],
+        *commands["foundation"],
+        *commands["compose"],
         *commands["fixtures"],
         *commands["lint"],
         *commands["typecheck"],
