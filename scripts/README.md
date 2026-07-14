@@ -7,4 +7,10 @@ Chứa script có thể review để build, test, lint, migrate, deploy, backup 
 - Thao tác phá hủy phải xác minh target, nêu phạm vi ảnh hưởng và yêu cầu approval phù hợp.
 - Script liên quan database hoặc local Docker data phải tuân thủ migration, backup và path-safety rules.
 
-Scaffold này chưa thêm executable script.
+Các entry point hiện có:
+
+- `quality.py`: chạy repository policy, Ruff, Mypy và unit tests bằng một lệnh ổn định.
+- `check_repository_safety.py`: kiểm tra tên/kích thước file tracked mà không đọc nội dung.
+- `test_gitleaks_canary.py`: xác minh Gitleaks chặn fake canary và không in giá trị scanner.
+
+Xem `docs/quality-gates.md` và `docs/security/secret-scanning.md` để cài tool và chạy local.

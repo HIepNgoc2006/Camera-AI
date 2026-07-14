@@ -99,7 +99,11 @@ def classify_path(path: str, size: int) -> str | None:
     if pure_path.suffix.lower() in FORBIDDEN_SUFFIXES:
         return "secret-data-media-or-model-file"
 
-    if lower_name.endswith(".license") or lower_name.startswith("license") and lower_name.endswith(".json"):
+    if (
+        lower_name.endswith(".license")
+        or lower_name.startswith("license")
+        and lower_name.endswith(".json")
+    ):
         return "license-file"
 
     if size > MAX_TRACKED_FILE_BYTES:

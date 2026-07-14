@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-from check_repository_safety import MAX_TRACKED_FILE_BYTES, classify_path
+from scripts.check_repository_safety import MAX_TRACKED_FILE_BYTES, classify_path
 
 
 class RepositorySafetyPolicyTests(unittest.TestCase):
