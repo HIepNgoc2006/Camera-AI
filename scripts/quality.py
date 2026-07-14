@@ -16,6 +16,10 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
 
     return {
         "repository": ((python, "scripts/check_repository_safety.py"),),
+        "fixtures": (
+            (python, "scripts/check_fixture_safety.py"),
+            (python, "-m", "scripts.test_fixture_safety_canary"),
+        ),
         "lint": (
             (python, "-m", "ruff", "check", "scripts"),
             (python, "-m", "ruff", "format", "--check", "scripts"),
@@ -42,7 +46,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
     if gate == "all":
         return tuple(
             command
-            for name in ("repository", "lint", "typecheck", "unit")
+            for name in ("repository", "fixtures", "lint", "typecheck", "unit")
             for command in commands[name]
         )
     return commands[gate]
@@ -52,7 +56,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "gate",
-        choices=("all", "repository", "lint", "typecheck", "unit"),
+        choices=("all", "repository", "fixtures", "lint", "typecheck", "unit"),
         help="quality gate to run",
     )
     return parser.parse_args(argv)

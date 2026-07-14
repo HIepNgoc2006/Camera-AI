@@ -11,4 +11,5 @@ Planning và tài liệu tham chiếu local tiếp tục được giữ ngoài i
 Runbook hiện có:
 
 - `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
+- `security/fixture-safety.md`: quy tắc fake fixture/seed, scanner và incident response.
 - `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.
