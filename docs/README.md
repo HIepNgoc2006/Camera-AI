@@ -7,3 +7,8 @@ Chứa tài liệu cần phát hành cùng implementation, như OpenAPI/event sc
 - Không chứa secret, dữ liệu thật, raw ANSVIS payload, ảnh/video evidence hoặc thông tin định danh thật.
 
 Planning và tài liệu tham chiếu local tiếp tục được giữ ngoài implementation commits.
+
+Runbook hiện có:
+
+- `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
+- `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.
