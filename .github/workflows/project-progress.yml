@@ -1,0 +1,43 @@
+name: Project progress
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 1 * * 1"
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: project-progress
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+
+      - name: Generate live progress summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/project_status.py
+          --repo "$GITHUB_REPOSITORY"
+          --main-branch main
+          --format text
+          --strict
+          >> "$GITHUB_STEP_SUMMARY"

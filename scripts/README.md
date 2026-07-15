@@ -16,6 +16,9 @@ Các entry point hiện có:
 - `test_fixture_safety_canary.py`: xác minh fake violation bị chặn mà không in nội dung.
 - `check_repository_safety.py`: kiểm tra tên/kích thước file tracked mà không đọc nội dung.
 - `test_gitleaks_canary.py`: xác minh Gitleaks chặn fake canary và không in giá trị scanner.
+- `project_status.py`: tổng hợp tiến độ live từ metadata GitHub/Git, hỗ trợ text/JSON và kiểm tra
+  execution-lane policy mà không đọc issue body hoặc log workflow.
 
-Xem `docs/quality-gates.md`, `docs/security/repository-protection.md` và
-`docs/security/secret-scanning.md` để cài tool và chạy local.
+Xem `docs/quality-gates.md`, `docs/project-progress.md`,
+`docs/security/repository-protection.md` và `docs/security/secret-scanning.md` để cài tool và chạy
+local.
