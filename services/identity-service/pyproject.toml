@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-identity-service"
+version = "0.1.0"
+description = "Internal identity boundary for the Camera AI platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.139.0",
+    "pydantic==2.13.4",
+    "uvicorn==0.51.0",
+]
+
+[project.optional-dependencies]
+test = ["httpx2==2.7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

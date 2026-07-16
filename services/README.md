@@ -10,6 +10,8 @@ Chứa API Gateway và backend service theo domain khi một issue triển khai 
 Service hiện có:
 
 - `api-gateway/`: entry point FastAPI tối thiểu, health check, request correlation và error envelope.
+- `identity-service/`: internal Identity boundary cho user/role/permission/session metadata an toàn.
 
-API Gateway hiện chưa có business route, auth, proxy, database hay ANSVIS integration. Các khả năng đó
-chỉ được bổ sung bởi issue riêng với authorization và data-boundary tests tương ứng.
+Hai service hiện chưa có business route, auth flow, proxy, database hay ANSVIS integration. Các khả
+năng đó chỉ được bổ sung bởi issue riêng với authorization và data-boundary tests tương ứng. Web và
+Mobile không được gọi Identity Service trực tiếp.
