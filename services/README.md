@@ -7,4 +7,9 @@ Chứa API Gateway và backend service theo domain khi một issue triển khai 
 - Domain rules không phụ thuộc framework, database, queue, storage hoặc ANSVIS client.
 - Mỗi service phải có README, environment example, migration và test phù hợp với rủi ro.
 
-Scaffold này chưa tạo deployable service hoặc xử lý dữ liệu nghiệp vụ.
+Service hiện có:
+
+- `api-gateway/`: entry point FastAPI tối thiểu, health check, request correlation và error envelope.
+
+API Gateway hiện chưa có business route, auth, proxy, database hay ANSVIS integration. Các khả năng đó
+chỉ được bổ sung bởi issue riêng với authorization và data-boundary tests tương ứng.

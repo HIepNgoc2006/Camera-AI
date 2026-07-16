@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-include = ["scripts/**/*.py"]
+include = ["scripts/**/*.py", "services/**/*.py"]
 
 [tool.ruff.lint]
 select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
@@ -9,11 +9,13 @@ select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["scripts"]
+files = ["scripts", "services/api-gateway/src", "services/api-gateway/tests"]
 pretty = true
 show_error_codes = true
+mypy_path = ["services/api-gateway/src"]
 
 [tool.pytest.ini_options]
-testpaths = ["scripts/tests"]
+testpaths = ["scripts/tests", "services/api-gateway/tests"]
+pythonpath = [".", "services/api-gateway/src"]
 addopts = ["--strict-config", "--strict-markers"]
 asyncio_mode = "strict"

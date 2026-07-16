@@ -23,11 +23,29 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
             (python, "-m", "scripts.test_fixture_safety_canary"),
         ),
         "lint": (
-            (python, "-m", "ruff", "check", "scripts"),
-            (python, "-m", "ruff", "format", "--check", "scripts"),
+            (python, "-m", "ruff", "check", "scripts", "services/api-gateway"),
+            (python, "-m", "ruff", "format", "--check", "scripts", "services/api-gateway"),
         ),
-        "typecheck": ((python, "-m", "mypy", "scripts"),),
-        "unit": ((python, "-m", "pytest", "-q", "scripts/tests"),),
+        "typecheck": (
+            (
+                python,
+                "-m",
+                "mypy",
+                "scripts",
+                "services/api-gateway/src",
+                "services/api-gateway/tests",
+            ),
+        ),
+        "unit": (
+            (
+                python,
+                "-m",
+                "pytest",
+                "-q",
+                "scripts/tests",
+                "services/api-gateway/tests",
+            ),
+        ),
     }
 
 
