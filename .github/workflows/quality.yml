@@ -13,6 +13,23 @@ jobs:
   python-quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      APP_ENV: test
+      SCHOOL_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
+    services:
+      postgres-school-test:
+        image: postgres:17.10-bookworm@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
+        env:
+          POSTGRES_DB: Camera_AI_school_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d Camera_AI_school_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -28,6 +45,7 @@ jobs:
             requirements-quality.txt
             services/api-gateway/pyproject.toml
             services/identity-service/pyproject.toml
+            services/school-service/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
         run: >-
@@ -35,6 +53,7 @@ jobs:
           -r requirements-quality.txt
           -e "services/api-gateway[test]"
           -e "services/identity-service[test]"
+          -e "services/school-service[test]"
 
       - name: Run repository quality gates
         run: python scripts/quality.py all

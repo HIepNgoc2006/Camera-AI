@@ -11,7 +11,9 @@ Service hiện có:
 
 - `api-gateway/`: entry point FastAPI tối thiểu, health check, request correlation và error envelope.
 - `identity-service/`: internal Identity boundary cho user/role/permission/session metadata an toàn.
+- `school-service/`: owner của tám bảng `school`, migration và constraint tenant/lifecycle an toàn.
 
-Hai service hiện chưa có business route, auth flow, proxy, database hay ANSVIS integration. Các khả
+API Gateway và Identity Service hiện chưa có business route, auth flow, proxy, database hay ANSVIS
+integration. School Service mới chỉ có schema/migration, chưa có API/repository/decryption. Các khả
 năng đó chỉ được bổ sung bởi issue riêng với authorization và data-boundary tests tương ứng. Web và
-Mobile không được gọi Identity Service trực tiếp.
+Mobile không được gọi các internal service trực tiếp.

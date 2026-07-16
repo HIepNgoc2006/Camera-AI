@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-school-service"
+version = "0.1.0"
+description = "School domain schema and migration boundary for the Camera AI platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic==1.18.5",
+    "psycopg[binary]==3.3.4",
+    "SQLAlchemy==2.0.51",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
