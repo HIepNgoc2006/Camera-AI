@@ -42,6 +42,13 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "services/identity-service/src",
                 "services/identity-service/tests",
             ),
+            (
+                python,
+                "-m",
+                "mypy",
+                "services/school-service/src",
+                "services/school-service/tests",
+            ),
         ),
         "unit": (
             (
@@ -52,6 +59,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "scripts/tests",
                 "services/api-gateway/tests",
                 "services/identity-service/tests",
+                "services/school-service/tests",
             ),
         ),
     }
