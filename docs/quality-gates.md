@@ -1,8 +1,8 @@
 # Baseline quality gates
 
 The repository exposes one stable Python entry point for checks that exist today. It covers the API
-Gateway and Identity Service scaffolds but does not claim Web or Mobile commands before those
-projects are scaffolded.
+Gateway, Identity Service, School Service, and Audit Log Service but does not claim Web or Mobile
+commands before those projects are scaffolded.
 
 ## Local setup
 
@@ -14,6 +14,8 @@ rtk python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -r requirements-quality.txt
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/api-gateway[test]"
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/identity-service[test]"
+.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/school-service[test]"
+.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/audit-log-service[test]"
 ```
 
 Do not install from a private index that requires credentials on the command line. The virtual

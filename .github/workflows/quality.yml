@@ -16,6 +16,7 @@ jobs:
     env:
       APP_ENV: test
       SCHOOL_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
+      AUDIT_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
     services:
       postgres-school-test:
         image: postgres:17.10-bookworm@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
@@ -46,6 +47,7 @@ jobs:
             services/api-gateway/pyproject.toml
             services/identity-service/pyproject.toml
             services/school-service/pyproject.toml
+            services/audit-log-service/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
         run: >-
@@ -54,6 +56,7 @@ jobs:
           -e "services/api-gateway[test]"
           -e "services/identity-service[test]"
           -e "services/school-service[test]"
+          -e "services/audit-log-service[test]"
 
       - name: Run repository quality gates
         run: python scripts/quality.py all
