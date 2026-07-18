@@ -14,6 +14,7 @@ files = [
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
+    "services/audit-log-service/src",
 ]
 pretty = true
 show_error_codes = true
@@ -21,6 +22,7 @@ mypy_path = [
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
+    "services/audit-log-service/src",
 ]
 
 [tool.pytest.ini_options]
@@ -29,6 +31,7 @@ testpaths = [
     "services/api-gateway/tests",
     "services/identity-service/tests",
     "services/school-service/tests",
+    "services/audit-log-service/tests",
 ]
 pythonpath = [
     ".",
