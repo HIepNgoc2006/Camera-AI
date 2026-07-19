@@ -175,11 +175,18 @@ ACTION_POLICIES.update(
 
 ACTION_POLICIES.update(
     _policies(
-        ("CONSENT_GRANTED", "CONSENT_WITHDRAWN"),
+        (
+            "CONSENT_REQUESTED",
+            "CONSENT_GRANTED",
+            "CONSENT_DENIED",
+            "CONSENT_WITHDRAWN",
+            "CONSENT_EXPIRED",
+            "CONSENT_RESTRICTED",
+        ),
         publishers=("consent-service",),
         resources=("consent",),
         purpose=True,
-        fields=("status", "validity"),
+        fields=("status", "validity", "scope"),
         references=("consent_id", "subject_id"),
         versions=("consent_policy", "retention_policy"),
     )

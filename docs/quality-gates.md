@@ -1,8 +1,8 @@
 # Baseline quality gates
 
 The repository exposes one stable Python entry point for checks that exist today. It covers the API
-Gateway, Identity Service, School Service, and Audit Log Service but does not claim Web or Mobile
-commands before those projects are scaffolded.
+Gateway, Identity Service, School Service, Audit Log Service, and Consent Service but does not claim
+Web or Mobile commands before those projects are scaffolded.
 
 ## Local setup
 
@@ -16,10 +16,16 @@ rtk python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/identity-service[test]"
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/school-service[test]"
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/audit-log-service[test]"
+.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/consent-service[test]"
 ```
 
 Do not install from a private index that requires credentials on the command line. The virtual
 environment is ignored by Git and must not contain project secrets or real data fixtures.
+
+Direct runtime and test dependencies, their source repositories, SPDX license identifiers, and
+approved exceptions are recorded in [open-source-dependencies.md](open-source-dependencies.md).
+Third-party software always retains its own license; it must never be described as project-owned
+MIT code.
 
 ## Commands
 
@@ -40,8 +46,8 @@ it uses no customer, student, biometric, camera, event, or credential data.
 
 The current gates cover tracked-path safety, repository structure/local links/ignore/defaults,
 static Docker Compose safety, synthetic fixture/seed safety, Python lint/format, strict type
-checking, repository-script tests, and API Gateway/Identity Service unit, integration, and contract
-tests. The `compose` gate requires Docker Compose but does not start, stop, reset, or delete
+checking, repository-script tests, and backend service unit, integration, and contract tests. The
+`compose` gate requires Docker Compose but does not start, stop, reset, or delete
 containers. Add Web and Mobile lint/typecheck/test commands only when each app scaffold exists.
 
 ## CI behavior
@@ -49,5 +55,6 @@ containers. Add Web and Mobile lint/typecheck/test commands only when each app s
 `.github/workflows/quality.yml` runs on pull requests, pushes to `main`, and manual dispatch. It uses
 read-only repository permission, commit-pinned official actions, Python 3.12, and the pinned tool
 versions in `requirements-quality.txt` and each service `pyproject.toml`. Any lint, format, type,
-repository-policy, or test failure fails the job. CI requires no database, production credential,
-`.env`, or real fixture.
+repository-policy, or test failure fails the job. CI requires no production credential, `.env`, or
+real fixture. Database integration uses only the CI-owned loopback PostgreSQL service with fake opaque
+identifiers.
