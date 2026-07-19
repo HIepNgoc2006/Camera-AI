@@ -15,6 +15,7 @@ files = [
     "services/identity-service/src",
     "services/school-service/src",
     "services/audit-log-service/src",
+    "services/consent-service/src",
 ]
 pretty = true
 show_error_codes = true
@@ -23,6 +24,7 @@ mypy_path = [
     "services/identity-service/src",
     "services/school-service/src",
     "services/audit-log-service/src",
+    "services/consent-service/src",
 ]
 
 [tool.pytest.ini_options]
@@ -32,12 +34,14 @@ testpaths = [
     "services/identity-service/tests",
     "services/school-service/tests",
     "services/audit-log-service/tests",
+    "services/consent-service/tests",
 ]
 pythonpath = [
     ".",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
+    "services/consent-service/src",
 ]
 addopts = ["--strict-config", "--strict-markers", "--import-mode=importlib"]
 asyncio_mode = "strict"
