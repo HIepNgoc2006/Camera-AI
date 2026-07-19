@@ -1,0 +1,1 @@
+"""Camera Registry application boundary."""

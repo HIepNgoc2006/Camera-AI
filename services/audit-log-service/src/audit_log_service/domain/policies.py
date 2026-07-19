@@ -226,8 +226,18 @@ ACTION_POLICIES.update(
     _policies(
         ("CAMERA_MAPPING_CHANGED",),
         publishers=("camera-registry-service",),
-        resources=("camera",),
-        fields=("ansvis_source", "status", "task", "zone"),
+        resources=("camera", "camera_zone"),
+        purpose=True,
+        fields=(
+            "ansvis_source",
+            "config",
+            "metadata",
+            "purpose",
+            "schedule",
+            "status",
+            "task",
+            "zone",
+        ),
         references=("camera_id", "source_id", "task_id", "zone_id"),
         versions=("camera_mapping",),
     )

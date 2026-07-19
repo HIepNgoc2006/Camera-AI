@@ -38,3 +38,12 @@ def test_consent_change_actions_keep_business_result_semantics() -> None:
         "CONSENT_RESTRICTED",
     ):
         assert ACTION_POLICIES[action].results == frozenset({AuditResult.SUCCESS})
+
+
+def test_camera_registry_policy_accepts_minimized_zone_and_camera_changes() -> None:
+    policy = ACTION_POLICIES["CAMERA_MAPPING_CHANGED"]
+
+    assert policy.publishers == frozenset({"camera-registry-service"})
+    assert policy.resource_types == frozenset({"camera", "camera_zone"})
+    assert policy.purpose_required is True
+    assert {"metadata", "purpose", "schedule", "status", "task", "zone"} <= (policy.changed_fields)
