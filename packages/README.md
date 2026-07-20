@@ -7,4 +7,7 @@ Chứa contract và thư viện dùng chung có ownership rõ, ví dụ API/even
 - Tránh đưa business rule của nhiều domain vào một package dùng chung.
 - Mọi contract phải có version và test tương thích khi được triển khai.
 
-Scaffold này chưa tạo shared package.
+Các contract hiện có:
+
+- `time-policy/time-policy-v1.json`: policy versioned cho UTC/IANA, clock health và replay window;
+  không chứa cấu hình endpoint hoặc secret theo môi trường.

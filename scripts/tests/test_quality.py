@@ -16,6 +16,7 @@ def test_all_expands_each_supported_gate_in_order() -> None:
         *commands["foundation"],
         *commands["compose"],
         *commands["fixtures"],
+        *commands["time-policy"],
         *commands["lint"],
         *commands["typecheck"],
         *commands["unit"],

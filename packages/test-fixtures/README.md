@@ -13,4 +13,6 @@ embeddings, camera frames, base64 media, credentials, RTSP URLs, private media U
 exports, database dumps, backups, logs, datasets, model artifacts, or externally sourced examples.
 
 ANSVIS fixtures must be minimal normalized contracts built manually from the approved schema. Do
-not copy a raw payload from ANSVIS/AIBOX. Run `python scripts/quality.py all` before review.
+not copy a raw payload from ANSVIS/AIBOX. `ansvis/timestamps.synthetic.json` is the compatibility
+matrix for `time_policy_v1`; it contains fake instants only and no raw event body. Run
+`python scripts/quality.py all` before review.

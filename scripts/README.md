@@ -18,6 +18,7 @@ Các entry point hiện có:
 - `test_gitleaks_canary.py`: xác minh Gitleaks chặn fake canary và không in giá trị scanner.
 - `project_status.py`: tổng hợp tiến độ live từ metadata GitHub/Git, hỗ trợ text/JSON và kiểm tra
   execution-lane policy mà không đọc issue body hoặc log workflow.
+- `check_time_policy.py`: kiểm machine-readable time policy và fixture UTC/IANA/drift/replay giả lập.
 
 Xem `docs/quality-gates.md`, `docs/project-progress.md`,
 `docs/security/repository-protection.md` và `docs/security/secret-scanning.md` để cài tool và chạy
