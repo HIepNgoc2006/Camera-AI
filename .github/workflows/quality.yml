@@ -52,6 +52,7 @@ jobs:
             services/audit-log-service/pyproject.toml
             services/consent-service/pyproject.toml
             services/camera-registry-service/pyproject.toml
+            services/ansvis-adapter/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
         run: >-
@@ -63,6 +64,7 @@ jobs:
           -e "services/audit-log-service[test]"
           -e "services/consent-service[test]"
           -e "services/camera-registry-service[test]"
+          -e "services/ansvis-adapter[test]"
 
       - name: Run repository quality gates
         run: python scripts/quality.py all

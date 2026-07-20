@@ -17,6 +17,7 @@ files = [
     "services/audit-log-service/src",
     "services/consent-service/src",
     "services/camera-registry-service/src",
+    "services/ansvis-adapter/src",
 ]
 pretty = true
 show_error_codes = true
@@ -27,6 +28,7 @@ mypy_path = [
     "services/audit-log-service/src",
     "services/consent-service/src",
     "services/camera-registry-service/src",
+    "services/ansvis-adapter/src",
 ]
 
 [tool.pytest.ini_options]
@@ -38,6 +40,7 @@ testpaths = [
     "services/audit-log-service/tests",
     "services/consent-service/tests",
     "services/camera-registry-service/tests",
+    "services/ansvis-adapter/tests",
 ]
 pythonpath = [
     ".",
@@ -46,6 +49,7 @@ pythonpath = [
     "services/school-service/src",
     "services/consent-service/src",
     "services/camera-registry-service/src",
+    "services/ansvis-adapter/src",
 ]
 addopts = ["--strict-config", "--strict-markers", "--import-mode=importlib"]
 asyncio_mode = "strict"

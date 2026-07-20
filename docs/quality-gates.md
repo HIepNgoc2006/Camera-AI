@@ -2,8 +2,8 @@
 
 The repository exposes one stable Python entry point for checks that exist today. It covers the API
 Gateway, Identity Service, School Service, Audit Log Service, Consent Service, Camera Registry Service,
-shared time-policy contract, and ANSVIS HTTP Trigger event contract but does not claim Web or Mobile
-commands before those projects are scaffolded.
+ANSVIS Adapter, shared time-policy contract, and ANSVIS HTTP Trigger event contract but does not claim
+Web or Mobile commands before those projects are scaffolded.
 
 ## Local setup
 
@@ -18,6 +18,8 @@ rtk python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/school-service[test]"
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/audit-log-service[test]"
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/consent-service[test]"
+.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/camera-registry-service[test]"
+.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/ansvis-adapter[test]"
 ```
 
 Do not install from a private index that requires credentials on the command line. The virtual

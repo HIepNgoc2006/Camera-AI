@@ -16,6 +16,9 @@ Service hiện có:
   append-only.
 - `consent-service/`: owner của purpose/consent trong `privacy`, consent gate fail-closed và
   transactional audit-intent outbox.
+- `camera-registry-service/`: owner của camera/zone registry, mapping metadata và lifecycle an toàn.
+- `ansvis-adapter/`: HTTP Trigger JSON boundary, strict normalization và commit-before-ACK ports;
+  runtime mặc định từ chối khi auth hoặc durable receipt chưa được nối.
 
 API Gateway và Identity Service hiện chưa có business route, auth flow, proxy, database hay ANSVIS
 integration. School Service mới chỉ có schema/migration, chưa có API/repository/decryption. Audit Log
