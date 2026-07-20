@@ -11,6 +11,8 @@ Planning và tài liệu tham chiếu local tiếp tục được giữ ngoài i
 Runbook hiện có:
 
 - `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
+- `../packages/ansvis-event-contract/README.md`: contract HTTP Trigger JSON/ACK, auth, replay và
+  idempotency versioned cho ANSVIS integration.
 - `project-progress.md`: báo cáo tiến độ live, execution-lane policy và lịch sử workflow hằng tuần.
 - `operations/time-synchronization-policy.md`: UTC/IANA, clock drift và replay-window contract cho
   Backend/ANSVIS/PostgreSQL.

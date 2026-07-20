@@ -19,6 +19,8 @@ Các entry point hiện có:
 - `project_status.py`: tổng hợp tiến độ live từ metadata GitHub/Git, hỗ trợ text/JSON và kiểm tra
   execution-lane policy mà không đọc issue body hoặc log workflow.
 - `check_time_policy.py`: kiểm machine-readable time policy và fixture UTC/IANA/drift/replay giả lập.
+- `check_ansvis_event_contract.py`: kiểm JSON Schema, Bearer source auth/replay/idempotency/ACK policy
+  và ma trận contract ANSVIS giả lập mà không in payload bị từ chối.
 
 Xem `docs/quality-gates.md`, `docs/project-progress.md`,
 `docs/security/repository-protection.md` và `docs/security/secret-scanning.md` để cài tool và chạy
