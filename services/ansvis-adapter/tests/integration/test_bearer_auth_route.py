@@ -4,8 +4,10 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 from datetime import UTC, datetime
 
+import pytest
 from ansvis_adapter.application.ports import (
     AuthenticatedSource,
     DurableReceipt,
@@ -18,6 +20,7 @@ from ansvis_adapter.infrastructure.bearer_auth import (
     BearerAuthPolicy,
     HmacBearerSourceAuthenticator,
 )
+from ansvis_adapter.logging import SERVICE_NAME, JsonLogFormatter
 from ansvis_adapter.main import create_app
 from fastapi.testclient import TestClient
 
@@ -126,7 +129,9 @@ def test_valid_bearer_reaches_only_the_committed_test_receipt() -> None:
     assert response.json()["receipt_id"] == "receipt_test_ansvis_auth_0001"
 
 
-def test_invalid_signature_is_masked_in_response_and_logs(capsys: object) -> None:
+def test_invalid_signature_is_masked_in_response_and_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     application = create_app(
         Settings(environment="test", log_level="INFO"),
         authenticator=app_authenticator(),
@@ -137,15 +142,20 @@ def test_invalid_signature_is_masked_in_response_and_logs(capsys: object) -> Non
     invalid_token = token(key=invalid_key)
     payload = event_payload()
     payload["attributes"] = {"status": "online", "raw_test_marker": "blocked_payload_marker"}
-    with TestClient(application, base_url="https://testserver") as client:
-        response = client.post(
-            "/integration/ansvis/events",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {invalid_token}",
-                "X-Request-ID": "req-test-auth-invalid",
-            },
-        )
+    logger = logging.getLogger(SERVICE_NAME)
+    logger.addHandler(caplog.handler)
+    try:
+        with TestClient(application, base_url="https://testserver") as client:
+            response = client.post(
+                "/integration/ansvis/events",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {invalid_token}",
+                    "X-Request-ID": "req-test-auth-invalid",
+                },
+            )
+    finally:
+        logger.removeHandler(caplog.handler)
 
     assert response.status_code == 401
     assert response.json() == {
@@ -153,8 +163,8 @@ def test_invalid_signature_is_masked_in_response_and_logs(capsys: object) -> Non
         "message": "Request rejected.",
         "request_id": "req-test-auth-invalid",
     }
-    captured = capsys.readouterr()  # type: ignore[attr-defined]
-    combined = captured.out + captured.err
+    records = [record for record in caplog.records if record.name == SERVICE_NAME]
+    combined = "\n".join(JsonLogFormatter().format(record) for record in records)
     assert "EVENT_AUTH_TOKEN_INVALID" in combined
     assert invalid_token not in response.text
     assert invalid_token not in combined
