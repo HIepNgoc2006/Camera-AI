@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.camera-ai.invalid/ansvis/canonical-event-v1.schema.json",
+  "title": "Canonical ANSVIS Event V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_namespace",
+    "source_event_id",
+    "event_type",
+    "tenant_ref",
+    "school_ref",
+    "camera_external_id",
+    "task_external_id",
+    "occurred_at",
+    "correlation_id",
+    "attributes",
+    "idempotency_key",
+    "canonical_fingerprint",
+    "time_policy_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ansvis_canonical_event_v1"
+    },
+    "source_namespace": {
+      "type": "string"
+    },
+    "source_event_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event_type": {
+      "enum": [
+        "attendance.face.observed",
+        "camera.health.changed",
+        "insight.emotion.observed",
+        "task.health.changed",
+        "timekeeping.face.observed",
+        "violation.littering.suspected",
+        "violation.ppe.suspected",
+        "violation.smoking.suspected",
+        "violation.uniform.suspected"
+      ]
+    },
+    "tenant_ref": {
+      "type": "string"
+    },
+    "school_ref": {
+      "type": "string"
+    },
+    "camera_external_id": {
+      "type": "string"
+    },
+    "task_external_id": {
+      "type": "string"
+    },
+    "occurred_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^corr_[A-Za-z0-9_-]{8,120}$"
+    },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 9,
+      "properties": {
+        "track_id": {
+          "$ref": "#/$defs/externalId"
+        },
+        "detection_key": {
+          "$ref": "#/$defs/stableRef"
+        },
+        "subject_external_id": {
+          "$ref": "#/$defs/externalId"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "multipleOf": 0.000001
+        },
+        "status": {
+          "enum": [
+            "delayed",
+            "offline",
+            "online",
+            "running",
+            "stopped",
+            "unknown"
+          ]
+        },
+        "model_version": {
+          "$ref": "#/$defs/stableCode"
+        },
+        "config_version": {
+          "$ref": "#/$defs/stableCode"
+        },
+        "rule_code": {
+          "$ref": "#/$defs/stableCode"
+        },
+        "detection_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^idem_(?:source|fallback)_v1_[0-9a-f]{64}$"
+    },
+    "canonical_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "time_policy_version": {
+      "const": "time_policy_v1"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "camera.health.changed",
+              "task.health.changed"
+            ]
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "required": [
+              "status"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_event_id": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "source_event_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "required": [
+              "track_id",
+              "detection_key"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stableCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.:-]{0,63}$"
+    },
+    "stableRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"
+    },
+    "externalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    }
+  }
+}

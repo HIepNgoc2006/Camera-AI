@@ -1,0 +1,216 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "contract_version": "ansvis_http_trigger_v1",
+  "server_received_at": "2030-01-01T00:00:10Z",
+  "schema_cases": [
+    {
+      "case_code": "valid_primary_identity",
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_numeric_vendor_ids",
+      "set": {
+        "source_event_id": 10001,
+        "camera_external_id": 20001,
+        "task_external_id": 30001
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_fallback_identity",
+      "set": {
+        "source_event_id": null
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "invalid_missing_event_type",
+      "remove": [
+        "event_type"
+      ],
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_unknown_top_level_field",
+      "set": {
+        "raw_payload": "blocked_test_value"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_unknown_attribute",
+      "set": {
+        "attributes.image_base64": "blocked_test_value"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_event_type",
+      "set": {
+        "event_type": "vendor.unapproved.event"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_TYPE_UNSUPPORTED"
+    },
+    {
+      "case_code": "invalid_naive_event_time",
+      "set": {
+        "event_time": "2030-01-01T00:00:00"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "TIME_TIMESTAMP_NAIVE"
+    },
+    {
+      "case_code": "stale_event_replay_window",
+      "set": {
+        "event_time": "2029-12-31T23:55:09Z"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "TIME_REPLAY_WINDOW_EXCEEDED"
+    },
+    {
+      "case_code": "invalid_fallback_identity",
+      "set": {
+        "source_event_id": null
+      },
+      "remove": [
+        "attributes.detection_key"
+      ],
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_FALLBACK_IDENTITY_INSUFFICIENT"
+    },
+    {
+      "case_code": "invalid_health_event_without_status",
+      "remove": [
+        "attributes.status"
+      ],
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_confidence_range",
+      "set": {
+        "attributes.confidence": 1.1
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    }
+  ],
+  "auth_cases": [
+    {
+      "case_code": "valid_source_bearer",
+      "auth_state": "valid",
+      "authenticated_source": "ansvis.test.source",
+      "issued_at": "2029-12-31T23:59:00Z",
+      "expires_at": "2030-01-01T00:04:00Z",
+      "https": true,
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "invalid_source_bearer",
+      "auth_state": "invalid",
+      "authenticated_source": "ansvis.test.source",
+      "issued_at": "2029-12-31T23:59:00Z",
+      "expires_at": "2030-01-01T00:04:00Z",
+      "https": true,
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_AUTH_TOKEN_INVALID"
+    },
+    {
+      "case_code": "expired_source_bearer",
+      "auth_state": "valid",
+      "authenticated_source": "ansvis.test.source",
+      "issued_at": "2029-12-31T23:55:10Z",
+      "expires_at": "2030-01-01T00:00:10Z",
+      "https": true,
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_AUTH_TOKEN_EXPIRED"
+    },
+    {
+      "case_code": "authenticated_source_mismatch",
+      "auth_state": "valid",
+      "authenticated_source": "ansvis.test.other",
+      "issued_at": "2029-12-31T23:59:00Z",
+      "expires_at": "2030-01-01T00:04:00Z",
+      "https": true,
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SOURCE_UNAUTHORIZED"
+    },
+    {
+      "case_code": "insecure_transport",
+      "auth_state": "valid",
+      "authenticated_source": "ansvis.test.source",
+      "issued_at": "2029-12-31T23:59:00Z",
+      "expires_at": "2030-01-01T00:04:00Z",
+      "https": false,
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SOURCE_UNAUTHORIZED"
+    }
+  ],
+  "idempotency_cases": [
+    {
+      "case_code": "primary_identical_retry",
+      "second_correlation_id": "corr_test_ansvis_retry_0001",
+      "expected_outcome": "duplicate"
+    },
+    {
+      "case_code": "primary_conflicting_retry",
+      "second_correlation_id": "corr_test_ansvis_retry_0002",
+      "second_status": "offline",
+      "expected_outcome": "conflict"
+    },
+    {
+      "case_code": "fallback_identical_retry",
+      "source_event_id": null,
+      "second_correlation_id": "corr_test_ansvis_retry_0003",
+      "expected_outcome": "duplicate"
+    }
+  ],
+  "response_cases": [
+    {
+      "case_code": "accepted_ack",
+      "expected_result": "accept",
+      "response": {
+        "schema_version": "ansvis_http_trigger_ack_v1",
+        "outcome": "accepted",
+        "receipt_id": "receipt_test_ansvis_0001",
+        "request_id": "req_test_ansvis_0001",
+        "correlation_id": "corr_test_ansvis_0001"
+      }
+    },
+    {
+      "case_code": "duplicate_ack",
+      "expected_result": "accept",
+      "response": {
+        "schema_version": "ansvis_http_trigger_ack_v1",
+        "outcome": "duplicate",
+        "receipt_id": "receipt_test_ansvis_0001",
+        "request_id": "req_test_ansvis_0002",
+        "correlation_id": "corr_test_ansvis_retry_0001"
+      }
+    },
+    {
+      "case_code": "masked_error",
+      "expected_result": "accept",
+      "response": {
+        "error_code": "EVENT_SCHEMA_INVALID",
+        "message": "Request rejected.",
+        "request_id": "req_test_ansvis_0003"
+      }
+    },
+    {
+      "case_code": "invalid_error_extra_field",
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID",
+      "response": {
+        "error_code": "EVENT_SCHEMA_INVALID",
+        "message": "Request rejected.",
+        "request_id": "req_test_ansvis_0004",
+        "payload": "blocked_test_value"
+      }
+    }
+  ]
+}

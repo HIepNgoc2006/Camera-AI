@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.camera-ai.invalid/ansvis/http-trigger-request-v1.schema.json",
+  "title": "ANSVIS HTTP Trigger Request V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_namespace",
+    "source_event_id",
+    "event_type",
+    "tenant_ref",
+    "school_ref",
+    "camera_external_id",
+    "task_external_id",
+    "event_time",
+    "correlation_id",
+    "attributes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ansvis_http_trigger_v1"
+    },
+    "source_namespace": {
+      "$ref": "#/$defs/stableCode"
+    },
+    "source_event_id": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/externalId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "event_type": {
+      "enum": [
+        "attendance.face.observed",
+        "camera.health.changed",
+        "insight.emotion.observed",
+        "task.health.changed",
+        "timekeeping.face.observed",
+        "violation.littering.suspected",
+        "violation.ppe.suspected",
+        "violation.smoking.suspected",
+        "violation.uniform.suspected"
+      ]
+    },
+    "tenant_ref": {
+      "$ref": "#/$defs/stableRef"
+    },
+    "school_ref": {
+      "$ref": "#/$defs/stableRef"
+    },
+    "camera_external_id": {
+      "$ref": "#/$defs/externalId"
+    },
+    "task_external_id": {
+      "$ref": "#/$defs/externalId"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time",
+      "minLength": 20,
+      "maxLength": 32
+    },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^corr_[A-Za-z0-9_-]{8,120}$"
+    },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 9,
+      "properties": {
+        "track_id": {
+          "$ref": "#/$defs/externalId"
+        },
+        "detection_key": {
+          "$ref": "#/$defs/stableRef"
+        },
+        "subject_external_id": {
+          "$ref": "#/$defs/externalId"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "multipleOf": 0.000001
+        },
+        "status": {
+          "enum": [
+            "delayed",
+            "offline",
+            "online",
+            "running",
+            "stopped",
+            "unknown"
+          ]
+        },
+        "model_version": {
+          "$ref": "#/$defs/stableCode"
+        },
+        "config_version": {
+          "$ref": "#/$defs/stableCode"
+        },
+        "rule_code": {
+          "$ref": "#/$defs/stableCode"
+        },
+        "detection_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "camera.health.changed",
+              "task.health.changed"
+            ]
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "required": [
+              "status"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_event_id": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "source_event_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attributes": {
+            "required": [
+              "track_id",
+              "detection_key"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stableCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.:-]{0,63}$"
+    },
+    "stableRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"
+    },
+    "externalId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  }
+}

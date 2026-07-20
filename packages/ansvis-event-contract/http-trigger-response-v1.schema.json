@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.camera-ai.invalid/ansvis/http-trigger-response-v1.schema.json",
+  "title": "ANSVIS HTTP Trigger Response V1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "outcome",
+        "receipt_id",
+        "request_id",
+        "correlation_id"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "ansvis_http_trigger_ack_v1"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "duplicate"
+          ]
+        },
+        "receipt_id": {
+          "type": "string",
+          "pattern": "^receipt_[A-Za-z0-9_-]{8,120}$"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^req_[A-Za-z0-9_-]{8,120}$"
+        },
+        "correlation_id": {
+          "type": "string",
+          "pattern": "^corr_[A-Za-z0-9_-]{8,120}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error_code",
+        "message",
+        "request_id"
+      ],
+      "properties": {
+        "error_code": {
+          "enum": [
+            "EVENT_AUTH_TOKEN_EXPIRED",
+            "EVENT_AUTH_TOKEN_INVALID",
+            "EVENT_BODY_TOO_LARGE",
+            "EVENT_CONTENT_TYPE_UNSUPPORTED",
+            "EVENT_DURABLE_RECEIPT_UNAVAILABLE",
+            "EVENT_FALLBACK_IDENTITY_INSUFFICIENT",
+            "EVENT_IDEMPOTENCY_CONFLICT",
+            "EVENT_RATE_LIMITED",
+            "EVENT_REPLAY_DETECTED",
+            "EVENT_SCHEMA_INVALID",
+            "EVENT_SOURCE_MAPPING_DENIED",
+            "EVENT_SOURCE_UNAUTHORIZED",
+            "EVENT_TYPE_UNSUPPORTED",
+            "TIME_EVENT_FUTURE",
+            "TIME_FRACTION_PRECISION",
+            "TIME_OFFSET_UNKNOWN",
+            "TIME_REPLAY_WINDOW_EXCEEDED",
+            "TIME_SOURCE_UNHEALTHY",
+            "TIME_TIMESTAMP_INVALID",
+            "TIME_TIMESTAMP_NAIVE"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^req_[A-Za-z0-9_-]{8,120}$"
+        }
+      }
+    }
+  ]
+}

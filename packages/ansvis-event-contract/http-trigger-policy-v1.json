@@ -1,0 +1,144 @@
+{
+  "policy_id": "ansvis_http_trigger",
+  "policy_version": "ansvis_http_trigger_policy_v1",
+  "status": "active",
+  "owner_code": "ansvis_integration",
+  "approver_code": "project_owner",
+  "purpose_code": "event_ingestion",
+  "data_class": "high",
+  "effective_at": "2026-07-20T00:00:00Z",
+  "expiry_trigger": "superseded_or_security_change",
+  "terminal_action": "retire_and_replace",
+  "request": {
+    "method": "POST",
+    "path": "/integration/ansvis/events",
+    "content_types": [
+      "application/json"
+    ],
+    "max_body_bytes": 65536
+  },
+  "authentication": {
+    "scheme": "ansvis-login-bearer-v1",
+    "transport": "https_required",
+    "integration_mode": "ansvis_login_required",
+    "authorization_header": "Authorization",
+    "token_prefix": "Bearer ",
+    "token_verification": "signature_or_active_introspection",
+    "required_security_properties": [
+      "trusted_issuer",
+      "ingestion_audience",
+      "registered_source_subject",
+      "issued_at",
+      "expires_at",
+      "revocable_token_id"
+    ],
+    "audience": "camera-ai-ansvis-ingestion",
+    "max_access_token_lifetime_seconds": 300,
+    "credential_handling": "dedicated_source_credential_outside_contract",
+    "source_mapping": "verified_token_subject_to_registered_source"
+  },
+  "time": {
+    "policy_version": "time_policy_v1",
+    "future_tolerance_seconds": 30,
+    "replay_window_seconds": 300,
+    "replay_nonce_field": "source_event_id",
+    "fallback_replay_identity": "versioned_keyed_idempotency",
+    "critical_clock_state": "fail_closed"
+  },
+  "rate_limit": {
+    "scope": "source_namespace",
+    "sustained_requests_per_second": 50,
+    "burst_requests": 200,
+    "rejection_status": 429
+  },
+  "idempotency": {
+    "primary_version": "source_identity_v1",
+    "primary_fields": [
+      "tenant_ref",
+      "source_namespace",
+      "source_event_id"
+    ],
+    "fallback_version": "ansvis_fallback_idempotency_v1",
+    "fallback_algorithm": "hmac-sha256",
+    "fallback_key_source": "approved_secret_manager_reference",
+    "fallback_time_bucket_seconds": 1,
+    "fallback_required_fields": [
+      "tenant_ref",
+      "school_ref",
+      "source_namespace",
+      "camera_external_id",
+      "task_external_id",
+      "event_type",
+      "event_time",
+      "attributes.track_id",
+      "attributes.detection_key"
+    ],
+    "canonicalization_version": "camera_ai_canonical_json_v1",
+    "fingerprint_algorithm": "sha256",
+    "fingerprint_excluded_fields": [
+      "correlation_id"
+    ],
+    "identical_duplicate_outcome": "duplicate",
+    "conflicting_duplicate_outcome": "reject_and_quarantine"
+  },
+  "event_types": [
+    "attendance.face.observed",
+    "camera.health.changed",
+    "insight.emotion.observed",
+    "task.health.changed",
+    "timekeeping.face.observed",
+    "violation.littering.suspected",
+    "violation.ppe.suspected",
+    "violation.smoking.suspected",
+    "violation.uniform.suspected"
+  ],
+  "attribute_allowlist": [
+    "confidence",
+    "config_version",
+    "detection_count",
+    "detection_key",
+    "model_version",
+    "rule_code",
+    "status",
+    "subject_external_id",
+    "track_id"
+  ],
+  "forbidden_fields_recursive": [
+    "authorization",
+    "camera_address",
+    "cookie",
+    "face_embedding",
+    "image",
+    "image_base64",
+    "media_url",
+    "password",
+    "private_key",
+    "raw_payload",
+    "rtsp_url",
+    "token",
+    "video",
+    "video_base64"
+  ],
+  "processing_order": [
+    "capture_trusted_receipt_time_and_request_id",
+    "verify_receiver_clock_health",
+    "enforce_content_type_body_size_and_rate_limit",
+    "authenticate_source_and_bearer_token",
+    "validate_event_timestamp_and_replay_nonce",
+    "validate_schema_event_time_and_event_type",
+    "validate_source_camera_task_mapping",
+    "derive_idempotency_and_canonical_fingerprint",
+    "commit_durable_receipt_before_ack"
+  ],
+  "http_outcomes": {
+    "accepted": 202,
+    "duplicate": 200,
+    "schema_invalid": 422,
+    "authentication_failed": 401,
+    "replay_or_conflict": 409,
+    "unsupported_content_type": 415,
+    "body_too_large": 413,
+    "rate_limited": 429,
+    "durable_receipt_unavailable": 503
+  }
+}

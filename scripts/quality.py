@@ -23,6 +23,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
             (python, "-m", "scripts.test_fixture_safety_canary"),
         ),
         "time-policy": ((python, "scripts/check_time_policy.py"),),
+        "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "lint": (
             (python, "-m", "ruff", "check", "scripts", "services"),
             (python, "-m", "ruff", "format", "--check", "scripts", "services"),
@@ -113,6 +114,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "compose",
                 "fixtures",
                 "time-policy",
+                "ansvis-contract",
                 "lint",
                 "typecheck",
                 "unit",
@@ -133,6 +135,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "compose",
             "fixtures",
             "time-policy",
+            "ansvis-contract",
             "lint",
             "typecheck",
             "unit",
