@@ -20,7 +20,7 @@ from ansvis_adapter.infrastructure.bearer_auth import (
     BearerAuthPolicy,
     HmacBearerSourceAuthenticator,
 )
-from ansvis_adapter.logging import SERVICE_NAME, JsonLogFormatter
+from ansvis_adapter.logging import JsonLogFormatter
 from ansvis_adapter.main import create_app
 from fastapi.testclient import TestClient
 
@@ -130,33 +130,31 @@ def test_valid_bearer_reaches_only_the_committed_test_receipt() -> None:
 
 
 def test_invalid_signature_is_masked_in_response_and_logs() -> None:
+    log_buffer = io.StringIO()
+    test_handler = logging.StreamHandler(log_buffer)
+    test_handler.setFormatter(JsonLogFormatter())
+    request_logger = logging.Logger("ansvis-adapter-route-test", level=logging.INFO)
+    request_logger.addHandler(test_handler)
     application = create_app(
         Settings(environment="test", log_level="INFO"),
         authenticator=app_authenticator(),
         receipt_port=CommittedReceiptPort(),
+        request_logger=request_logger,
         now=lambda: NOW,
     )
     invalid_key = hashlib.sha256(b"SYNTHETIC_TEST_DATA_ONLY:invalid-route-key").digest()
     invalid_token = token(key=invalid_key)
     payload = event_payload()
     payload["attributes"] = {"status": "online", "raw_test_marker": "blocked_payload_marker"}
-    logger = logging.getLogger(SERVICE_NAME)
-    log_buffer = io.StringIO()
-    test_handler = logging.StreamHandler(log_buffer)
-    test_handler.setFormatter(JsonLogFormatter())
     with TestClient(application, base_url="https://testserver") as client:
-        logger.addHandler(test_handler)
-        try:
-            response = client.post(
-                "/integration/ansvis/events",
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {invalid_token}",
-                    "X-Request-ID": "req-test-auth-invalid",
-                },
-            )
-        finally:
-            logger.removeHandler(test_handler)
+        response = client.post(
+            "/integration/ansvis/events",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {invalid_token}",
+                "X-Request-ID": "req-test-auth-invalid",
+            },
+        )
 
     assert response.status_code == 401
     assert response.json() == {
