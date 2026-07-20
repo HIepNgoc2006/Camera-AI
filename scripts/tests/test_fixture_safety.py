@@ -31,6 +31,7 @@ class FixtureSafetyTests(unittest.TestCase):
         relative_paths = (
             "packages/test-fixtures/core/identifiers.synthetic.json",
             "packages/test-fixtures/ansvis/event.synthetic.json",
+            "packages/test-fixtures/ansvis/timestamps.synthetic.json",
         )
         for relative_path in relative_paths:
             with self.subTest(relative_path=relative_path):

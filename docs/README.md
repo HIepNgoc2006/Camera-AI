@@ -12,6 +12,8 @@ Runbook hiện có:
 
 - `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
 - `project-progress.md`: báo cáo tiến độ live, execution-lane policy và lịch sử workflow hằng tuần.
+- `operations/time-synchronization-policy.md`: UTC/IANA, clock drift và replay-window contract cho
+  Backend/ANSVIS/PostgreSQL.
 - `security/fixture-safety.md`: quy tắc fake fixture/seed, scanner và incident response.
 - `security/repository-protection.md`: branch protection và required-check baseline.
 - `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.

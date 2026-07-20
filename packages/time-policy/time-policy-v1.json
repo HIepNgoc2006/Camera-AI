@@ -1,0 +1,50 @@
+{
+  "policy_id": "camera_event_time",
+  "policy_version": "time_policy_v1",
+  "status": "active",
+  "owner_code": "platform_operations",
+  "approver_code": "project_owner",
+  "purpose_code": "event_integrity",
+  "data_class": "high",
+  "effective_at": "2026-07-20T00:00:00Z",
+  "expiry_trigger": "superseded_or_security_change",
+  "terminal_action": "retire_and_replace",
+  "transport_timezone": "UTC",
+  "persistence_timezone": "UTC",
+  "default_business_timezone": "Asia/Ho_Chi_Minh",
+  "timezone_config_version": "school_timezone_v1",
+  "timestamp_profile": {
+    "format": "RFC3339",
+    "offset_required": true,
+    "uppercase_designators_required": true,
+    "unknown_offset_allowed": false,
+    "leap_second_allowed": false,
+    "max_fractional_digits": 6,
+    "canonical_utc_suffix": "Z"
+  },
+  "clock_health": {
+    "sample_interval_seconds": 60,
+    "warning_offset_seconds": 1,
+    "critical_offset_seconds": 5,
+    "warning_consecutive_samples": 3,
+    "recovery_consecutive_samples": 5
+  },
+  "event_validation": {
+    "future_tolerance_seconds": 30,
+    "replay_window_seconds": 300,
+    "nonce_retention_seconds": 600
+  },
+  "stable_error_codes": {
+    "timestamp_invalid": "TIME_TIMESTAMP_INVALID",
+    "timestamp_naive": "TIME_TIMESTAMP_NAIVE",
+    "offset_unknown": "TIME_OFFSET_UNKNOWN",
+    "fraction_precision": "TIME_FRACTION_PRECISION",
+    "event_future": "TIME_EVENT_FUTURE",
+    "replay_window_exceeded": "TIME_REPLAY_WINDOW_EXCEEDED",
+    "local_ambiguous": "TIME_LOCAL_AMBIGUOUS",
+    "local_nonexistent": "TIME_LOCAL_NONEXISTENT",
+    "timezone_invalid": "TIME_TIMEZONE_INVALID",
+    "timezone_unapproved": "TIME_TIMEZONE_UNAPPROVED",
+    "source_unhealthy": "TIME_SOURCE_UNHEALTHY"
+  }
+}

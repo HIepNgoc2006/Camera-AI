@@ -1,0 +1,147 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "policy_version": "time_policy_v1",
+  "event_timestamp_cases": [
+    {
+      "case_code": "valid_utc",
+      "vendor_event_time": "2026-01-15T08:30:00Z",
+      "server_received_at": "2026-01-15T08:30:01Z",
+      "expected_result": "accept",
+      "expected_utc": "2026-01-15T08:30:00.000000Z"
+    },
+    {
+      "case_code": "valid_numeric_offset",
+      "vendor_event_time": "2026-01-15T08:30:00+07:00",
+      "server_received_at": "2026-01-15T01:30:01Z",
+      "expected_result": "accept",
+      "expected_utc": "2026-01-15T01:30:00.000000Z"
+    },
+    {
+      "case_code": "future_boundary_accepted",
+      "vendor_event_time": "2026-01-15T08:30:30Z",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "accept",
+      "expected_utc": "2026-01-15T08:30:30.000000Z"
+    },
+    {
+      "case_code": "future_exceeded",
+      "vendor_event_time": "2026-01-15T08:30:31Z",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_EVENT_FUTURE"
+    },
+    {
+      "case_code": "replay_boundary_accepted",
+      "vendor_event_time": "2026-01-15T08:25:00Z",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "accept",
+      "expected_utc": "2026-01-15T08:25:00.000000Z"
+    },
+    {
+      "case_code": "replay_exceeded",
+      "vendor_event_time": "2026-01-15T08:24:59Z",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_REPLAY_WINDOW_EXCEEDED"
+    },
+    {
+      "case_code": "naive_rejected",
+      "vendor_event_time": "2026-01-15T08:30:00",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_TIMESTAMP_NAIVE"
+    },
+    {
+      "case_code": "malformed_rejected",
+      "vendor_event_time": "not-a-timestamp",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_TIMESTAMP_INVALID"
+    },
+    {
+      "case_code": "unknown_offset_rejected",
+      "vendor_event_time": "2026-01-15T08:30:00-00:00",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_OFFSET_UNKNOWN"
+    },
+    {
+      "case_code": "excess_precision_rejected",
+      "vendor_event_time": "2026-01-15T08:30:00.1234567Z",
+      "server_received_at": "2026-01-15T08:30:00Z",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_FRACTION_PRECISION"
+    }
+  ],
+  "timezone_cases": [
+    {
+      "case_code": "default_business_timezone",
+      "operation": "utc_to_business",
+      "input_utc": "2026-01-15T01:30:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "expected_result": "accept",
+      "expected_local": "2026-01-15T08:30:00.000000+07:00"
+    },
+    {
+      "case_code": "ambiguous_without_choice_rejected",
+      "operation": "local_to_utc",
+      "local_time": "2026-11-01T01:30:00",
+      "timezone": "America/New_York",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_LOCAL_AMBIGUOUS"
+    },
+    {
+      "case_code": "ambiguous_earlier_selected",
+      "operation": "local_to_utc",
+      "local_time": "2026-11-01T01:30:00",
+      "timezone": "America/New_York",
+      "disambiguation": "earlier_instant",
+      "expected_result": "accept",
+      "expected_utc": "2026-11-01T05:30:00.000000Z"
+    },
+    {
+      "case_code": "ambiguous_later_selected",
+      "operation": "local_to_utc",
+      "local_time": "2026-11-01T01:30:00",
+      "timezone": "America/New_York",
+      "disambiguation": "later_instant",
+      "expected_result": "accept",
+      "expected_utc": "2026-11-01T06:30:00.000000Z"
+    },
+    {
+      "case_code": "nonexistent_local_rejected",
+      "operation": "local_to_utc",
+      "local_time": "2026-03-08T02:30:00",
+      "timezone": "America/New_York",
+      "expected_result": "reject",
+      "expected_error_code": "TIME_LOCAL_NONEXISTENT"
+    }
+  ],
+  "clock_health_cases": [
+    {
+      "case_code": "healthy_zero",
+      "absolute_offset_seconds": 0,
+      "expected_state": "healthy"
+    },
+    {
+      "case_code": "healthy_boundary",
+      "absolute_offset_seconds": 1,
+      "expected_state": "healthy"
+    },
+    {
+      "case_code": "warning_above_boundary",
+      "absolute_offset_seconds": 1.001,
+      "expected_state": "warning"
+    },
+    {
+      "case_code": "warning_boundary",
+      "absolute_offset_seconds": 5,
+      "expected_state": "warning"
+    },
+    {
+      "case_code": "critical_above_boundary",
+      "absolute_offset_seconds": 5.001,
+      "expected_state": "critical"
+    }
+  ]
+}
