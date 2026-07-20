@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
+from ansvis_adapter.domain.auth import RegisteredSource
 from ansvis_adapter.domain.models import NormalizedAnsvisEvent
 
 
@@ -14,7 +15,7 @@ class SourceAuthRequest:
     """Authentication inputs; implementations must never log the authorization value."""
 
     declared_source_namespace: str
-    authorization: str | None
+    authorization_values: tuple[str, ...]
     transport_secure: bool
 
 
@@ -24,6 +25,23 @@ class AuthenticatedSource:
 
     source_namespace: str
     subject_ref: str
+    tenant_ref: str
+    school_ref: str
+
+
+class SigningKeyProvider(Protocol):
+    def key_for(self, key_id: str) -> bytes | None:
+        """Return secret-managed verification key bytes, or None for an unknown key ID."""
+
+
+class TokenRevocationChecker(Protocol):
+    def is_revoked(self, token_id: str) -> bool:
+        """Return revocation status; implementations must fail rather than guess."""
+
+
+class RegisteredSourceRepository(Protocol):
+    def find_by_subject(self, subject_ref: str) -> RegisteredSource | None:
+        """Return the unique authoritative mapping for a verified token subject."""
 
 
 class SourceAuthenticator(Protocol):

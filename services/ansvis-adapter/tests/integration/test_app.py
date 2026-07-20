@@ -37,6 +37,8 @@ class FakeAuthenticator:
         return AuthenticatedSource(
             source_namespace=request.declared_source_namespace,
             subject_ref="source_subject_test_0001",
+            tenant_ref="tenant_test_0001",
+            school_ref="school_test_0001",
         )
 
 

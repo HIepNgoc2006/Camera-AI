@@ -42,14 +42,14 @@ class IngestAnsvisEvent:
         self,
         payload: Mapping[str, object],
         *,
-        authorization: str | None,
+        authorization_values: tuple[str, ...],
         transport_secure: bool,
     ) -> DurableReceipt:
         source_namespace = declared_source_namespace(payload)
         source = self._authenticator.authenticate(
             SourceAuthRequest(
                 declared_source_namespace=source_namespace,
-                authorization=authorization,
+                authorization_values=authorization_values,
                 transport_secure=transport_secure,
             )
         )
@@ -57,6 +57,8 @@ class IngestAnsvisEvent:
             raise AnsvisAdapterError("EVENT_SOURCE_UNAUTHORIZED")
 
         event = parse_and_normalize_event(payload)
+        if event.tenant_ref != source.tenant_ref or event.school_ref != source.school_ref:
+            raise AnsvisAdapterError("EVENT_SOURCE_MAPPING_DENIED")
         self._validate_replay_window(event.occurred_at)
         receipt = self._receipt_port.record(event, source)
         if not receipt.commit_confirmed or RECEIPT_ID_PATTERN.fullmatch(receipt.receipt_id) is None:

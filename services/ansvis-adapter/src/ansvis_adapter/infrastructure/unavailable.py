@@ -14,7 +14,7 @@ from ansvis_adapter.domain.models import NormalizedAnsvisEvent
 
 
 class UnavailableSourceAuthenticator(SourceAuthenticator):
-    """Deny every source until Issue #19 provides a verified implementation."""
+    """Deny every source until approved key/revocation/source adapters are explicitly wired."""
 
     def authenticate(self, request: SourceAuthRequest) -> AuthenticatedSource:
         del request

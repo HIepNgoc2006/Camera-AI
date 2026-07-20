@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import datetime
 
@@ -28,6 +29,7 @@ def create_app(
     *,
     authenticator: SourceAuthenticator | None = None,
     receipt_port: DurableReceiptPort | None = None,
+    request_logger: logging.Logger | None = None,
     now: Callable[[], datetime] = system_utc_now,
 ) -> FastAPI:
     runtime_settings = load_settings() if settings is None else settings
@@ -47,7 +49,7 @@ def create_app(
     application.add_middleware(
         RequestContextMiddleware,
         settings=runtime_settings,
-        logger=configure_logging(runtime_settings),
+        logger=(configure_logging(runtime_settings) if request_logger is None else request_logger),
     )
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
