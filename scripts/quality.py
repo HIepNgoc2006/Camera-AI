@@ -72,6 +72,13 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "services/camera-registry-service/src",
                 "services/camera-registry-service/tests",
             ),
+            (
+                python,
+                "-m",
+                "mypy",
+                "services/ansvis-adapter/src",
+                "services/ansvis-adapter/tests",
+            ),
         ),
         "unit": (
             (
@@ -86,6 +93,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "services/audit-log-service/tests",
                 "services/consent-service/tests",
                 "services/camera-registry-service/tests",
+                "services/ansvis-adapter/tests",
             ),
         ),
     }

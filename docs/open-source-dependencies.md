@@ -28,13 +28,13 @@ permission to download or add packages.
 | Alembic | 1.18.5 | Audit, Consent, School | https://github.com/sqlalchemy/alembic | MIT | Preferred |
 | Psycopg | 3.3.4 | Audit, Consent, School | https://github.com/psycopg/psycopg | LGPL-3.0-only | Recorded PostgreSQL-driver exception |
 | psycopg-binary | 3.3.4 | Binary extra for Psycopg | https://github.com/psycopg/psycopg | LGPL-3.0-only | Same PostgreSQL-driver exception |
-| Pydantic | 2.13.4 | API Gateway, Audit, Consent, Identity | https://github.com/pydantic/pydantic | MIT | Preferred |
+| Pydantic | 2.13.4 | API Gateway, ANSVIS Adapter, Audit, Consent, Identity | https://github.com/pydantic/pydantic | MIT | Preferred |
 | SQLAlchemy | 2.0.51 | Audit, Consent, School | https://github.com/sqlalchemy/sqlalchemy | MIT | Preferred |
-| FastAPI | 0.139.0 | API Gateway, Identity | https://github.com/fastapi/fastapi | MIT | Preferred |
-| Uvicorn | 0.51.0 | API Gateway, Identity | https://github.com/Kludex/uvicorn | BSD-3-Clause | Recorded runtime-server exception |
+| FastAPI | 0.139.0 | API Gateway, ANSVIS Adapter, Identity | https://github.com/fastapi/fastapi | MIT | Preferred |
+| Uvicorn | 0.51.0 | API Gateway, ANSVIS Adapter, Identity | https://github.com/Kludex/uvicorn | BSD-3-Clause | Recorded runtime-server exception |
 | pytest | 9.1.1 | Implemented service test suites | https://github.com/pytest-dev/pytest | MIT | Preferred |
 | pytest-asyncio | 1.4.0 | Repository async test support | https://github.com/pytest-dev/pytest-asyncio | Apache-2.0 | Recorded test-tool exception |
-| httpx2 | 2.7.0 | API Gateway and Identity tests | https://github.com/pydantic/httpx2 | BSD-3-Clause | Recorded test-client exception |
+| httpx2 | 2.7.0 | API Gateway, ANSVIS Adapter and Identity tests | https://github.com/pydantic/httpx2 | BSD-3-Clause | Recorded test-client exception |
 | mypy | 2.3.0 | Repository type checking | https://github.com/python/mypy | MIT | Preferred |
 | Ruff | 0.15.21 | Repository lint and format checking | https://github.com/astral-sh/ruff | MIT | Preferred |
 
