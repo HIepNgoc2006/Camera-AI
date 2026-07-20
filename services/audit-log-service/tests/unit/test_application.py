@@ -144,3 +144,34 @@ def test_append_rejects_expired_retention_context() -> None:
 
     with pytest.raises(AuditError, match="AUDIT_EVENT_INVALID"):
         _service(CapturingRepository()).append(_payload(), context)
+
+
+def test_camera_registry_zone_change_matches_the_minimized_audit_policy() -> None:
+    payload: dict[str, object] = {
+        "event_schema_version": 1,
+        "source_service": "camera-registry-service",
+        "source_event_id": str(EVENT_ID),
+        "action": "CAMERA_MAPPING_CHANGED",
+        "purpose_code": "camera_operations",
+        "resource_type": "camera_zone",
+        "resource_id": str(RESOURCE_ID),
+        "request_id": "req_0123456789abcdef",
+        "result": "success",
+        "occurred_at": NOW.isoformat(),
+        "changes": {
+            "schema_version": "audit_changes_v1",
+            "changed_fields": ["status", "zone"],
+            "state_before_codes": {"status": "active"},
+            "state_after_codes": {"status": "inactive"},
+            "reference_ids": {"zone_id": str(RESOURCE_ID)},
+            "policy_versions": {"camera_mapping": "camera_policy_v1"},
+        },
+    }
+
+    outcome = _service(CapturingRepository()).append(
+        payload,
+        _context("camera-registry-service"),
+    )
+
+    assert outcome.event.event.action == "CAMERA_MAPPING_CHANGED"
+    assert outcome.event.event.resource_type == "camera_zone"

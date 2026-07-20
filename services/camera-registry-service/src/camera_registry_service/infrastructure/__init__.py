@@ -1,0 +1,1 @@
+"""Camera Registry infrastructure adapters."""
