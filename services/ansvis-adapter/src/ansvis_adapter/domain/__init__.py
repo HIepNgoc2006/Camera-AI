@@ -1,5 +1,6 @@
-"""Pure ANSVIS event domain models."""
+"""Pure ANSVIS event and source-policy domain models."""
 
+from ansvis_adapter.domain.auth import RegisteredSource
 from ansvis_adapter.domain.models import (
     EmotionInsightEvent,
     EventAttributes,
@@ -15,5 +16,6 @@ __all__ = [
     "FaceObservationEvent",
     "HealthStatusEvent",
     "NormalizedAnsvisEvent",
+    "RegisteredSource",
     "SuspectedViolationEvent",
 ]

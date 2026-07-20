@@ -58,7 +58,7 @@ def create_event_router(service: IngestAnsvisEvent) -> APIRouter:
             payload = load_json_object(await _bounded_json_body(request))
             receipt = service.execute(
                 payload,
-                authorization=request.headers.get("authorization"),
+                authorization_values=tuple(request.headers.getlist("authorization")),
                 transport_secure=request.url.scheme == "https",
             )
         except AnsvisAdapterError as exc:

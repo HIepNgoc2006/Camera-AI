@@ -42,12 +42,14 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 exception_type=type(exc).__name__,
             )
         else:
+            error_code: object = getattr(request.state, "error_code", None)
             log_request(
                 self._logger,
                 environment=self._settings.environment,
                 event="request_completed",
                 request_id=request_id,
                 status_code=response.status_code,
+                error_code=error_code if isinstance(error_code, str) else None,
             )
         response.headers[REQUEST_ID_HEADER] = request_id
         return response

@@ -10,6 +10,8 @@ from ansvis_adapter.api.request_id import generated_request_id
 from ansvis_adapter.schemas.responses import ErrorResponse
 
 ERROR_STATUS = {
+    "EVENT_AUTH_TOKEN_EXPIRED": 401,
+    "EVENT_AUTH_TOKEN_INVALID": 401,
     "EVENT_BODY_TOO_LARGE": 413,
     "EVENT_CONTENT_TYPE_UNSUPPORTED": 415,
     "EVENT_DURABLE_RECEIPT_UNAVAILABLE": 503,
@@ -17,6 +19,7 @@ ERROR_STATUS = {
     "EVENT_IDEMPOTENCY_CONFLICT": 409,
     "EVENT_SCHEMA_INVALID": 422,
     "EVENT_SOURCE_UNAUTHORIZED": 401,
+    "EVENT_SOURCE_MAPPING_DENIED": 401,
     "EVENT_TYPE_UNSUPPORTED": 422,
     "TIME_EVENT_FUTURE": 409,
     "TIME_FRACTION_PRECISION": 422,
@@ -44,6 +47,7 @@ def error_response(*, status_code: int, error_code: str, request_id: str) -> JSO
 def adapter_error_response(request: Request, error_code: str) -> JSONResponse:
     status_code = ERROR_STATUS.get(error_code, 500)
     public_code = error_code if error_code in ERROR_STATUS else "INTERNAL_SERVER_ERROR"
+    request.state.error_code = public_code
     return error_response(
         status_code=status_code,
         error_code=public_code,

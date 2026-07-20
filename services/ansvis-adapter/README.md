@@ -1,9 +1,10 @@
 # ANSVIS Adapter
 
 This service is the HTTP Trigger boundary between ANSVIS/AIBOX and the Camera AI backend. Issue #18
-implements only the bounded JSON endpoint, strict V1 parser, typed normalized event families and the
-ports needed for source authentication and durable receipt storage. It does not build or train an AI
-model, receive media, write PostgreSQL, or make attendance/disciplinary decisions.
+provides the bounded JSON endpoint, strict V1 parser and typed normalized event families. Issue #19
+adds the strict `ansvis-login-bearer-v1` validation core and registered-source binding. The service does
+not issue tokens, build or train an AI model, receive media, write PostgreSQL, or make attendance or
+disciplinary decisions.
 
 ## API
 
@@ -17,10 +18,17 @@ Success is deliberately conditional on durable storage:
 - `200` with `outcome=duplicate` only after the receipt port confirms a committed identical receipt.
 - `503 EVENT_DURABLE_RECEIPT_UNAVAILABLE` when the durable port cannot confirm commit.
 
-The runtime defaults deny all sources because Issue #19 owns real ANSVIS bearer authentication. A
-source authenticator and a durable receipt port can be injected only through the application factory;
-the production implementations are not part of this issue. Issue #61 owns PostgreSQL inbox/outbox
-storage and Issue #20 owns the concrete idempotency behavior.
+The runtime defaults still deny all sources. Issue #19 provides a fixed HS256 JWS verifier, but it can
+authenticate only when signing-key, revocation and registered-source adapters are explicitly injected
+through the application factory. Real secret-manager adapters and persistent source/revocation stores
+are not part of this issue. The durable receipt port also defaults to unavailable: Issue #61 owns
+PostgreSQL inbox/outbox storage and Issue #20 owns concrete idempotency behavior.
+
+Authentication requires exactly one HTTPS `Authorization: Bearer ...` value. The verifier requires
+`alg=HS256`, `typ=JWT`, a stable `kid`, exact issuer/audience, opaque `sub` and revocable `jti`, strict
+NumericDate values and a maximum five-minute token lifetime. It binds the verified subject to one
+active source namespace, tenant and school. Missing, duplicate, combined, malformed, expired, revoked,
+unknown or dependency-unavailable inputs fail closed with stable masked errors.
 
 Errors are exactly:
 
@@ -54,7 +62,9 @@ skeleton cannot produce a success ACK by using memory or by silently dropping an
 ## Environment and local run
 
 Only `APP_ENV` and `LOG_LEVEL` are read. They are non-secret labels documented in `.env.example`.
-Authentication and database secrets must remain in an approved credential store/secret manager.
+There is deliberately no environment variable for a signing key or Bearer token. Authentication and
+database secrets must remain in an approved credential store/secret manager and be supplied through
+approved adapters in a later production-wiring issue.
 
 ```powershell
 $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'
@@ -62,8 +72,8 @@ $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'
 .\.venv\Scripts\python.exe -m uvicorn ansvis_adapter.main:app --app-dir services/ansvis-adapter/src --host 127.0.0.1 --port 8010
 ```
 
-The example binds only to loopback. TLS termination, trusted proxy handling, bearer verification,
-rate limiting and production exposure require their approved implementation issues.
+The example binds only to loopback. Runtime secret/source adapter wiring, TLS termination, trusted
+proxy handling, rate limiting and production exposure require their approved implementation issues.
 
 ## Tests
 
@@ -73,8 +83,10 @@ rate limiting and production exposure require their approved implementation issu
 ```
 
 Tests use synthetic identifiers and controlled fake ports. They cover schema normalization, event
-family mapping, source mismatch, time replay limits, body/content-type limits, default denial,
-commit-before-ACK behavior, minimal errors, logging allowlisting and OpenAPI route exposure.
+family mapping, strict Bearer/JWS parsing, algorithm/signature/claim/time boundaries, revocation and
+provider failures, duplicate/combined headers, registered-source and tenant/school mismatch, time
+replay limits, body/content-type limits, default denial, commit-before-ACK behavior, masked errors and
+logs, logging allowlisting and OpenAPI route exposure.
 
 ## Logs and security
 

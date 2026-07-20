@@ -32,8 +32,16 @@ def event_payload() -> dict[str, object]:
 
 
 class FakeAuthenticator:
-    def __init__(self, source_namespace: str = "ansvis.test.source") -> None:
+    def __init__(
+        self,
+        source_namespace: str = "ansvis.test.source",
+        *,
+        tenant_ref: str = "tenant_test_0001",
+        school_ref: str = "school_test_0001",
+    ) -> None:
         self.source_namespace = source_namespace
+        self.tenant_ref = tenant_ref
+        self.school_ref = school_ref
         self.requests: list[SourceAuthRequest] = []
 
     def authenticate(self, request: SourceAuthRequest) -> AuthenticatedSource:
@@ -41,6 +49,8 @@ class FakeAuthenticator:
         return AuthenticatedSource(
             source_namespace=self.source_namespace,
             subject_ref="source_subject_test_0001",
+            tenant_ref=self.tenant_ref,
+            school_ref=self.school_ref,
         )
 
 
@@ -68,7 +78,7 @@ def test_use_case_authenticates_before_record_and_returns_committed_receipt() ->
     receipts = FakeReceiptPort()
     service = IngestAnsvisEvent(auth, receipts, now=fixed_now)
 
-    receipt = service.execute(event_payload(), authorization=None, transport_secure=False)
+    receipt = service.execute(event_payload(), authorization_values=(), transport_secure=False)
 
     assert receipt.outcome is ReceiptOutcome.ACCEPTED
     assert len(auth.requests) == 1
@@ -80,7 +90,28 @@ def test_source_mismatch_fails_before_receipt() -> None:
     service = IngestAnsvisEvent(FakeAuthenticator("ansvis.test.other"), receipts, now=fixed_now)
 
     with pytest.raises(AnsvisAdapterError, match="EVENT_SOURCE_UNAUTHORIZED"):
-        service.execute(event_payload(), authorization=None, transport_secure=False)
+        service.execute(event_payload(), authorization_values=(), transport_secure=False)
+
+    assert receipts.events == []
+
+
+@pytest.mark.parametrize(
+    ("tenant_ref", "school_ref"),
+    [
+        ("tenant_test_other_0001", "school_test_0001"),
+        ("tenant_test_0001", "school_test_other_0001"),
+    ],
+)
+def test_authoritative_tenant_and_school_binding_fails_before_receipt(
+    tenant_ref: str, school_ref: str
+) -> None:
+    receipts = FakeReceiptPort()
+    service = IngestAnsvisEvent(
+        FakeAuthenticator(tenant_ref=tenant_ref, school_ref=school_ref), receipts, now=fixed_now
+    )
+
+    with pytest.raises(AnsvisAdapterError, match="EVENT_SOURCE_MAPPING_DENIED"):
+        service.execute(event_payload(), authorization_values=(), transport_secure=True)
 
     assert receipts.events == []
 
@@ -89,7 +120,7 @@ def test_unavailable_receipt_port_never_acknowledges() -> None:
     service = IngestAnsvisEvent(FakeAuthenticator(), UnavailableDurableReceiptPort(), now=fixed_now)
 
     with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
-        service.execute(event_payload(), authorization=None, transport_secure=False)
+        service.execute(event_payload(), authorization_values=(), transport_secure=False)
 
 
 def test_unconfirmed_receipt_never_acknowledges() -> None:
@@ -98,7 +129,7 @@ def test_unconfirmed_receipt_never_acknowledges() -> None:
     )
 
     with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
-        service.execute(event_payload(), authorization=None, transport_secure=False)
+        service.execute(event_payload(), authorization_values=(), transport_secure=False)
 
 
 @pytest.mark.parametrize(
@@ -115,7 +146,7 @@ def test_use_case_enforces_replay_window(event_time: str, expected_code: str) ->
     service = IngestAnsvisEvent(FakeAuthenticator(), receipts, now=fixed_now)
 
     with pytest.raises(AnsvisAdapterError) as raised:
-        service.execute(payload, authorization=None, transport_secure=False)
+        service.execute(payload, authorization_values=(), transport_secure=False)
 
     assert raised.value.code == expected_code
     assert receipts.events == []
