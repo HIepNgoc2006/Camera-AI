@@ -24,6 +24,128 @@
       "expected_result": "accept"
     },
     {
+      "case_code": "valid_attendance_face_observed",
+      "set": {
+        "event_type": "attendance.face.observed",
+        "attributes": {
+          "track_id": "track_test_attendance_0001",
+          "detection_key": "detection_test_attendance_0001",
+          "subject_external_id": "subject_test_attendance_0001",
+          "confidence": 0.99,
+          "model_version": "face_recognition_v1",
+          "config_version": "attendance_config_v1"
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_timekeeping_face_observed",
+      "set": {
+        "event_type": "timekeeping.face.observed",
+        "attributes": {
+          "track_id": "track_test_timekeeping_0001",
+          "detection_key": "detection_test_timekeeping_0001",
+          "subject_external_id": "subject_test_timekeeping_0001",
+          "confidence": 0.98,
+          "model_version": "face_recognition_v1",
+          "config_version": "timekeeping_config_v1"
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_emotion_observed",
+      "set": {
+        "event_type": "insight.emotion.observed",
+        "attributes": {
+          "track_id": "track_test_emotion_0001",
+          "detection_key": "detection_test_emotion_0001",
+          "confidence": 0.87,
+          "model_version": "face_attributes_v1",
+          "rule_code": "emotion_observation_v1"
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_littering_suspected",
+      "set": {
+        "event_type": "violation.littering.suspected",
+        "attributes": {
+          "track_id": "track_test_littering_0001",
+          "detection_key": "detection_test_littering_0001",
+          "confidence": 0.91,
+          "rule_code": "littering_suspected_v1",
+          "detection_count": 1
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_smoking_suspected",
+      "set": {
+        "event_type": "violation.smoking.suspected",
+        "attributes": {
+          "track_id": "track_test_smoking_0001",
+          "detection_key": "detection_test_smoking_0001",
+          "confidence": 0.89,
+          "rule_code": "smoking_suspected_v1",
+          "detection_count": 1
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_uniform_suspected",
+      "set": {
+        "event_type": "violation.uniform.suspected",
+        "attributes": {
+          "track_id": "track_test_uniform_0001",
+          "detection_key": "detection_test_uniform_0001",
+          "confidence": 0.93,
+          "rule_code": "uniform_suspected_v1",
+          "detection_count": 1
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_ppe_suspected",
+      "set": {
+        "event_type": "violation.ppe.suspected",
+        "attributes": {
+          "track_id": "track_test_ppe_0001",
+          "detection_key": "detection_test_ppe_0001",
+          "confidence": 0.94,
+          "rule_code": "ppe_suspected_v1",
+          "detection_count": 1
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_camera_health_changed",
+      "set": {
+        "event_type": "camera.health.changed",
+        "attributes": {
+          "status": "offline",
+          "config_version": "camera_health_v1"
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
+      "case_code": "valid_task_health_changed",
+      "set": {
+        "event_type": "task.health.changed",
+        "attributes": {
+          "status": "stopped",
+          "config_version": "task_health_v1"
+        }
+      },
+      "expected_result": "accept"
+    },
+    {
       "case_code": "invalid_missing_event_type",
       "remove": [
         "event_type"
@@ -97,6 +219,46 @@
       },
       "expected_result": "reject",
       "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_schema_version",
+      "set": {
+        "schema_version": "ansvis_http_trigger_v2"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_event_type_value_type",
+      "set": {
+        "event_type": 7
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "invalid_attributes_value_type",
+      "set": {
+        "attributes": []
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
+    },
+    {
+      "case_code": "future_event_skew",
+      "set": {
+        "event_time": "2030-01-01T00:00:41Z"
+      },
+      "expected_result": "reject",
+      "expected_error_code": "TIME_EVENT_FUTURE"
+    },
+    {
+      "case_code": "invalid_boolean_source_event_id",
+      "set": {
+        "source_event_id": true
+      },
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_SCHEMA_INVALID"
     }
   ],
   "auth_cases": [
@@ -111,6 +273,16 @@
     },
     {
       "case_code": "invalid_source_bearer",
+      "auth_state": "invalid",
+      "authenticated_source": "ansvis.test.source",
+      "issued_at": "2029-12-31T23:59:00Z",
+      "expires_at": "2030-01-01T00:04:00Z",
+      "https": true,
+      "expected_result": "reject",
+      "expected_error_code": "EVENT_AUTH_TOKEN_INVALID"
+    },
+    {
+      "case_code": "invalid_bad_signature",
       "auth_state": "invalid",
       "authenticated_source": "ansvis.test.source",
       "issued_at": "2029-12-31T23:59:00Z",

@@ -879,16 +879,17 @@ def _mutated(base: JsonObject, case: JsonObject) -> JsonObject:
     return document
 
 
-def _expected_case(case: JsonObject, operation: Callable[[], object]) -> None:
+def _expected_case(case: JsonObject, operation: Callable[[], object]) -> object | None:
     expected = _text(case.get("expected_result"))
     try:
-        operation()
+        result = operation()
     except ContractError as error:
         if expected != "reject" or error.code != _text(case.get("expected_error_code")):
             _fail(CONTRACT_POLICY_INVALID)
-        return
+        return None
     if expected != "accept":
         _fail(CONTRACT_POLICY_INVALID)
+    return result
 
 
 def validate_fixtures(
@@ -908,12 +909,13 @@ def validate_fixtures(
     server_received_at = _text(cases_fixture.get("server_received_at"))
     test_key = bytes(range(32))
     count = 0
+    accepted_event_types: set[str] = set()
 
     schema_cases = _list(cases_fixture.get("schema_cases"), CONTRACT_POLICY_INVALID)
     for item in schema_cases:
         case = _mapping(item, CONTRACT_POLICY_INVALID)
         document = _mutated(base, case)
-        _expected_case(
+        result = _expected_case(
             case,
             partial(
                 validate_request,
@@ -924,7 +926,13 @@ def validate_fixtures(
                 fallback_key=test_key,
             ),
         )
+        if result is not None:
+            accepted_event_types.add(
+                _text(_mapping(result, CONTRACT_POLICY_INVALID).get("event_type"))
+            )
         count += 1
+    if accepted_event_types != policy.event_types:
+        _fail(CONTRACT_POLICY_INVALID)
 
     raw_body = canonical_json_bytes(base)
     auth_cases = _list(cases_fixture.get("auth_cases"), CONTRACT_POLICY_INVALID)
