@@ -3,9 +3,10 @@
 This service is the HTTP Trigger boundary between ANSVIS/AIBOX and the Camera AI backend. Issue #18
 provides the bounded JSON endpoint, strict V1 parser and typed normalized event families. Issue #19
 adds the strict `ansvis-login-bearer-v1` validation core and registered-source binding. Issue #20 adds
-the versioned idempotency descriptor and durable-receipt consistency contract. The service does not
-issue tokens, build or train an AI model, receive media, write PostgreSQL, or make attendance or
-disciplinary decisions.
+the versioned idempotency descriptor and durable-receipt consistency contract. Issue #61 adds the
+co-located Event Ingestion persistence core and bounded transactional outbox. The service does not
+issue tokens, build or train an AI model, receive/store media, resolve biometric identity, or make
+attendance or disciplinary decisions.
 
 ## API
 
@@ -24,8 +25,10 @@ The runtime defaults still deny authentication, idempotency derivation and durab
 provides a fixed HS256 JWS verifier, but it can authenticate only when signing-key, revocation and
 registered-source adapters are explicitly injected through the application factory. Issue #20 provides
 `ContractIdempotencyDeriver`, but it must also be injected and its fallback HMAC key must come from an
-approved secret-manager adapter. Real secret-manager/source/revocation adapters and persistent stores
-are not part of these issues. Issue #61 owns PostgreSQL inbox/outbox storage and concurrency control.
+approved secret-manager adapter. Issue #61 provides `PostgresEventIngestionRepository`, but it remains
+fail closed until an authoritative source/camera/task scope resolver, an approved retention duration
+and a secret-injected PostgreSQL engine are supplied. Real secret-manager/source/revocation wiring and
+production process assembly remain outside this issue.
 
 Authentication requires exactly one HTTPS `Authorization: Bearer ...` value. The verifier requires
 `alg=HS256`, `typ=JWT`, a stable `kid`, exact issuer/audience, opaque `sub` and revocable `jti`, strict
@@ -79,21 +82,62 @@ an observation, not proof of attendance or an automated decision.
 
 ## Events and database
 
-The service currently publishes no message and owns no table. `IdempotencyDeriver` and
-`DurableReceiptPort` are the application boundaries for identifying and accepting an event. Their
-runtime defaults always fail closed, so this skeleton cannot produce a success ACK by using memory or
-by silently dropping an event.
+The Event Ingestion component owns only these tables in the `events` schema:
+
+- `ingestion_receipts`: append-only source/key checksum gate;
+- `normalized_events`: one minimized normalized record per accepted receipt;
+- `event_detections`: controlled non-media detection attributes without producer subject IDs;
+- `processing_attempts`: append-only conflict, publisher and authorized replay outcomes;
+- `outbox_messages`: versioned normalized messages with a 30-second claim lease.
+
+The receipt insert, normalized event, optional detection and outbox message commit in one PostgreSQL
+transaction. `UNIQUE (source_id, idempotency_key)` makes identical retries return the original receipt
+and changed-content reuse records a stable `EVENT_IDEMPOTENCY_CONFLICT` quarantine attempt. Scope IDs
+come only from `EventScopeResolver`; the repository neither queries nor foreign-keys another service's
+schema. Retention has no code default and must be supplied from an approved bounded policy.
+
+Outbox delivery is at-least-once. One dispatcher claim is leased for 30 seconds, failures use
+5/10/20/40-second exponential base delays plus bounded 0–20% jitter, and the fifth failure becomes
+`failed`/dead-lettered. Replay accepts only an
+explicit typed operator authorization with an opaque actor UUID and allowlisted reason code; it writes
+an append-only replay attempt before returning the message to `pending`. A concrete broker publisher
+is injected through `EventPublisher`; the default application does not start a worker or guess a queue
+connection. Downstream consumers must remain idempotent.
+
+Stored JSONB contracts are allowlisted as `event_metadata_v1`, `detection_attributes_v1` and
+`normalized_outbox_v1`. They cannot contain raw ANSVIS payloads, media URLs/binary, base64, RTSP data,
+credentials, face embeddings or producer `subject_external_id`. Face/emotion observations enter with
+`consent_gate_status=not_evaluated`; this component never turns them into an identity or business
+decision.
+
+Telemetry uses only these low-cardinality counters/outcomes:
+
+- `event_ingestion_total{outcome=accepted|duplicate|rejected|conflict}`;
+- `event_outbox_dispatch_total{outcome=empty|published|retry_scheduled|dead_lettered}`;
+- `event_outbox_replay_total{outcome=replayed}`.
+
+The internal `snapshot()` boundary exposes aggregate accepted, pending, published, failed, retry,
+conflict, delayed and oldest-pending values only; it has no tenant, school, camera, event, person or
+evidence identifiers. `EVENT_OUTBOX_OLDEST_MESSAGE` is warning above 120 seconds and critical above
+600 seconds. Any untriaged failed/DLQ message raises `EVENT_OUTBOX_DLQ_UNTRIAGED` at critical. These
+are the approved baseline thresholds; post-pilot tuning requires the operational owner and cannot
+silence the signal. The ANSVIS Integration operations role owns triage: stop automated replay, inspect
+only sanitized receipt/attempt metadata, resolve the broker/consumer cause, authorize one bounded
+replay, then confirm backlog drain. The default no-op sink validates metric names but does not expose a
+public metrics endpoint; deployment must inject its internal telemetry exporter and access control.
 
 ## Environment and local run
 
-Only `APP_ENV` and `LOG_LEVEL` are read. They are non-secret labels documented in `.env.example`.
-There is deliberately no environment variable for a signing key, Bearer token or fallback-idempotency
-key. Authentication, idempotency and database secrets must remain in an approved credential
-store/secret manager and be supplied through approved adapters in a later production-wiring issue.
+`APP_ENV` and `LOG_LEVEL` are non-secret runtime labels. Alembic additionally requires
+`EVENT_DATABASE_URI`, which is secret-bearing, parsed without a printable representation and never
+loaded from a dotenv file by application code. Inject it from the approved credential store or secret
+manager. There is deliberately no environment variable for a signing key, Bearer token or fallback
+idempotency key; those values remain behind injected provider ports.
 
 ```powershell
 $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'
 .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/ansvis-adapter[test]"
+.\.venv\Scripts\python.exe -m alembic -c services/ansvis-adapter/alembic.ini upgrade head
 .\.venv\Scripts\python.exe -m uvicorn ansvis_adapter.main:app --app-dir services/ansvis-adapter/src --host 127.0.0.1 --port 8010
 ```
 
@@ -113,8 +157,26 @@ provider failures, duplicate/combined headers, registered-source and tenant/scho
 replay limits, body/content-type limits, primary/fallback idempotency vectors, ten-retry duplicate
 behavior, changed-content conflict, cross-scope separation, provider/receipt failure, default denial,
 commit-before-ACK behavior, masked errors and logs, logging allowlisting and OpenAPI route exposure.
+Event-ingestion coverage adds migration ownership/constraints, JSONB minimization, ten identical
+retries, conflicting-content quarantine, concurrent first-write behavior, outbox leasing and bounded
+retry/dead-letter/replay state. The PostgreSQL integration test skips unless `EVENT_DATABASE_URI` is
+injected and fails closed unless it names a loopback, non-5432 database ending in `_test`.
 The shared sanitized payload matrix also runs every allowlisted event type and each schema rejection
 case through `IngestAnsvisEvent` and `ContractIdempotencyDeriver`.
+
+## Operations and rollback
+
+Apply and roll back the schema only through Alembic after injecting the database URL securely:
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic -c services/ansvis-adapter/alembic.ini upgrade head
+.\.venv\Scripts\python.exe -m alembic -c services/ansvis-adapter/alembic.ini downgrade base
+```
+
+Before rollback, stop ingestion and the outbox dispatcher, verify no accepted receipt or unpublished
+message must be preserved, and follow the approved backup/restore process. The downgrade drops the
+owned `events` schema and is destructive; it is not an operational reset procedure. Never replay by
+editing rows manually, and never delete/quarantine records to make a queue appear healthy.
 
 ## Logs and security
 

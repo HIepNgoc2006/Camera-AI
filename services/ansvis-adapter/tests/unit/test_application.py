@@ -81,8 +81,14 @@ class FakeIdempotencyDeriver:
 
 
 class FakeReceiptPort:
-    def __init__(self, *, committed: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        committed: bool = True,
+        outcome: ReceiptOutcome = ReceiptOutcome.ACCEPTED,
+    ) -> None:
         self.committed = committed
+        self.outcome = outcome
         self.events: list[NormalizedAnsvisEvent] = []
 
     def record(
@@ -95,7 +101,7 @@ class FakeReceiptPort:
         self.events.append(event)
         return DurableReceipt(
             receipt_id="receipt_test_ansvis_0001",
-            outcome=ReceiptOutcome.ACCEPTED,
+            outcome=self.outcome,
             commit_confirmed=self.committed,
             idempotency_key=idempotency.idempotency_key,
             canonical_fingerprint=idempotency.canonical_fingerprint,
@@ -119,6 +125,28 @@ class InconsistentReceiptPort:
         )
 
 
+class ConflictReceiptPort:
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
+        del event, source, idempotency
+        raise AnsvisAdapterError("EVENT_IDEMPOTENCY_CONFLICT")
+
+
+class FakeMetrics:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.values: list[tuple[str, str]] = []
+
+    def increment(self, metric: str, *, outcome: str) -> None:
+        if self.fail:
+            raise RuntimeError("synthetic telemetry outage")
+        self.values.append((metric, outcome))
+
+
 def fixed_now() -> datetime:
     return datetime(2030, 1, 1, tzinfo=UTC)
 
@@ -135,6 +163,64 @@ def test_use_case_authenticates_before_record_and_returns_committed_receipt() ->
     assert len(auth.requests) == 1
     assert len(idempotency.events) == 1
     assert len(receipts.events) == 1
+
+
+def test_ingestion_metrics_use_only_bounded_outcomes_and_never_change_ack() -> None:
+    metrics = FakeMetrics()
+    accepted = IngestAnsvisEvent(
+        FakeAuthenticator(),
+        FakeIdempotencyDeriver(),
+        FakeReceiptPort(),
+        metrics=metrics,
+        now=fixed_now,
+    ).execute(event_payload(), authorization_values=(), transport_secure=True)
+    duplicate = IngestAnsvisEvent(
+        FakeAuthenticator(),
+        FakeIdempotencyDeriver(),
+        FakeReceiptPort(outcome=ReceiptOutcome.DUPLICATE),
+        metrics=metrics,
+        now=fixed_now,
+    ).execute(event_payload(), authorization_values=(), transport_secure=True)
+    assert accepted.outcome is ReceiptOutcome.ACCEPTED
+    assert duplicate.outcome is ReceiptOutcome.DUPLICATE
+
+    with pytest.raises(AnsvisAdapterError, match="EVENT_IDEMPOTENCY_CONFLICT"):
+        IngestAnsvisEvent(
+            FakeAuthenticator(),
+            FakeIdempotencyDeriver(),
+            ConflictReceiptPort(),
+            metrics=metrics,
+            now=fixed_now,
+        ).execute(event_payload(), authorization_values=(), transport_secure=True)
+    invalid = event_payload()
+    invalid["event_type"] = "unknown.event"
+    with pytest.raises(AnsvisAdapterError, match="EVENT_TYPE_UNSUPPORTED"):
+        IngestAnsvisEvent(
+            FakeAuthenticator(),
+            FakeIdempotencyDeriver(),
+            FakeReceiptPort(),
+            metrics=metrics,
+            now=fixed_now,
+        ).execute(invalid, authorization_values=(), transport_secure=True)
+
+    assert metrics.values == [
+        ("event_ingestion_total", "accepted"),
+        ("event_ingestion_total", "duplicate"),
+        ("event_ingestion_total", "conflict"),
+        ("event_ingestion_total", "rejected"),
+    ]
+    assert (
+        IngestAnsvisEvent(
+            FakeAuthenticator(),
+            FakeIdempotencyDeriver(),
+            FakeReceiptPort(),
+            metrics=FakeMetrics(fail=True),
+            now=fixed_now,
+        )
+        .execute(event_payload(), authorization_values=(), transport_secure=True)
+        .outcome
+        is ReceiptOutcome.ACCEPTED
+    )
 
 
 def test_source_mismatch_fails_before_receipt() -> None:

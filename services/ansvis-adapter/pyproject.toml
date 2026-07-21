@@ -9,8 +9,11 @@ description = "Fail-closed ANSVIS HTTP Trigger adapter for Camera AI"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic==1.18.5",
     "fastapi==0.139.0",
+    "psycopg[binary]==3.3.4",
     "pydantic==2.13.4",
+    "SQLAlchemy==2.0.51",
     "uvicorn==0.51.0",
 ]
 

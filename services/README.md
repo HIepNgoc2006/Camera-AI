@@ -17,8 +17,9 @@ Service hiện có:
 - `consent-service/`: owner của purpose/consent trong `privacy`, consent gate fail-closed và
   transactional audit-intent outbox.
 - `camera-registry-service/`: owner của camera/zone registry, mapping metadata và lifecycle an toàn.
-- `ansvis-adapter/`: HTTP Trigger JSON boundary, strict normalization và commit-before-ACK ports;
-  runtime mặc định từ chối khi auth hoặc durable receipt chưa được nối.
+- `ansvis-adapter/`: HTTP Trigger JSON boundary, strict normalization, PostgreSQL durable receipt,
+  minimized `events` schema và transactional outbox; runtime mặc định vẫn từ chối cho tới khi auth,
+  authoritative scope resolver, retention policy, database và publisher được nối rõ ràng.
 
 API Gateway và Identity Service hiện chưa có business route, auth flow, proxy, database hay ANSVIS
 integration. School Service mới chỉ có schema/migration, chưa có API/repository/decryption. Audit Log

@@ -10,10 +10,12 @@ from ansvis_adapter.application.ports import (
     DurableReceipt,
     DurableReceiptPort,
     IdempotencyDeriver,
+    MetricsSink,
     ReceiptOutcome,
     SourceAuthenticator,
     SourceAuthRequest,
 )
+from ansvis_adapter.application.telemetry import NullMetricsSink
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.schemas.events import declared_source_namespace, parse_and_normalize_event
 
@@ -35,14 +37,36 @@ class IngestAnsvisEvent:
         idempotency_deriver: IdempotencyDeriver,
         receipt_port: DurableReceiptPort,
         *,
+        metrics: MetricsSink | None = None,
         now: Callable[[], datetime] = system_utc_now,
     ) -> None:
         self._authenticator = authenticator
         self._idempotency_deriver = idempotency_deriver
         self._receipt_port = receipt_port
+        self._metrics = metrics or NullMetricsSink()
         self._now = now
 
     def execute(
+        self,
+        payload: Mapping[str, object],
+        *,
+        authorization_values: tuple[str, ...],
+        transport_secure: bool,
+    ) -> DurableReceipt:
+        try:
+            receipt = self._execute(
+                payload,
+                authorization_values=authorization_values,
+                transport_secure=transport_secure,
+            )
+        except AnsvisAdapterError as exc:
+            outcome = "conflict" if exc.code == "EVENT_IDEMPOTENCY_CONFLICT" else "rejected"
+            self._metric(outcome)
+            raise
+        self._metric(receipt.outcome.value)
+        return receipt
+
+    def _execute(
         self,
         payload: Mapping[str, object],
         *,
@@ -85,6 +109,12 @@ class IngestAnsvisEvent:
         ):
             raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
         return receipt
+
+    def _metric(self, outcome: str) -> None:
+        try:
+            self._metrics.increment("event_ingestion_total", outcome=outcome)
+        except Exception:
+            return
 
     def _validate_replay_window(self, occurred_at: datetime) -> None:
         now = self._now()

@@ -17,9 +17,11 @@ from ansvis_adapter.api.middleware import RequestContextMiddleware
 from ansvis_adapter.application.ports import (
     DurableReceiptPort,
     IdempotencyDeriver,
+    MetricsSink,
     SourceAuthenticator,
 )
 from ansvis_adapter.application.service import IngestAnsvisEvent, system_utc_now
+from ansvis_adapter.application.telemetry import NullMetricsSink
 from ansvis_adapter.config import Settings, load_settings
 from ansvis_adapter.infrastructure.unavailable import (
     UnavailableDurableReceiptPort,
@@ -35,10 +37,12 @@ def create_app(
     authenticator: SourceAuthenticator | None = None,
     idempotency_deriver: IdempotencyDeriver | None = None,
     receipt_port: DurableReceiptPort | None = None,
+    metrics: MetricsSink | None = None,
     request_logger: logging.Logger | None = None,
     now: Callable[[], datetime] = system_utc_now,
 ) -> FastAPI:
     runtime_settings = load_settings() if settings is None else settings
+    runtime_metrics = metrics or NullMetricsSink()
     production = runtime_settings.environment == "production"
     application = FastAPI(
         title="Camera AI ANSVIS Adapter",
@@ -51,6 +55,7 @@ def create_app(
         authenticator or UnavailableSourceAuthenticator(),
         idempotency_deriver or UnavailableIdempotencyDeriver(),
         receipt_port or UnavailableDurableReceiptPort(),
+        metrics=runtime_metrics,
         now=now,
     )
     application.add_middleware(
@@ -61,7 +66,7 @@ def create_app(
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.include_router(health_router)
-    application.include_router(create_event_router(service))
+    application.include_router(create_event_router(service, metrics=runtime_metrics))
     return application
 
 
