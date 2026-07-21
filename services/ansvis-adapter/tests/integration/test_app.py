@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 
 from ansvis_adapter.application.ports import (
@@ -9,7 +10,9 @@ from ansvis_adapter.application.ports import (
     SourceAuthRequest,
 )
 from ansvis_adapter.config import MAX_EVENT_BODY_BYTES, Settings
+from ansvis_adapter.domain.idempotency import IdempotencyDescriptor
 from ansvis_adapter.domain.models import NormalizedAnsvisEvent
+from ansvis_adapter.infrastructure.idempotency import ContractIdempotencyDeriver
 from ansvis_adapter.infrastructure.unavailable import UnavailableDurableReceiptPort
 from ansvis_adapter.main import create_app
 from fastapi import FastAPI
@@ -42,16 +45,34 @@ class FakeAuthenticator:
         )
 
 
+class FakeFallbackKeys:
+    def key_for(self, version: str) -> bytes | None:
+        if version != "ansvis_fallback_idempotency_v1":
+            return None
+        return hashlib.sha256(b"SYNTHETIC_TEST_DATA_ONLY:route-fallback-key").digest()
+
+
+def idempotency_deriver() -> ContractIdempotencyDeriver:
+    return ContractIdempotencyDeriver(fallback_keys=FakeFallbackKeys())
+
+
 class FakeReceiptPort:
     def __init__(self, outcome: ReceiptOutcome = ReceiptOutcome.ACCEPTED) -> None:
         self.outcome = outcome
 
-    def record(self, event: NormalizedAnsvisEvent, source: AuthenticatedSource) -> DurableReceipt:
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
         assert event.source_namespace == source.source_namespace
         return DurableReceipt(
             receipt_id="receipt_test_ansvis_0001",
             outcome=self.outcome,
             commit_confirmed=True,
+            idempotency_key=idempotency.idempotency_key,
+            canonical_fingerprint=idempotency.canonical_fingerprint,
         )
 
 
@@ -79,6 +100,7 @@ def test_committed_receipt_returns_minimal_accepted_ack() -> None:
     app = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
+        idempotency_deriver=idempotency_deriver(),
         receipt_port=FakeReceiptPort(),
         now=fixed_now,
     )
@@ -104,6 +126,7 @@ def test_committed_duplicate_returns_200() -> None:
     app = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
+        idempotency_deriver=idempotency_deriver(),
         receipt_port=FakeReceiptPort(ReceiptOutcome.DUPLICATE),
         now=fixed_now,
     )
@@ -118,6 +141,7 @@ def test_unavailable_durable_receipt_returns_503_without_ack() -> None:
     app = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
+        idempotency_deriver=idempotency_deriver(),
         receipt_port=UnavailableDurableReceiptPort(),
         now=fixed_now,
     )

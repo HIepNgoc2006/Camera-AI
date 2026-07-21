@@ -11,8 +11,21 @@ from ansvis_adapter.application.ports import (
 )
 from ansvis_adapter.application.service import IngestAnsvisEvent
 from ansvis_adapter.domain.errors import AnsvisAdapterError
+from ansvis_adapter.domain.idempotency import (
+    IdempotencyDescriptor,
+    IdempotencyIdentityKind,
+)
 from ansvis_adapter.domain.models import NormalizedAnsvisEvent
-from ansvis_adapter.infrastructure.unavailable import UnavailableDurableReceiptPort
+from ansvis_adapter.infrastructure.unavailable import (
+    UnavailableDurableReceiptPort,
+    UnavailableIdempotencyDeriver,
+)
+
+IDEMPOTENCY = IdempotencyDescriptor(
+    identity_kind=IdempotencyIdentityKind.SOURCE,
+    idempotency_key="idem_source_v1_" + "1" * 64,
+    canonical_fingerprint="sha256:" + "2" * 64,
+)
 
 
 def event_payload() -> dict[str, object]:
@@ -54,18 +67,55 @@ class FakeAuthenticator:
         )
 
 
+class FakeIdempotencyDeriver:
+    def __init__(self, descriptor: IdempotencyDescriptor = IDEMPOTENCY) -> None:
+        self.descriptor = descriptor
+        self.events: list[NormalizedAnsvisEvent] = []
+
+    def derive(
+        self, event: NormalizedAnsvisEvent, source: AuthenticatedSource
+    ) -> IdempotencyDescriptor:
+        assert event.source_namespace == source.source_namespace
+        self.events.append(event)
+        return self.descriptor
+
+
 class FakeReceiptPort:
     def __init__(self, *, committed: bool = True) -> None:
         self.committed = committed
         self.events: list[NormalizedAnsvisEvent] = []
 
-    def record(self, event: NormalizedAnsvisEvent, source: AuthenticatedSource) -> DurableReceipt:
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
         assert source.subject_ref == "source_subject_test_0001"
         self.events.append(event)
         return DurableReceipt(
             receipt_id="receipt_test_ansvis_0001",
             outcome=ReceiptOutcome.ACCEPTED,
             commit_confirmed=self.committed,
+            idempotency_key=idempotency.idempotency_key,
+            canonical_fingerprint=idempotency.canonical_fingerprint,
+        )
+
+
+class InconsistentReceiptPort:
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
+        del event, source
+        return DurableReceipt(
+            receipt_id="receipt_test_ansvis_0001",
+            outcome=ReceiptOutcome.ACCEPTED,
+            commit_confirmed=True,
+            idempotency_key="idem_source_v1_" + "3" * 64,
+            canonical_fingerprint=idempotency.canonical_fingerprint,
         )
 
 
@@ -75,19 +125,23 @@ def fixed_now() -> datetime:
 
 def test_use_case_authenticates_before_record_and_returns_committed_receipt() -> None:
     auth = FakeAuthenticator()
+    idempotency = FakeIdempotencyDeriver()
     receipts = FakeReceiptPort()
-    service = IngestAnsvisEvent(auth, receipts, now=fixed_now)
+    service = IngestAnsvisEvent(auth, idempotency, receipts, now=fixed_now)
 
     receipt = service.execute(event_payload(), authorization_values=(), transport_secure=False)
 
     assert receipt.outcome is ReceiptOutcome.ACCEPTED
     assert len(auth.requests) == 1
+    assert len(idempotency.events) == 1
     assert len(receipts.events) == 1
 
 
 def test_source_mismatch_fails_before_receipt() -> None:
     receipts = FakeReceiptPort()
-    service = IngestAnsvisEvent(FakeAuthenticator("ansvis.test.other"), receipts, now=fixed_now)
+    service = IngestAnsvisEvent(
+        FakeAuthenticator("ansvis.test.other"), FakeIdempotencyDeriver(), receipts, now=fixed_now
+    )
 
     with pytest.raises(AnsvisAdapterError, match="EVENT_SOURCE_UNAUTHORIZED"):
         service.execute(event_payload(), authorization_values=(), transport_secure=False)
@@ -107,7 +161,10 @@ def test_authoritative_tenant_and_school_binding_fails_before_receipt(
 ) -> None:
     receipts = FakeReceiptPort()
     service = IngestAnsvisEvent(
-        FakeAuthenticator(tenant_ref=tenant_ref, school_ref=school_ref), receipts, now=fixed_now
+        FakeAuthenticator(tenant_ref=tenant_ref, school_ref=school_ref),
+        FakeIdempotencyDeriver(),
+        receipts,
+        now=fixed_now,
     )
 
     with pytest.raises(AnsvisAdapterError, match="EVENT_SOURCE_MAPPING_DENIED"):
@@ -117,19 +174,51 @@ def test_authoritative_tenant_and_school_binding_fails_before_receipt(
 
 
 def test_unavailable_receipt_port_never_acknowledges() -> None:
-    service = IngestAnsvisEvent(FakeAuthenticator(), UnavailableDurableReceiptPort(), now=fixed_now)
-
-    with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
-        service.execute(event_payload(), authorization_values=(), transport_secure=False)
-
-
-def test_unconfirmed_receipt_never_acknowledges() -> None:
     service = IngestAnsvisEvent(
-        FakeAuthenticator(), FakeReceiptPort(committed=False), now=fixed_now
+        FakeAuthenticator(),
+        FakeIdempotencyDeriver(),
+        UnavailableDurableReceiptPort(),
+        now=fixed_now,
     )
 
     with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
         service.execute(event_payload(), authorization_values=(), transport_secure=False)
+
+
+def test_unavailable_idempotency_deriver_never_reaches_receipt() -> None:
+    receipts = FakeReceiptPort()
+    service = IngestAnsvisEvent(
+        FakeAuthenticator(), UnavailableIdempotencyDeriver(), receipts, now=fixed_now
+    )
+
+    with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
+        service.execute(event_payload(), authorization_values=(), transport_secure=True)
+
+    assert receipts.events == []
+
+
+def test_unconfirmed_receipt_never_acknowledges() -> None:
+    service = IngestAnsvisEvent(
+        FakeAuthenticator(),
+        FakeIdempotencyDeriver(),
+        FakeReceiptPort(committed=False),
+        now=fixed_now,
+    )
+
+    with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
+        service.execute(event_payload(), authorization_values=(), transport_secure=False)
+
+
+def test_receipt_must_echo_the_committed_idempotency_identity() -> None:
+    service = IngestAnsvisEvent(
+        FakeAuthenticator(),
+        FakeIdempotencyDeriver(),
+        InconsistentReceiptPort(),
+        now=fixed_now,
+    )
+
+    with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
+        service.execute(event_payload(), authorization_values=(), transport_secure=True)
 
 
 @pytest.mark.parametrize(
@@ -143,10 +232,12 @@ def test_use_case_enforces_replay_window(event_time: str, expected_code: str) ->
     payload = event_payload()
     payload["event_time"] = event_time
     receipts = FakeReceiptPort()
-    service = IngestAnsvisEvent(FakeAuthenticator(), receipts, now=fixed_now)
+    idempotency = FakeIdempotencyDeriver()
+    service = IngestAnsvisEvent(FakeAuthenticator(), idempotency, receipts, now=fixed_now)
 
     with pytest.raises(AnsvisAdapterError) as raised:
         service.execute(payload, authorization_values=(), transport_secure=False)
 
     assert raised.value.code == expected_code
+    assert idempotency.events == []
     assert receipts.events == []

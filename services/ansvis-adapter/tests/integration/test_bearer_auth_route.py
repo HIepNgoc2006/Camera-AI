@@ -15,11 +15,13 @@ from ansvis_adapter.application.ports import (
 )
 from ansvis_adapter.config import Settings
 from ansvis_adapter.domain.auth import RegisteredSource
+from ansvis_adapter.domain.idempotency import IdempotencyDescriptor
 from ansvis_adapter.domain.models import NormalizedAnsvisEvent
 from ansvis_adapter.infrastructure.bearer_auth import (
     BearerAuthPolicy,
     HmacBearerSourceAuthenticator,
 )
+from ansvis_adapter.infrastructure.idempotency import ContractIdempotencyDeriver
 from ansvis_adapter.logging import JsonLogFormatter
 from ansvis_adapter.main import create_app
 from fastapi.testclient import TestClient
@@ -90,13 +92,27 @@ class FakeSources:
         )
 
 
+class FakeFallbackKeys:
+    def key_for(self, version: str) -> bytes | None:
+        if version != "ansvis_fallback_idempotency_v1":
+            return None
+        return hashlib.sha256(b"SYNTHETIC_TEST_DATA_ONLY:bearer-route-fallback-key").digest()
+
+
 class CommittedReceiptPort:
-    def record(self, event: NormalizedAnsvisEvent, source: AuthenticatedSource) -> DurableReceipt:
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
         assert event.tenant_ref == source.tenant_ref
         return DurableReceipt(
             receipt_id="receipt_test_ansvis_auth_0001",
             outcome=ReceiptOutcome.ACCEPTED,
             commit_confirmed=True,
+            idempotency_key=idempotency.idempotency_key,
+            canonical_fingerprint=idempotency.canonical_fingerprint,
         )
 
 
@@ -110,10 +126,15 @@ def app_authenticator() -> HmacBearerSourceAuthenticator:
     )
 
 
+def app_idempotency() -> ContractIdempotencyDeriver:
+    return ContractIdempotencyDeriver(fallback_keys=FakeFallbackKeys())
+
+
 def test_valid_bearer_reaches_only_the_committed_test_receipt() -> None:
     application = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=app_authenticator(),
+        idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
         now=lambda: NOW,
     )
@@ -138,6 +159,7 @@ def test_invalid_signature_is_masked_in_response_and_logs() -> None:
     application = create_app(
         Settings(environment="test", log_level="INFO"),
         authenticator=app_authenticator(),
+        idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
         request_logger=request_logger,
         now=lambda: NOW,
@@ -182,6 +204,7 @@ def test_expired_missing_and_insecure_bearer_requests_are_rejected() -> None:
     application = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=app_authenticator(),
+        idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
         now=lambda: NOW,
     )
@@ -211,6 +234,7 @@ def test_duplicate_and_combined_authorization_values_are_rejected() -> None:
     application = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=app_authenticator(),
+        idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
         now=lambda: NOW,
     )
@@ -239,6 +263,7 @@ def test_verified_source_cannot_cross_tenant_boundary() -> None:
     application = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=app_authenticator(),
+        idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
         now=lambda: NOW,
     )

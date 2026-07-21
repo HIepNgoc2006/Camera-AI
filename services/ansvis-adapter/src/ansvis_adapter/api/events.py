@@ -49,7 +49,7 @@ def create_event_router(service: IngestAnsvisEvent) -> APIRouter:
             413: {"model": ErrorResponse, "description": "Body exceeds 64 KiB"},
             415: {"model": ErrorResponse, "description": "JSON content type required"},
             422: {"model": ErrorResponse, "description": "Event contract rejected"},
-            503: {"model": ErrorResponse, "description": "Durable receipt unavailable"},
+            503: {"model": ErrorResponse, "description": "Idempotency or receipt unavailable"},
         },
         summary="Receive one normalized ANSVIS event",
     )

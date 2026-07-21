@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Protocol
 
 from ansvis_adapter.domain.auth import RegisteredSource
+from ansvis_adapter.domain.idempotency import IdempotencyDescriptor
 from ansvis_adapter.domain.models import NormalizedAnsvisEvent
 
 
@@ -49,6 +50,18 @@ class SourceAuthenticator(Protocol):
         """Verify the source or raise a stable fail-closed adapter error."""
 
 
+class FallbackIdempotencyKeyProvider(Protocol):
+    def key_for(self, version: str) -> bytes | None:
+        """Return secret-managed fallback HMAC key bytes for one exact policy version."""
+
+
+class IdempotencyDeriver(Protocol):
+    def derive(
+        self, event: NormalizedAnsvisEvent, source: AuthenticatedSource
+    ) -> IdempotencyDescriptor:
+        """Return the opaque key/fingerprint pair or fail closed."""
+
+
 class ReceiptOutcome(StrEnum):
     ACCEPTED = "accepted"
     DUPLICATE = "duplicate"
@@ -61,8 +74,15 @@ class DurableReceipt:
     receipt_id: str
     outcome: ReceiptOutcome
     commit_confirmed: bool
+    idempotency_key: str
+    canonical_fingerprint: str
 
 
 class DurableReceiptPort(Protocol):
-    def record(self, event: NormalizedAnsvisEvent, source: AuthenticatedSource) -> DurableReceipt:
-        """Persist the normalized event and return its committed receipt outcome."""
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
+        """Atomically return accepted/duplicate or reject a conflicting fingerprint."""
