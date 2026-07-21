@@ -76,6 +76,14 @@ class FakeReceiptPort:
         )
 
 
+class FakeMetrics:
+    def __init__(self) -> None:
+        self.values: list[tuple[str, str]] = []
+
+    def increment(self, metric: str, *, outcome: str) -> None:
+        self.values.append((metric, outcome))
+
+
 def fixed_now() -> datetime:
     return datetime(2030, 1, 1, tzinfo=UTC)
 
@@ -162,10 +170,12 @@ def test_unavailable_durable_receipt_returns_503_without_ack() -> None:
 
 
 def test_content_type_and_body_limits_fail_before_business_processing() -> None:
+    metrics = FakeMetrics()
     app = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
         receipt_port=FakeReceiptPort(),
+        metrics=metrics,
         now=fixed_now,
     )
     with TestClient(app) as client:
@@ -184,6 +194,10 @@ def test_content_type_and_body_limits_fail_before_business_processing() -> None:
     assert wrong_type.json()["error_code"] == "EVENT_CONTENT_TYPE_UNSUPPORTED"
     assert oversized.status_code == 413
     assert oversized.json()["error_code"] == "EVENT_BODY_TOO_LARGE"
+    assert metrics.values == [
+        ("event_ingestion_total", "rejected"),
+        ("event_ingestion_total", "rejected"),
+    ]
 
 
 def test_invalid_json_and_unknown_fields_use_sanitized_error() -> None:

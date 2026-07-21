@@ -6,12 +6,20 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ansvis_adapter.api.errors import adapter_error_response, request_id_from
-from ansvis_adapter.application.ports import ReceiptOutcome
+from ansvis_adapter.application.ports import MetricsSink, ReceiptOutcome
 from ansvis_adapter.application.service import IngestAnsvisEvent
+from ansvis_adapter.application.telemetry import NullMetricsSink
 from ansvis_adapter.config import MAX_EVENT_BODY_BYTES
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.schemas.events import load_json_object
 from ansvis_adapter.schemas.responses import ErrorResponse, IngestionAck
+
+
+def _rejected_metric(metrics: MetricsSink) -> None:
+    try:
+        metrics.increment("event_ingestion_total", outcome="rejected")
+    except Exception:
+        return
 
 
 async def _bounded_json_body(request: Request) -> bytes:
@@ -35,8 +43,11 @@ async def _bounded_json_body(request: Request) -> bytes:
     return bytes(body)
 
 
-def create_event_router(service: IngestAnsvisEvent) -> APIRouter:
+def create_event_router(
+    service: IngestAnsvisEvent, *, metrics: MetricsSink | None = None
+) -> APIRouter:
     router = APIRouter(tags=["ansvis-integration"])
+    runtime_metrics = metrics or NullMetricsSink()
 
     @router.post(
         "/integration/ansvis/events",
@@ -54,14 +65,18 @@ def create_event_router(service: IngestAnsvisEvent) -> APIRouter:
         summary="Receive one normalized ANSVIS event",
     )
     async def ingest_event(request: Request) -> JSONResponse:
+        dispatched = False
         try:
             payload = load_json_object(await _bounded_json_body(request))
+            dispatched = True
             receipt = service.execute(
                 payload,
                 authorization_values=tuple(request.headers.getlist("authorization")),
                 transport_secure=request.url.scheme == "https",
             )
         except AnsvisAdapterError as exc:
+            if not dispatched:
+                _rejected_metric(runtime_metrics)
             return adapter_error_response(request, exc.code)
 
         correlation_id = payload.get("correlation_id")
