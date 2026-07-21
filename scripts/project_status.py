@@ -58,7 +58,6 @@ class Phase:
     open: int
     closed: int
     completion_percent: float
-    due_on: str | None
 
     def public(self) -> dict[str, object]:
         return {
@@ -67,7 +66,6 @@ class Phase:
             "open": self.open,
             "closed": self.closed,
             "completion_percent": self.completion_percent,
-            "due_on": self.due_on,
         }
 
 
@@ -155,9 +153,6 @@ class ProjectReport:
         active_closed = len(self.active_issues) - active_open
         deferred_open = sum(issue.state == "OPEN" for issue in self.deferred_issues)
         deferred_closed = len(self.deferred_issues) - deferred_open
-        missing_due_dates = [
-            phase.title for phase in self.phases if phase.open and not phase.due_on
-        ]
         return {
             "schema_version": 1,
             "generated_at": self.generated_at,
@@ -170,10 +165,6 @@ class ProjectReport:
                 ),
             },
             "phases": [phase.public() for phase in self.phases],
-            "schedule": {
-                "status": "not_assessable" if missing_due_dates else "assessable",
-                "missing_due_dates": missing_due_dates,
-            },
             "lanes": {
                 "ready": [issue.public() for issue in self.ready],
                 "in_progress": [issue.public() for issue in self.in_progress],
@@ -257,12 +248,6 @@ def _boolean(value: object, context: str) -> bool:
     return value
 
 
-def _optional_string(value: object, context: str) -> str | None:
-    if value is None:
-        return None
-    return _string(value, context)
-
-
 def _parse_issue(value: object) -> Issue:
     data = _mapping(value, "issue")
     milestone_value = data.get("milestone")
@@ -310,16 +295,6 @@ def load_issues(repo: str, scope: str, runner: Runner) -> tuple[Issue, ...]:
         runner,
     )
     return tuple(_parse_issue(item) for item in _list(raw, f"{scope} issues"))
-
-
-def load_milestone_due_dates(repo: str, runner: Runner) -> dict[str, str | None]:
-    raw = _json(("gh", "api", f"repos/{repo}/milestones?state=all&per_page=100"), runner)
-    due_dates: dict[str, str | None] = {}
-    for value in _list(raw, "milestones"):
-        milestone = _mapping(value, "milestone")
-        title = _string(milestone.get("title"), "milestone title")
-        due_dates[title] = _optional_string(milestone.get("due_on"), "milestone due date")
-    return due_dates
 
 
 def load_pull_requests(repo: str, runner: Runner) -> tuple[PullRequest, ...]:
@@ -407,7 +382,7 @@ def _phase_sort_key(title: str) -> tuple[int, str]:
     return (int(match.group(1)), title) if match else (sys.maxsize, title)
 
 
-def build_phases(issues: Sequence[Issue], due_dates: Mapping[str, str | None]) -> tuple[Phase, ...]:
+def build_phases(issues: Sequence[Issue]) -> tuple[Phase, ...]:
     grouped: defaultdict[str, list[Issue]] = defaultdict(list)
     for issue in issues:
         grouped[issue.milestone].append(issue)
@@ -423,7 +398,6 @@ def build_phases(issues: Sequence[Issue], due_dates: Mapping[str, str | None]) -
                 open=total - closed,
                 closed=closed,
                 completion_percent=_percent(closed, total),
-                due_on=due_dates.get(title),
             )
         )
     return tuple(phases)
@@ -436,7 +410,6 @@ def _issues_in_lane(issues: Sequence[Issue], label: str) -> tuple[Issue, ...]:
 def evaluate_findings(
     active: Sequence[Issue],
     deferred: Sequence[Issue],
-    phases: Sequence[Phase],
     ready: Sequence[Issue],
     in_progress: Sequence[Issue],
     main_runs: Sequence[WorkflowRun],
@@ -490,16 +463,6 @@ def evaluate_findings(
                 )
             )
 
-    missing_due_dates = [phase.title for phase in phases if phase.open and not phase.due_on]
-    if missing_due_dates:
-        findings.append(
-            Finding(
-                "MILESTONE_DUE_DATES",
-                "warning",
-                "schedule cannot be assessed; open milestones without due dates: "
-                + ", ".join(missing_due_dates),
-            )
-        )
     if len(active) >= ISSUE_LIMIT or len(deferred) >= ISSUE_LIMIT:
         findings.append(
             Finding(
@@ -524,7 +487,7 @@ def build_report(
     validate_repo(repo)
     active = load_issues(repo, ACTIVE_SCOPE, runner)
     deferred = load_issues(repo, DEFERRED_SCOPE, runner)
-    phases = build_phases(active, load_milestone_due_dates(repo, runner))
+    phases = build_phases(active)
     ready = _issues_in_lane(active, READY)
     in_progress = _issues_in_lane(active, IN_PROGRESS)
     blocked = _issues_in_lane(active, BLOCKED)
@@ -532,7 +495,7 @@ def build_report(
     pull_requests = load_pull_requests(repo, runner)
     main_runs = load_main_runs(repo, main_branch, runner)
     git_state = load_git_state(main_branch, runner)
-    findings = evaluate_findings(active, deferred, phases, ready, in_progress, main_runs)
+    findings = evaluate_findings(active, deferred, ready, in_progress, main_runs)
     timestamp = generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace(
         "+00:00", "Z"
     )
@@ -600,10 +563,9 @@ def render_text(report: ProjectReport) -> str:
         "Phases",
     ]
     for phase in report.phases:
-        due = phase.due_on or "unset"
         lines.append(
             f"  {phase.title}: {phase.closed}/{phase.total} closed "
-            f"({phase.completion_percent:.1f}%), {phase.open} open, due={due}"
+            f"({phase.completion_percent:.1f}%), {phase.open} open"
         )
     lines.extend(["", "Execution lanes"])
     for name, issues in (

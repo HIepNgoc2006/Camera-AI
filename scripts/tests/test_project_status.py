@@ -59,13 +59,6 @@ class FakeRunner:
             search = command[command.index("--search") + 1]
             values = self.active if search == f"label:{ACTIVE_SCOPE}" else self.deferred
             return json.dumps(values)
-        if command[:2] == ("gh", "api"):
-            return json.dumps(
-                [
-                    {"title": "M2 - Codebase Foundation", "due_on": "2026-07-15T00:00:00Z"},
-                    {"title": "M3 - Backend Core", "due_on": "2026-08-15T00:00:00Z"},
-                ]
-            )
         if command[:3] == ("gh", "pr", "list"):
             return json.dumps([])
         if command[:3] == ("gh", "run", "list"):
@@ -193,26 +186,18 @@ def test_text_report_is_a_compact_operational_summary() -> None:
     assert "body" not in rendered.lower()
 
 
-def test_missing_due_date_is_reported_without_making_schedule_up() -> None:
+def test_milestone_due_dates_are_not_loaded_or_reported() -> None:
     runner = FakeRunner(healthy_active_issues())
+    report = build_report(REPO, "main", runner, GENERATED_AT)
+    public_report = report.public()
+    phases = public_report["phases"]
 
-    def no_due_date(command: Command) -> str:
-        if command[:2] == ("gh", "api"):
-            return json.dumps(
-                [
-                    {"title": "M2 - Codebase Foundation", "due_on": None},
-                    {"title": "M3 - Backend Core", "due_on": None},
-                ]
-            )
-        return runner(command)
-
-    report = build_report(REPO, "main", no_due_date, GENERATED_AT)
-
-    assert report.public()["schedule"] == {
-        "status": "not_assessable",
-        "missing_due_dates": ["M3 - Backend Core"],
-    }
-    assert any(finding.code == "MILESTONE_DUE_DATES" for finding in report.findings)
+    assert not any(command[:2] == ("gh", "api") for command in runner.commands)
+    assert "schedule" not in public_report
+    assert isinstance(phases, list)
+    assert all(isinstance(phase, dict) and "due_on" not in phase for phase in phases)
+    assert all(finding.code != "MILESTONE_DUE_DATES" for finding in report.findings)
+    assert "due=" not in render_text(report)
 
 
 def test_failed_command_does_not_expose_captured_output() -> None:
