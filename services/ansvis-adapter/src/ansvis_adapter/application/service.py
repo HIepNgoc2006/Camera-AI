@@ -9,6 +9,8 @@ from datetime import UTC, datetime, timedelta
 from ansvis_adapter.application.ports import (
     DurableReceipt,
     DurableReceiptPort,
+    IdempotencyDeriver,
+    ReceiptOutcome,
     SourceAuthenticator,
     SourceAuthRequest,
 )
@@ -30,11 +32,13 @@ class IngestAnsvisEvent:
     def __init__(
         self,
         authenticator: SourceAuthenticator,
+        idempotency_deriver: IdempotencyDeriver,
         receipt_port: DurableReceiptPort,
         *,
         now: Callable[[], datetime] = system_utc_now,
     ) -> None:
         self._authenticator = authenticator
+        self._idempotency_deriver = idempotency_deriver
         self._receipt_port = receipt_port
         self._now = now
 
@@ -60,8 +64,25 @@ class IngestAnsvisEvent:
         if event.tenant_ref != source.tenant_ref or event.school_ref != source.school_ref:
             raise AnsvisAdapterError("EVENT_SOURCE_MAPPING_DENIED")
         self._validate_replay_window(event.occurred_at)
-        receipt = self._receipt_port.record(event, source)
-        if not receipt.commit_confirmed or RECEIPT_ID_PATTERN.fullmatch(receipt.receipt_id) is None:
+        try:
+            idempotency = self._idempotency_deriver.derive(event, source)
+        except AnsvisAdapterError:
+            raise
+        except Exception:
+            raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE") from None
+        try:
+            receipt = self._receipt_port.record(event, source, idempotency)
+        except AnsvisAdapterError:
+            raise
+        except Exception:
+            raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE") from None
+        if (
+            not receipt.commit_confirmed
+            or not isinstance(receipt.outcome, ReceiptOutcome)
+            or RECEIPT_ID_PATTERN.fullmatch(receipt.receipt_id) is None
+            or receipt.idempotency_key != idempotency.idempotency_key
+            or receipt.canonical_fingerprint != idempotency.canonical_fingerprint
+        ):
             raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
         return receipt
 

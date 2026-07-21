@@ -14,11 +14,16 @@ from ansvis_adapter.api.errors import http_exception_handler, validation_excepti
 from ansvis_adapter.api.events import create_event_router
 from ansvis_adapter.api.health import router as health_router
 from ansvis_adapter.api.middleware import RequestContextMiddleware
-from ansvis_adapter.application.ports import DurableReceiptPort, SourceAuthenticator
+from ansvis_adapter.application.ports import (
+    DurableReceiptPort,
+    IdempotencyDeriver,
+    SourceAuthenticator,
+)
 from ansvis_adapter.application.service import IngestAnsvisEvent, system_utc_now
 from ansvis_adapter.config import Settings, load_settings
 from ansvis_adapter.infrastructure.unavailable import (
     UnavailableDurableReceiptPort,
+    UnavailableIdempotencyDeriver,
     UnavailableSourceAuthenticator,
 )
 from ansvis_adapter.logging import configure_logging
@@ -28,6 +33,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     authenticator: SourceAuthenticator | None = None,
+    idempotency_deriver: IdempotencyDeriver | None = None,
     receipt_port: DurableReceiptPort | None = None,
     request_logger: logging.Logger | None = None,
     now: Callable[[], datetime] = system_utc_now,
@@ -43,6 +49,7 @@ def create_app(
     )
     service = IngestAnsvisEvent(
         authenticator or UnavailableSourceAuthenticator(),
+        idempotency_deriver or UnavailableIdempotencyDeriver(),
         receipt_port or UnavailableDurableReceiptPort(),
         now=now,
     )
