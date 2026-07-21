@@ -20,6 +20,7 @@ jobs:
       CONSENT_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
       CAMERA_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
       EVENT_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
+      ATTENDANCE_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
     services:
       postgres-school-test:
         image: postgres:17.10-bookworm@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
@@ -54,6 +55,7 @@ jobs:
             services/consent-service/pyproject.toml
             services/camera-registry-service/pyproject.toml
             services/ansvis-adapter/pyproject.toml
+            services/attendance-service/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
         run: >-
@@ -66,6 +68,7 @@ jobs:
           -e "services/consent-service[test]"
           -e "services/camera-registry-service[test]"
           -e "services/ansvis-adapter[test]"
+          -e "services/attendance-service[test]"
 
       - name: Run repository quality gates
         run: python scripts/quality.py all

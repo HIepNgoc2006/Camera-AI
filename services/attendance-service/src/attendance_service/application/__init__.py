@@ -1,0 +1,1 @@
+"""Attendance application use cases."""

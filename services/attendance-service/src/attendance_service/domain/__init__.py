@@ -1,0 +1,1 @@
+"""Pure attendance domain rules."""
