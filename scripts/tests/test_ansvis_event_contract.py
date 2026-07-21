@@ -40,6 +40,47 @@ from scripts.check_time_policy import validate_policy as validate_time_policy
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVER_RECEIVED_AT = "2030-01-01T00:00:10Z"
 TEST_KEY = bytes(range(32))
+EXPECTED_EVENT_TYPES = {
+    "attendance.face.observed",
+    "camera.health.changed",
+    "insight.emotion.observed",
+    "task.health.changed",
+    "timekeeping.face.observed",
+    "violation.littering.suspected",
+    "violation.ppe.suspected",
+    "violation.smoking.suspected",
+    "violation.uniform.suspected",
+}
+REQUIRED_CASE_CODES = {
+    "valid_attendance_face_observed",
+    "valid_timekeeping_face_observed",
+    "valid_emotion_observed",
+    "valid_littering_suspected",
+    "valid_smoking_suspected",
+    "valid_uniform_suspected",
+    "valid_ppe_suspected",
+    "valid_camera_health_changed",
+    "valid_task_health_changed",
+    "invalid_missing_event_type",
+    "invalid_unknown_top_level_field",
+    "invalid_unknown_attribute",
+    "invalid_event_type",
+    "invalid_schema_version",
+    "invalid_event_type_value_type",
+    "invalid_attributes_value_type",
+    "invalid_boolean_source_event_id",
+    "invalid_naive_event_time",
+    "future_event_skew",
+    "stale_event_replay_window",
+    "invalid_fallback_identity",
+    "invalid_bad_signature",
+    "primary_identical_retry",
+    "primary_conflicting_retry",
+    "fallback_identical_retry",
+    "accepted_ack",
+    "duplicate_ack",
+    "masked_error",
+}
 
 
 def _documents() -> tuple[TimePolicy, ContractPolicy]:
@@ -53,6 +94,16 @@ def _base() -> JsonObject:
     request = fixture["request"]
     assert isinstance(request, dict)
     return request
+
+
+def _objects(value: object) -> list[JsonObject]:
+    assert isinstance(value, list)
+    objects: list[JsonObject] = []
+    for item in value:
+        assert isinstance(item, dict)
+        assert all(isinstance(key, str) for key in item)
+        objects.append(item)
+    return objects
 
 
 def test_machine_contract_and_sanitized_case_matrix_pass() -> None:
@@ -71,7 +122,34 @@ def test_machine_contract_and_sanitized_case_matrix_pass() -> None:
         time_policy,
     )
 
-    assert count == 28
+    assert count == 43
+
+
+def test_sanitized_matrix_has_unique_required_cases_and_every_event_type() -> None:
+    fixture = load_json(REPO_ROOT / CASE_FIXTURE_PATH)
+    groups = ("schema_cases", "auth_cases", "idempotency_cases", "response_cases")
+    cases = [case for group in groups for case in _objects(fixture[group])]
+    case_codes: list[str] = []
+    for case in cases:
+        case_code = case["case_code"]
+        assert isinstance(case_code, str)
+        case_codes.append(case_code)
+
+    accepted_event_types: set[str] = set()
+    for case in _objects(fixture["schema_cases"]):
+        case_code = case["case_code"]
+        changes = case.get("set")
+        assert isinstance(case_code, str)
+        if not case_code.startswith("valid_") or not isinstance(changes, dict):
+            continue
+        event_type = changes.get("event_type")
+        if event_type is not None:
+            assert isinstance(event_type, str)
+            accepted_event_types.add(event_type)
+
+    assert len(case_codes) == len(set(case_codes))
+    assert set(case_codes) >= REQUIRED_CASE_CODES
+    assert accepted_event_types == EXPECTED_EVENT_TYPES
 
 
 def test_strict_json_rejects_duplicate_properties_and_non_finite_numbers() -> None:

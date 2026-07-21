@@ -95,6 +95,12 @@ library and existing project time-policy code.
 
 ## Verification
 
+The sanitized contract matrix contains 43 deterministic cases. It covers all nine allowlisted event
+types and rejects invalid schema/version/type, replay or future skew, unsafe media/base64 fields,
+invalid authentication, oversize input and idempotency conflicts. Adapter contract tests execute the
+shared schema cases through the real application service and idempotency derivation boundary; fixture
+safety checks run separately.
+
 Run:
 
 ```powershell

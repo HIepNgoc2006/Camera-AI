@@ -113,6 +113,8 @@ provider failures, duplicate/combined headers, registered-source and tenant/scho
 replay limits, body/content-type limits, primary/fallback idempotency vectors, ten-retry duplicate
 behavior, changed-content conflict, cross-scope separation, provider/receipt failure, default denial,
 commit-before-ACK behavior, masked errors and logs, logging allowlisting and OpenAPI route exposure.
+The shared sanitized payload matrix also runs every allowlisted event type and each schema rejection
+case through `IngestAnsvisEvent` and `ContractIdempotencyDeriver`.
 
 ## Logs and security
 

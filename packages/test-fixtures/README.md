@@ -15,6 +15,8 @@ exports, database dumps, backups, logs, datasets, model artifacts, or externally
 ANSVIS fixtures must be minimal normalized contracts built manually from the approved schema. Do
 not copy a raw payload from ANSVIS/AIBOX. `ansvis/event.synthetic.json` wraps one valid request under
 the required synthetic marker; `ansvis/event-contract-cases.synthetic.json` contains only sanitized
-contract mutations and expected stable outcomes. `ansvis/timestamps.synthetic.json` is the
+contract mutations and expected stable outcomes. Its schema matrix includes every allowlisted V1
+event type plus invalid schema, time-window, media/base64, authentication, idempotency and response
+cases. `ansvis/timestamps.synthetic.json` is the
 compatibility matrix for `time_policy_v1`; it contains fake instants only and no raw event body. Run
 `python scripts/quality.py all` before review.

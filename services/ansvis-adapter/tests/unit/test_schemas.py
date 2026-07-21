@@ -42,7 +42,10 @@ def event_payload(event_type: str = "camera.health.changed") -> dict[str, object
     [
         ("attendance.face.observed", FaceObservationEvent),
         ("timekeeping.face.observed", FaceObservationEvent),
+        ("violation.littering.suspected", SuspectedViolationEvent),
+        ("violation.ppe.suspected", SuspectedViolationEvent),
         ("violation.smoking.suspected", SuspectedViolationEvent),
+        ("violation.uniform.suspected", SuspectedViolationEvent),
         ("insight.emotion.observed", EmotionInsightEvent),
         ("camera.health.changed", HealthStatusEvent),
         ("task.health.changed", HealthStatusEvent),
