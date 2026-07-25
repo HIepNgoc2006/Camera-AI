@@ -18,6 +18,7 @@ files = [
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
+    "services/timekeeping-service/src",
 ]
 pretty = true
 show_error_codes = true
@@ -29,6 +30,7 @@ mypy_path = [
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
+    "services/timekeeping-service/src",
 ]
 
 [tool.pytest.ini_options]
@@ -41,6 +43,7 @@ testpaths = [
     "services/consent-service/tests",
     "services/camera-registry-service/tests",
     "services/ansvis-adapter/tests",
+    "services/timekeeping-service/tests",
 ]
 pythonpath = [
     ".",
@@ -50,6 +53,7 @@ pythonpath = [
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
+    "services/timekeeping-service/src",
 ]
 addopts = ["--strict-config", "--strict-markers", "--import-mode=importlib"]
 asyncio_mode = "strict"
