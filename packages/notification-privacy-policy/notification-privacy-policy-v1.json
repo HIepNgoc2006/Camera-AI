@@ -1,0 +1,640 @@
+{
+  "policy_id": "notification_privacy_policy_v1",
+  "version": 1,
+  "status": "approved_for_implementation",
+  "owner": "notification_privacy_owner",
+  "data_classifications": {
+    "recipient_identity_relationship_and_device_endpoint": "Critical",
+    "notification_content_resource_and_delivery_state": "High_or_Critical",
+    "audit_and_operational_metadata": "High_minimized"
+  },
+  "runtime_activation": {
+    "status": "blocked_pending_named_approvals",
+    "required_approvals": {
+      "privacy_legal": "pending",
+      "security_ops": "pending",
+      "business_owner": "pending"
+    },
+    "missing_or_inactive_policy_behavior": "deny",
+    "synthetic_allow_cases_assume_future_named_approvals": true
+  },
+  "operations": [
+    "dispatch",
+    "retry",
+    "dead_letter",
+    "open",
+    "cancel"
+  ],
+  "channels": {
+    "in_app": {
+      "required_fields": [
+        "template_code",
+        "template_version",
+        "generic_title_code",
+        "generic_body_code",
+        "opaque_notification_ref",
+        "opaque_resource_ref",
+        "created_at",
+        "expires_at"
+      ],
+      "allowed_fields": [
+        "template_code",
+        "template_version",
+        "generic_title_code",
+        "generic_body_code",
+        "category_code",
+        "opaque_notification_ref",
+        "opaque_resource_ref",
+        "created_at",
+        "expires_at",
+        "action_available"
+      ],
+      "endpoint_requirement": "authenticated_in_app_inbox",
+      "preview_rule": "generic_codes_only"
+    },
+    "push": {
+      "required_fields": [
+        "template_code",
+        "template_version",
+        "generic_title_code",
+        "generic_body_code",
+        "opaque_notification_ref",
+        "allowlisted_route_code",
+        "expires_at"
+      ],
+      "allowed_fields": [
+        "template_code",
+        "template_version",
+        "generic_title_code",
+        "generic_body_code",
+        "category_code",
+        "opaque_notification_ref",
+        "allowlisted_route_code",
+        "expires_at"
+      ],
+      "endpoint_requirement": "active_verified_owned_encrypted_device_endpoint",
+      "preview_rule": "generic_text_and_opaque_notification_ref_only"
+    },
+    "email": {
+      "required_fields": [
+        "template_code",
+        "template_version",
+        "generic_subject_code",
+        "generic_body_code",
+        "opaque_notification_ref",
+        "allowlisted_route_code",
+        "expires_at"
+      ],
+      "allowed_fields": [
+        "template_code",
+        "template_version",
+        "generic_subject_code",
+        "generic_body_code",
+        "category_code",
+        "opaque_notification_ref",
+        "allowlisted_route_code",
+        "expires_at"
+      ],
+      "endpoint_requirement": "active_verified_owned_encrypted_email_endpoint",
+      "preview_rule": "generic_text_and_opaque_notification_ref_only"
+    }
+  },
+  "globally_prohibited_fields": [
+    "student_name",
+    "staff_name",
+    "guardian_name",
+    "email_address",
+    "phone_number",
+    "student_code",
+    "class_name",
+    "attendance_status",
+    "attendance_time",
+    "timekeeping_status",
+    "timekeeping_time",
+    "violation_type",
+    "violation_detail",
+    "disciplinary_outcome",
+    "emotion_label",
+    "emotion_confidence",
+    "health_inference",
+    "consent_state",
+    "face_image",
+    "image_base64",
+    "media_url",
+    "signed_url",
+    "bucket_name",
+    "object_key",
+    "provider_locator",
+    "camera_id",
+    "zone_name",
+    "raw_ansvis_payload",
+    "face_embedding",
+    "device_token",
+    "access_token",
+    "refresh_token",
+    "credential",
+    "free_form_note"
+  ],
+  "content_classes": {
+    "attendance_update": {
+      "template_code": "notification.attendance.generic",
+      "template_version": 1,
+      "permission_code": "notification.attendance.receive",
+      "purpose_code": "attendance_notification",
+      "allowed_channels": [
+        "in_app",
+        "push",
+        "email"
+      ],
+      "allowed_source_states": [
+        "confirmed",
+        "corrected"
+      ],
+      "candidate_recipient_roles": [
+        "parent_guardian",
+        "teacher",
+        "bgh"
+      ]
+    },
+    "timekeeping_update": {
+      "template_code": "notification.timekeeping.generic",
+      "template_version": 1,
+      "permission_code": "notification.timekeeping.receive",
+      "purpose_code": "timekeeping_notification",
+      "allowed_channels": [
+        "in_app",
+        "push",
+        "email"
+      ],
+      "allowed_source_states": [
+        "confirmed",
+        "corrected"
+      ],
+      "candidate_recipient_roles": [
+        "staff_self",
+        "hr_officer",
+        "bgh"
+      ]
+    },
+    "violation_update": {
+      "template_code": "notification.violation.generic",
+      "template_version": 1,
+      "permission_code": "notification.violation.receive",
+      "purpose_code": "violation_notification",
+      "allowed_channels": [
+        "in_app",
+        "push",
+        "email"
+      ],
+      "allowed_source_states": [
+        "confirmed",
+        "corrected"
+      ],
+      "candidate_recipient_roles": [
+        "parent_guardian",
+        "teacher",
+        "bgh",
+        "kitchen_manager"
+      ]
+    },
+    "correction_update": {
+      "template_code": "notification.correction.generic",
+      "template_version": 1,
+      "permission_code": "notification.correction.receive",
+      "purpose_code": "correction_notification",
+      "allowed_channels": [
+        "in_app",
+        "push",
+        "email"
+      ],
+      "allowed_source_states": [
+        "corrected"
+      ],
+      "candidate_recipient_roles": [
+        "parent_guardian",
+        "teacher",
+        "staff_self",
+        "hr_officer",
+        "bgh"
+      ]
+    },
+    "privacy_action": {
+      "template_code": "notification.privacy_action.generic",
+      "template_version": 1,
+      "permission_code": "notification.privacy.receive",
+      "purpose_code": "privacy_action_notification",
+      "allowed_channels": [
+        "in_app",
+        "push",
+        "email"
+      ],
+      "allowed_source_states": [
+        "action_required"
+      ],
+      "candidate_recipient_roles": [
+        "parent_guardian",
+        "staff_self",
+        "privacy_officer"
+      ]
+    },
+    "operational_alert": {
+      "template_code": "notification.operational_alert.generic",
+      "template_version": 1,
+      "permission_code": "notification.operations.receive",
+      "purpose_code": "operations_notification",
+      "allowed_channels": [
+        "in_app",
+        "push",
+        "email"
+      ],
+      "allowed_source_states": [
+        "active_alert",
+        "resolved_alert"
+      ],
+      "candidate_recipient_roles": [
+        "bgh",
+        "school_admin",
+        "system_admin",
+        "technical_operator"
+      ]
+    }
+  },
+  "recipient_role_matrix": {
+    "parent_guardian": {
+      "relationships": [
+        "active_linked_child"
+      ],
+      "content_classes": [
+        "attendance_update",
+        "violation_update",
+        "correction_update",
+        "privacy_action"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "teacher": {
+      "relationships": [
+        "assigned_class_schedule_task",
+        "assigned_homeroom"
+      ],
+      "content_classes": [
+        "attendance_update",
+        "violation_update",
+        "correction_update"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "staff_self": {
+      "relationships": [
+        "own_staff_record"
+      ],
+      "content_classes": [
+        "timekeeping_update",
+        "correction_update",
+        "privacy_action"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "hr_officer": {
+      "relationships": [
+        "assigned_hr_unit"
+      ],
+      "content_classes": [
+        "timekeeping_update",
+        "correction_update"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "bgh": {
+      "relationships": [
+        "assigned_school"
+      ],
+      "content_classes": [
+        "attendance_update",
+        "timekeeping_update",
+        "violation_update",
+        "correction_update",
+        "operational_alert"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "kitchen_manager": {
+      "relationships": [
+        "assigned_kitchen_zone_shift"
+      ],
+      "content_classes": [
+        "violation_update"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "privacy_officer": {
+      "relationships": [
+        "approved_privacy_case"
+      ],
+      "content_classes": [
+        "privacy_action"
+      ],
+      "channels": [
+        "in_app",
+        "email"
+      ]
+    },
+    "school_admin": {
+      "relationships": [
+        "assigned_school"
+      ],
+      "content_classes": [
+        "operational_alert"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "system_admin": {
+      "relationships": [
+        "system_operations"
+      ],
+      "content_classes": [
+        "operational_alert"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "technical_operator": {
+      "relationships": [
+        "system_operations"
+      ],
+      "content_classes": [
+        "operational_alert"
+      ],
+      "channels": [
+        "in_app",
+        "push",
+        "email"
+      ]
+    },
+    "auditor": {
+      "relationships": [],
+      "content_classes": [],
+      "channels": []
+    }
+  },
+  "service_actor_matrix": {
+    "notification_service": {
+      "trusted_identity_required": true,
+      "permission_code": "service.notification.dispatch",
+      "allowed_operations": [
+        "dispatch",
+        "retry",
+        "dead_letter",
+        "open",
+        "cancel"
+      ]
+    },
+    "source_business_service": {
+      "trusted_identity_required": true,
+      "permission_code": "service.notification.request",
+      "delegation_required": true
+    },
+    "provider_adapter": {
+      "trusted_identity_required": true,
+      "permission_code": "service.notification.provider_deliver",
+      "required_channels": [
+        "push",
+        "email"
+      ]
+    }
+  },
+  "authorization": {
+    "dispatch_checks": [
+      "exact_active_policy_version_and_named_approvals",
+      "trusted_notification_and_source_service_identity",
+      "approved_source_delegation",
+      "active_verified_recipient_identity",
+      "tenant_and_school_scope",
+      "current_object_relationship",
+      "exact_current_permission",
+      "approved_purpose",
+      "authoritative_consent_decision",
+      "content_class_channel_and_template_allowlist",
+      "source_notification_eligibility_and_state",
+      "source_and_notification_expiry",
+      "current_endpoint_owner_verification_and_preference",
+      "deduplication_and_cancellation_state"
+    ],
+    "open_checks": [
+      "authenticated_current_recipient",
+      "notification_not_expired_or_cancelled",
+      "fresh_tenant_school_object_relationship",
+      "fresh_permission_purpose_and_consent",
+      "fresh_source_state_and_retention",
+      "resource_service_authorization"
+    ],
+    "notification_payload_is_never_authority": true,
+    "wrong_recipient_scope_and_missing_resource_share_public_error": true
+  },
+  "endpoint_protection": {
+    "device_token_storage": "ENCV1_ciphertext",
+    "device_token_exact_lookup": "LOOKUP-V1/device-token-v1",
+    "email_endpoint_storage": "ENCV1_ciphertext",
+    "plaintext_boundary": "provider_dispatch_only",
+    "required_status": "active_verified_owned",
+    "revoked_inactive_reassigned_or_ambiguous_behavior": "deny_and_cancel_pending",
+    "invalid_provider_endpoint_behavior": "revoke_without_logging_endpoint_value",
+    "forbidden_destinations": [
+      "audit",
+      "log",
+      "trace",
+      "queue",
+      "dead_letter",
+      "notification_content",
+      "response",
+      "support_export"
+    ]
+  },
+  "expiry_retry_and_dead_letter": {
+    "notification_expires_at_required": true,
+    "source_expires_at_required": true,
+    "notification_must_not_outlive_source_or_purpose": true,
+    "retry_profile_requires_named_approved_limits": true,
+    "missing_retry_limit_behavior": "deny",
+    "retry_must_reauthorize_before_each_attempt": true,
+    "retry_must_finish_before_notification_and_source_expiry": true,
+    "dead_letter_payload_allowed_fields": [
+      "opaque_notification_ref",
+      "opaque_recipient_ref",
+      "opaque_resource_ref",
+      "channel",
+      "template_version",
+      "policy_version",
+      "purpose_code",
+      "attempt_count",
+      "next_attempt_at",
+      "expires_at",
+      "correlation_id",
+      "stable_failure_category"
+    ],
+    "dead_letter_never_extends_retention_or_authority": true,
+    "deduplication_behavior": "suppress_duplicate_without_duplicate_content_or_audit_payload",
+    "cancellation_triggers": [
+      "consent_withdrawn",
+      "permission_revoked",
+      "relationship_revoked",
+      "recipient_deactivated",
+      "endpoint_revoked",
+      "source_rejected",
+      "source_expired",
+      "purpose_ended",
+      "policy_superseded"
+    ]
+  },
+  "audit": {
+    "actions": [
+      "NOTIFICATION_DISPATCH_GRANTED",
+      "NOTIFICATION_DISPATCH_DENIED",
+      "NOTIFICATION_DELIVERED",
+      "NOTIFICATION_DELIVERY_FAILED",
+      "NOTIFICATION_RETRY_SCHEDULED",
+      "NOTIFICATION_DEAD_LETTERED",
+      "NOTIFICATION_OPEN_GRANTED",
+      "NOTIFICATION_OPEN_DENIED",
+      "NOTIFICATION_CANCELLED",
+      "NOTIFICATION_EXPIRED",
+      "DEVICE_ENDPOINT_REVOKED"
+    ],
+    "required_fields": [
+      "opaque_actor_or_service_ref",
+      "opaque_recipient_ref",
+      "tenant_ref",
+      "school_ref",
+      "opaque_notification_ref",
+      "opaque_resource_ref",
+      "channel",
+      "content_class",
+      "template_version",
+      "policy_version",
+      "purpose_code",
+      "outcome",
+      "stable_reason_code",
+      "request_id",
+      "correlation_id",
+      "occurred_at"
+    ],
+    "optional_minimized_fields": [
+      "attempt_count",
+      "stable_provider_result_category",
+      "expires_at",
+      "cancellation_trigger"
+    ],
+    "forbidden_fields": [
+      "recipient_name",
+      "email_address",
+      "phone_number",
+      "device_token",
+      "endpoint_ciphertext",
+      "endpoint_fingerprint",
+      "message_text",
+      "template_parameters",
+      "signed_url",
+      "bucket_name",
+      "object_key",
+      "provider_locator",
+      "media_binary",
+      "image_base64",
+      "face_embedding",
+      "raw_ansvis_payload",
+      "access_token",
+      "credential",
+      "personal_profile",
+      "free_form_note"
+    ],
+    "allowed_and_denied_are_append_only": true
+  },
+  "stable_reason_codes": {
+    "dispatch_allowed": "NOTIFICATION_DISPATCH_ALLOWED",
+    "retry_allowed": "NOTIFICATION_RETRY_ALLOWED",
+    "dead_letter_allowed": "NOTIFICATION_DEAD_LETTER_ALLOWED",
+    "open_allowed": "NOTIFICATION_OPEN_ALLOWED",
+    "cancellation_allowed": "NOTIFICATION_CANCELLATION_ALLOWED",
+    "service_identity_denied": "NOTIFICATION_SERVICE_IDENTITY_DENIED",
+    "source_service_denied": "NOTIFICATION_SOURCE_SERVICE_DENIED",
+    "delegation_required": "NOTIFICATION_DELEGATION_REQUIRED",
+    "provider_adapter_denied": "NOTIFICATION_PROVIDER_ADAPTER_DENIED",
+    "recipient_unauthenticated": "NOTIFICATION_RECIPIENT_UNAUTHENTICATED",
+    "recipient_inactive": "NOTIFICATION_RECIPIENT_INACTIVE",
+    "recipient_scope_denied": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+    "permission_denied": "NOTIFICATION_PERMISSION_DENIED",
+    "purpose_denied": "NOTIFICATION_PURPOSE_DENIED",
+    "consent_denied": "NOTIFICATION_CONSENT_DENIED",
+    "policy_inactive": "NOTIFICATION_POLICY_INACTIVE",
+    "channel_denied": "NOTIFICATION_CHANNEL_DENIED",
+    "content_denied": "NOTIFICATION_CONTENT_DENIED",
+    "source_not_eligible": "NOTIFICATION_SOURCE_NOT_ELIGIBLE",
+    "expired": "NOTIFICATION_EXPIRED",
+    "cancelled": "NOTIFICATION_CANCELLED",
+    "endpoint_denied": "NOTIFICATION_ENDPOINT_DENIED",
+    "duplicate_suppressed": "NOTIFICATION_DUPLICATE_SUPPRESSED",
+    "retry_denied": "NOTIFICATION_RETRY_DENIED",
+    "dead_letter_payload_invalid": "NOTIFICATION_DEAD_LETTER_PAYLOAD_INVALID",
+    "open_reauthorization_denied": "NOTIFICATION_OPEN_REAUTHORIZATION_DENIED",
+    "cancellation_denied": "NOTIFICATION_CANCELLATION_DENIED",
+    "dependency_unavailable": "NOTIFICATION_DEPENDENCY_UNAVAILABLE",
+    "sensitivity_invalid": "NOTIFICATION_SENSITIVITY_INVALID"
+  },
+  "public_errors": {
+    "concealed": "NOTIFICATION_NOT_FOUND",
+    "not_available": "NOTIFICATION_NOT_AVAILABLE",
+    "invalid": "NOTIFICATION_REQUEST_INVALID",
+    "dependency_unavailable": "NOTIFICATION_DELIVERY_UNAVAILABLE"
+  },
+  "supersession": {
+    "published_versions_are_immutable": true,
+    "requires_new_version_for": [
+      "role_or_relationship_change",
+      "channel_or_content_change",
+      "permission_or_purpose_change",
+      "consent_or_authorization_change",
+      "endpoint_or_provider_boundary_change",
+      "expiry_retry_dead_letter_or_cancellation_change",
+      "audit_or_error_change",
+      "customer_legal_or_security_finding",
+      "runtime_activation_change"
+    ],
+    "required_evidence": [
+      "compatibility_matrix",
+      "privacy_legal_approval",
+      "security_ops_approval",
+      "business_owner_approval",
+      "rollback_and_supersession_record"
+    ]
+  }
+}

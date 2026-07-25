@@ -21,6 +21,9 @@ Các entry point hiện có:
 - `check_time_policy.py`: kiểm machine-readable time policy và fixture UTC/IANA/drift/replay giả lập.
 - `check_evidence_access_policy.py`: kiểm role/object/purpose/consent/retention, signed GET TTL,
   export/audit và ma trận allow/deny evidence giả lập mà không tạo URL hoặc đọc media.
+- `check_notification_privacy_policy.py`: kiểm channel/content minimization, recipient/object/purpose,
+  endpoint protection, retry/DLQ, cancellation/open re-authorization và audit bằng dữ liệu giả lập;
+  không tạo notification, provider call hoặc đọc endpoint/token thật.
 - `check_ansvis_event_contract.py`: kiểm JSON Schema, Bearer source auth/replay/idempotency/ACK policy
   và ma trận contract ANSVIS giả lập mà không in payload bị từ chối.
 
