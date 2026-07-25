@@ -1,0 +1,1 @@
+"""Timekeeping infrastructure adapters."""
