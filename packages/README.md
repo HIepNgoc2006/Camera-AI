@@ -9,6 +9,9 @@ Chứa contract và thư viện dùng chung có ownership rõ, ví dụ API/even
 
 Các contract hiện có:
 
+- `evidence-access-policy/evidence-access-policy-v1.json`: policy versioned cho metadata, thumbnail,
+  original, download/export, object authorization, signed GET TTL và audit; runtime activation vẫn
+  fail closed tới khi đủ named approval.
 - `time-policy/time-policy-v1.json`: policy versioned cho UTC/IANA, clock health và replay window;
   không chứa cấu hình endpoint hoặc secret theo môi trường.
 - `ansvis-event-contract/`: JSON Schema, Bearer source auth/replay/idempotency policy và contract ACK

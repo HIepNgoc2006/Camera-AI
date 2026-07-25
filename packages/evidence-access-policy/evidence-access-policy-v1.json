@@ -1,0 +1,474 @@
+{
+  "policy_id": "evidence_access",
+  "policy_version": "evidence_access_policy_v1",
+  "status": "approved_for_implementation",
+  "runtime_activation": {
+    "status": "blocked_pending_named_approvals",
+    "implementation_authority": "issue_31",
+    "required_approvals": {
+      "privacy_legal": "pending",
+      "security_ops": "pending",
+      "business_owner": "pending"
+    }
+  },
+  "owner_code": "evidence_service_security_owner",
+  "technical_review": {
+    "status": "single_developer_self_reviewed",
+    "evidence_code": "issue_31_verification"
+  },
+  "data_classes": [
+    "high",
+    "critical"
+  ],
+  "default_decision": "deny",
+  "public_existence_concealment": true,
+  "authorization_inputs": [
+    "authenticated_actor",
+    "trusted_service_identity_for_service_actor",
+    "tenant_scope",
+    "school_scope",
+    "object_scope",
+    "relationship_or_assignment",
+    "requested_action",
+    "explicit_permission",
+    "approved_purpose",
+    "consent_snapshot_when_applicable",
+    "evidence_sensitivity",
+    "evidence_state",
+    "retention_state",
+    "legal_hold_state",
+    "policy_version",
+    "reason_code_when_required",
+    "request_and_correlation_id",
+    "delegation_context_for_service_actor"
+  ],
+  "actions": {
+    "view_metadata": {
+      "permission_code": "evidence.view_metadata",
+      "delivery_kind": "metadata_only",
+      "signed_get_profile": null,
+      "reason_code_required": false,
+      "export_approval_required": false,
+      "recipient_control_required": false
+    },
+    "view_thumbnail": {
+      "permission_code": "evidence.view_thumbnail",
+      "delivery_kind": "inline_thumbnail",
+      "signed_get_profile": "standard_view",
+      "reason_code_required": false,
+      "export_approval_required": false,
+      "recipient_control_required": false
+    },
+    "view_original": {
+      "permission_code": "evidence.view_original",
+      "delivery_kind": "inline_original",
+      "signed_get_profile": "standard_view",
+      "reason_code_required": true,
+      "export_approval_required": false,
+      "recipient_control_required": false
+    },
+    "download": {
+      "permission_code": "evidence.download",
+      "delivery_kind": "attachment",
+      "signed_get_profile": "standard_view",
+      "reason_code_required": true,
+      "export_approval_required": false,
+      "recipient_control_required": false
+    },
+    "export": {
+      "permission_code": "evidence.export",
+      "delivery_kind": "export_artifact",
+      "signed_get_profile": "export_delivery",
+      "reason_code_required": true,
+      "export_approval_required": true,
+      "recipient_control_required": true
+    }
+  },
+  "access_reason_code_allowlist": [
+    "BUSINESS_REVIEW",
+    "ATTENDANCE_AUDIT",
+    "TIMEKEEPING_AUDIT",
+    "VIOLATION_REVIEW",
+    "SECURITY_INVESTIGATION",
+    "LEGAL_REQUEST",
+    "DATA_SUBJECT_REQUEST",
+    "MANAGEMENT_REPORT"
+  ],
+  "role_matrix": {
+    "subject_self": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail"
+      ],
+      "allowed_relationship_scopes": [
+        "own_staff_record"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "parent_guardian": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail"
+      ],
+      "allowed_relationship_scopes": [
+        "linked_child"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "teacher_subject": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail"
+      ],
+      "allowed_relationship_scopes": [
+        "assigned_class_schedule_task"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "teacher_homeroom": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail"
+      ],
+      "allowed_relationship_scopes": [
+        "assigned_homeroom"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "hr_officer": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail",
+        "view_original",
+        "download",
+        "export"
+      ],
+      "allowed_relationship_scopes": [
+        "assigned_hr_unit"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "bgh": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail",
+        "view_original",
+        "download",
+        "export"
+      ],
+      "allowed_relationship_scopes": [
+        "assigned_school"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "kitchen_manager": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail",
+        "view_original"
+      ],
+      "allowed_relationship_scopes": [
+        "assigned_kitchen_zone_shift"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "security_reviewer": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail",
+        "view_original",
+        "download",
+        "export"
+      ],
+      "allowed_relationship_scopes": [
+        "assigned_zone_camera"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "privacy_officer": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata"
+      ],
+      "allowed_relationship_scopes": [
+        "approved_privacy_ticket"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "auditor": {
+      "actor_kind": "human",
+      "candidate_actions": [
+        "view_metadata"
+      ],
+      "allowed_relationship_scopes": [
+        "approved_audit_ticket"
+      ],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "school_admin": {
+      "actor_kind": "human",
+      "candidate_actions": [],
+      "allowed_relationship_scopes": [],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "system_admin": {
+      "actor_kind": "human",
+      "candidate_actions": [],
+      "allowed_relationship_scopes": [],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "technical_operator": {
+      "actor_kind": "human",
+      "candidate_actions": [],
+      "allowed_relationship_scopes": [],
+      "delegation_required": false,
+      "service_permission_code": null
+    },
+    "evidence_service": {
+      "actor_kind": "service",
+      "candidate_actions": [
+        "view_metadata",
+        "view_thumbnail",
+        "view_original",
+        "download",
+        "export"
+      ],
+      "allowed_relationship_scopes": [
+        "delegated_authorized_scope"
+      ],
+      "delegation_required": true,
+      "service_permission_code": "service.evidence.deliver"
+    },
+    "report_service": {
+      "actor_kind": "service",
+      "candidate_actions": [
+        "export"
+      ],
+      "allowed_relationship_scopes": [
+        "approved_export_scope"
+      ],
+      "delegation_required": true,
+      "service_permission_code": "service.report.export"
+    },
+    "notification_service": {
+      "actor_kind": "service",
+      "candidate_actions": [],
+      "allowed_relationship_scopes": [],
+      "delegation_required": false,
+      "service_permission_code": "service.notification.reference_only"
+    }
+  },
+  "evidence_states": {
+    "recognized": [
+      "pending_upload",
+      "quarantined",
+      "available",
+      "delete_pending",
+      "deleted",
+      "missing"
+    ],
+    "readable": [
+      "available"
+    ]
+  },
+  "retention": {
+    "required_status": "active",
+    "expired_denied_before_physical_disposal": true,
+    "source_hold_does_not_extend_export_artifact": true
+  },
+  "consent": {
+    "recognized_statuses": [
+      "allowed",
+      "blocked",
+      "not_required"
+    ],
+    "required_result": "allowed",
+    "missing_or_ambiguous_decision": "deny"
+  },
+  "legal_hold": {
+    "recognized_statuses": [
+      "none",
+      "active",
+      "released"
+    ],
+    "active_blocks_disposal_only": true,
+    "active_does_not_grant_access": true,
+    "active_does_not_extend_expired_access": true,
+    "missing_or_ambiguous_decision": "deny"
+  },
+  "signed_get": {
+    "profiles": {
+      "standard_view": {
+        "default_ttl_seconds": 60,
+        "minimum_ttl_seconds": 1,
+        "hard_max_ttl_seconds": 300
+      },
+      "export_delivery": {
+        "default_ttl_seconds": 60,
+        "minimum_ttl_seconds": 1,
+        "hard_max_ttl_seconds": 120
+      }
+    },
+    "method": "GET",
+    "persistence_allowed": false,
+    "logging_allowed": false,
+    "notification_delivery_allowed": false,
+    "client_storage_allowed": false,
+    "response_headers": {
+      "cache_control": "private, no-store",
+      "x_content_type_options": "nosniff",
+      "content_disposition": "safe_allowlisted"
+    }
+  },
+  "export": {
+    "artifact_default_ttl_seconds": 604800,
+    "artifact_hard_max_ttl_seconds": 604800,
+    "source_authorization_required_at_request": true,
+    "source_authorization_required_at_delivery": true,
+    "ordinary_view_or_download_does_not_imply_export": true,
+    "distinct_artifact_hold_required": true,
+    "reason_code_allowlist": [
+      "ATTENDANCE_AUDIT",
+      "TIMEKEEPING_AUDIT",
+      "VIOLATION_REVIEW",
+      "SECURITY_INVESTIGATION",
+      "LEGAL_REQUEST",
+      "DATA_SUBJECT_REQUEST",
+      "MANAGEMENT_REPORT"
+    ],
+    "recipient_control_allowlist": [
+      "authenticated_requester",
+      "approved_internal_recipient",
+      "approved_external_recipient_with_expiry"
+    ]
+  },
+  "audit": {
+    "outcomes": [
+      "allowed",
+      "denied"
+    ],
+    "required_fields": [
+      "audit_event_id",
+      "occurred_at",
+      "actor_id",
+      "actor_type",
+      "tenant_id",
+      "school_id",
+      "evidence_object_id",
+      "resource_type",
+      "resource_id",
+      "requested_action",
+      "purpose_code",
+      "policy_version",
+      "outcome",
+      "reason_code",
+      "request_id",
+      "correlation_id",
+      "url_ttl_seconds",
+      "export_request_id",
+      "recipient_control_code"
+    ],
+    "forbidden_fields": [
+      "signed_url",
+      "object_key",
+      "bucket_name",
+      "provider_version_id",
+      "media_binary",
+      "image_base64",
+      "video_base64",
+      "face_embedding",
+      "biometric_payload",
+      "raw_ansvis_payload",
+      "access_token",
+      "refresh_token",
+      "credential",
+      "personal_profile",
+      "free_form_note"
+    ],
+    "event_codes": {
+      "view_allowed": "EVIDENCE_VIEW_GRANTED",
+      "view_denied": "EVIDENCE_VIEW_DENIED",
+      "download_allowed": "EVIDENCE_DOWNLOAD_GRANTED",
+      "download_denied": "EVIDENCE_DOWNLOAD_DENIED",
+      "export_allowed": "EVIDENCE_EXPORT_GRANTED",
+      "export_denied": "EVIDENCE_EXPORT_DENIED",
+      "export_delivered": "EVIDENCE_EXPORT_DELIVERED",
+      "export_expired": "EVIDENCE_EXPORT_EXPIRED"
+    }
+  },
+  "stable_reason_codes": {
+    "access_allowed": "EVIDENCE_ACCESS_ALLOWED",
+    "actor_unauthenticated": "EVIDENCE_ACTOR_UNAUTHENTICATED",
+    "service_identity_denied": "EVIDENCE_SERVICE_IDENTITY_DENIED",
+    "delegation_required": "EVIDENCE_DELEGATION_REQUIRED",
+    "tenant_scope_denied": "EVIDENCE_TENANT_SCOPE_DENIED",
+    "school_scope_denied": "EVIDENCE_SCHOOL_SCOPE_DENIED",
+    "object_scope_denied": "EVIDENCE_OBJECT_SCOPE_DENIED",
+    "action_denied": "EVIDENCE_ACTION_DENIED",
+    "permission_denied": "EVIDENCE_PERMISSION_DENIED",
+    "purpose_required": "EVIDENCE_PURPOSE_REQUIRED",
+    "purpose_denied": "EVIDENCE_PURPOSE_DENIED",
+    "consent_required": "EVIDENCE_CONSENT_REQUIRED",
+    "consent_denied": "EVIDENCE_CONSENT_DENIED",
+    "not_found": "EVIDENCE_NOT_FOUND",
+    "upload_pending": "EVIDENCE_UPLOAD_PENDING",
+    "quarantined": "EVIDENCE_QUARANTINED",
+    "not_available": "EVIDENCE_NOT_AVAILABLE",
+    "deleted": "EVIDENCE_DELETED",
+    "retention_expired": "EVIDENCE_RETENTION_EXPIRED",
+    "legal_hold_unresolved": "EVIDENCE_LEGAL_HOLD_UNRESOLVED",
+    "ttl_invalid": "EVIDENCE_URL_TTL_INVALID",
+    "reason_required": "EVIDENCE_REASON_REQUIRED",
+    "reason_invalid": "EVIDENCE_REASON_INVALID",
+    "export_approval_required": "EVIDENCE_EXPORT_APPROVAL_REQUIRED",
+    "export_recipient_invalid": "EVIDENCE_EXPORT_RECIPIENT_INVALID",
+    "export_artifact_ttl_invalid": "EVIDENCE_EXPORT_ARTIFACT_TTL_INVALID",
+    "authorization_dependency_unavailable": "EVIDENCE_AUTHZ_DEPENDENCY_UNAVAILABLE"
+  },
+  "public_errors": {
+    "resource_concealed": "EVIDENCE_NOT_FOUND",
+    "not_available": "EVIDENCE_NOT_AVAILABLE",
+    "invalid_request": "EVIDENCE_ACCESS_INVALID",
+    "dependency_unavailable": "EVIDENCE_ACCESS_UNAVAILABLE",
+    "url_issue_failed": "EVIDENCE_URL_ISSUE_FAILED",
+    "unauthorized_and_missing_same_response": true,
+    "error_shape": [
+      "error_code",
+      "message",
+      "request_id"
+    ]
+  },
+  "supersession": {
+    "published_version_immutable": true,
+    "replacement_status": "retired",
+    "review_triggers": [
+      "role_or_permission_change",
+      "consent_or_retention_change",
+      "new_evidence_type_or_sensitivity",
+      "storage_or_delivery_provider_change",
+      "security_incident_or_audit_finding",
+      "legal_or_customer_policy_change",
+      "ttl_or_export_behavior_change"
+    ]
+  }
+}
