@@ -1,0 +1,1138 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "fixture_id": "test_notification_privacy_policy_v1_cases",
+  "synthetic_only": true,
+  "contains_real_personal_data": false,
+  "contains_real_endpoint_or_token": false,
+  "default_context": {
+    "operation": "dispatch",
+    "notification_service_identity_trusted": true,
+    "notification_service_permission_code": "service.notification.dispatch",
+    "source_service_identity_trusted": true,
+    "source_service_permission_code": "service.notification.request",
+    "source_delegation_status": "approved",
+    "provider_adapter_identity_trusted": true,
+    "provider_adapter_permission_code": "service.notification.provider_deliver",
+    "recipient_authenticated": true,
+    "recipient_identity_status": "active_verified",
+    "recipient_role": "parent_guardian",
+    "recipient_relationship": "active_linked_child",
+    "tenant_scope_match": true,
+    "school_scope_match": true,
+    "resource_exists": true,
+    "resource_scope_match": true,
+    "permission_code": "notification.attendance.receive",
+    "permission_status": "active",
+    "purpose_code": "attendance_notification",
+    "purpose_status": "approved",
+    "consent_status": "allowed",
+    "consent_decision_authoritative": true,
+    "policy_version_status": "active",
+    "runtime_approval_status": "approved",
+    "notification_sensitivity": "High",
+    "channel": "in_app",
+    "channel_preference_status": "enabled",
+    "content_class": "attendance_update",
+    "template_code": "notification.attendance.generic",
+    "template_version": 1,
+    "content_fields": [
+      "template_code",
+      "template_version",
+      "generic_title_code",
+      "generic_body_code",
+      "opaque_notification_ref",
+      "opaque_resource_ref",
+      "created_at",
+      "expires_at"
+    ],
+    "source_state": "confirmed",
+    "source_notification_eligible": true,
+    "source_retention_status": "current",
+    "notification_state": "eligible",
+    "notification_expiry_status": "current",
+    "source_expiry_status": "current",
+    "endpoint_status": "not_required",
+    "endpoint_owner_match": true,
+    "endpoint_verified": true,
+    "endpoint_protection_status": "not_required",
+    "deduplication_state": "new",
+    "authorization_dependencies_available": true,
+    "provider_dependency_available": true,
+    "retry_limit_status": "named_approved",
+    "retry_attempt_status": "within_limit",
+    "retry_window_status": "within_expiry",
+    "retry_payload_minimized": true,
+    "dead_letter_fields": [
+      "opaque_notification_ref",
+      "opaque_recipient_ref",
+      "opaque_resource_ref",
+      "channel",
+      "template_version",
+      "policy_version",
+      "purpose_code",
+      "attempt_count",
+      "next_attempt_at",
+      "expires_at",
+      "correlation_id",
+      "stable_failure_category"
+    ],
+    "dead_letter_expiry_status": "within_source_expiry",
+    "open_resource_authorization_status": "granted",
+    "cancellation_trigger": "consent_withdrawn",
+    "cancellation_owner_authorized": true
+  },
+  "cases": [
+    {
+      "case_code": "parent_in_app_attendance_allowed",
+      "overrides": {},
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "parent_push_attendance_allowed",
+      "overrides": {
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "parent_email_attendance_allowed",
+      "overrides": {
+        "channel": "email",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_endpoint",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_subject_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "teacher_push_attendance_allowed",
+      "overrides": {
+        "recipient_role": "teacher",
+        "recipient_relationship": "assigned_class_schedule_task",
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "staff_timekeeping_in_app_allowed",
+      "overrides": {
+        "recipient_role": "staff_self",
+        "recipient_relationship": "own_staff_record",
+        "content_class": "timekeeping_update",
+        "template_code": "notification.timekeeping.generic",
+        "template_version": 1,
+        "permission_code": "notification.timekeeping.receive",
+        "purpose_code": "timekeeping_notification"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "hr_timekeeping_email_allowed",
+      "overrides": {
+        "recipient_role": "hr_officer",
+        "recipient_relationship": "assigned_hr_unit",
+        "content_class": "timekeeping_update",
+        "template_code": "notification.timekeeping.generic",
+        "template_version": 1,
+        "permission_code": "notification.timekeeping.receive",
+        "purpose_code": "timekeeping_notification",
+        "channel": "email",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_endpoint",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_subject_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "bgh_violation_push_allowed",
+      "overrides": {
+        "recipient_role": "bgh",
+        "recipient_relationship": "assigned_school",
+        "content_class": "violation_update",
+        "template_code": "notification.violation.generic",
+        "template_version": 1,
+        "permission_code": "notification.violation.receive",
+        "purpose_code": "violation_notification",
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "kitchen_violation_in_app_allowed",
+      "overrides": {
+        "recipient_role": "kitchen_manager",
+        "recipient_relationship": "assigned_kitchen_zone_shift",
+        "content_class": "violation_update",
+        "template_code": "notification.violation.generic",
+        "template_version": 1,
+        "permission_code": "notification.violation.receive",
+        "purpose_code": "violation_notification"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "privacy_officer_email_action_allowed",
+      "overrides": {
+        "recipient_role": "privacy_officer",
+        "recipient_relationship": "approved_privacy_case",
+        "content_class": "privacy_action",
+        "template_code": "notification.privacy_action.generic",
+        "template_version": 1,
+        "permission_code": "notification.privacy.receive",
+        "purpose_code": "privacy_action_notification",
+        "source_state": "action_required",
+        "channel": "email",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_endpoint",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_subject_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "system_admin_operational_email_allowed",
+      "overrides": {
+        "recipient_role": "system_admin",
+        "recipient_relationship": "system_operations",
+        "content_class": "operational_alert",
+        "template_code": "notification.operational_alert.generic",
+        "template_version": 1,
+        "permission_code": "notification.operations.receive",
+        "purpose_code": "operations_notification",
+        "source_state": "active_alert",
+        "consent_status": "not_required",
+        "channel": "email",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_endpoint",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_subject_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "technical_operator_operational_push_allowed",
+      "overrides": {
+        "recipient_role": "technical_operator",
+        "recipient_relationship": "system_operations",
+        "content_class": "operational_alert",
+        "template_code": "notification.operational_alert.generic",
+        "template_version": 1,
+        "permission_code": "notification.operations.receive",
+        "purpose_code": "operations_notification",
+        "source_state": "active_alert",
+        "consent_status": "not_required",
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "school_admin_operational_in_app_allowed",
+      "overrides": {
+        "recipient_role": "school_admin",
+        "recipient_relationship": "assigned_school",
+        "content_class": "operational_alert",
+        "template_code": "notification.operational_alert.generic",
+        "template_version": 1,
+        "permission_code": "notification.operations.receive",
+        "purpose_code": "operations_notification",
+        "source_state": "resolved_alert",
+        "consent_status": "not_required"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "auditor_notification_denied",
+      "overrides": {
+        "recipient_role": "auditor",
+        "recipient_relationship": "approved_audit_ticket"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "parent_timekeeping_denied",
+      "overrides": {
+        "content_class": "timekeeping_update",
+        "template_code": "notification.timekeeping.generic",
+        "template_version": 1,
+        "permission_code": "notification.timekeeping.receive",
+        "purpose_code": "timekeeping_notification"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "wrong_relationship_denied",
+      "overrides": {
+        "recipient_relationship": "unrelated_child"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "cross_tenant_denied",
+      "overrides": {
+        "tenant_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "cross_school_denied",
+      "overrides": {
+        "school_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "missing_resource_concealed",
+      "overrides": {
+        "resource_exists": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "resource_scope_denied",
+      "overrides": {
+        "resource_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "permission_code_denied",
+      "overrides": {
+        "permission_code": "notification.timekeeping.receive"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PERMISSION_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "stale_permission_denied",
+      "overrides": {
+        "permission_status": "revoked"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PERMISSION_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "purpose_code_denied",
+      "overrides": {
+        "purpose_code": "operations_notification"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PURPOSE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "purpose_inactive_denied",
+      "overrides": {
+        "purpose_status": "ended"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PURPOSE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "consent_withdrawn_denied",
+      "overrides": {
+        "consent_status": "withdrawn"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONSENT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "consent_ambiguous_denied",
+      "overrides": {
+        "consent_status": "ambiguous"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONSENT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "consent_non_authoritative_denied",
+      "overrides": {
+        "consent_decision_authoritative": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONSENT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "recipient_unauthenticated_denied",
+      "overrides": {
+        "recipient_authenticated": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_UNAUTHENTICATED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "recipient_inactive_denied",
+      "overrides": {
+        "recipient_identity_status": "inactive"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_INACTIVE",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "policy_version_inactive_denied",
+      "overrides": {
+        "policy_version_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_POLICY_INACTIVE",
+      "expected_public_error": "NOTIFICATION_DELIVERY_UNAVAILABLE"
+    },
+    {
+      "case_code": "runtime_approval_pending_denied",
+      "overrides": {
+        "runtime_approval_status": "pending"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_POLICY_INACTIVE",
+      "expected_public_error": "NOTIFICATION_DELIVERY_UNAVAILABLE"
+    },
+    {
+      "case_code": "notification_service_untrusted_denied",
+      "overrides": {
+        "notification_service_identity_trusted": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SERVICE_IDENTITY_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "notification_service_wrong_permission_denied",
+      "overrides": {
+        "notification_service_permission_code": "service.notification.request"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SERVICE_IDENTITY_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "source_service_untrusted_denied",
+      "overrides": {
+        "source_service_identity_trusted": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SOURCE_SERVICE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "source_service_wrong_permission_denied",
+      "overrides": {
+        "source_service_permission_code": "service.notification.dispatch"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SOURCE_SERVICE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "source_delegation_missing_denied",
+      "overrides": {
+        "source_delegation_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DELEGATION_REQUIRED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "push_provider_adapter_untrusted_denied",
+      "overrides": {
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "provider_adapter_identity_trusted": false,
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PROVIDER_ADAPTER_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "email_provider_wrong_permission_denied",
+      "overrides": {
+        "channel": "email",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_endpoint",
+        "provider_adapter_permission_code": "service.notification.request",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_subject_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PROVIDER_ADAPTER_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "channel_preference_disabled_denied",
+      "overrides": {
+        "channel_preference_status": "disabled"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CHANNEL_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "privacy_officer_push_denied",
+      "overrides": {
+        "recipient_role": "privacy_officer",
+        "recipient_relationship": "approved_privacy_case",
+        "content_class": "privacy_action",
+        "template_code": "notification.privacy_action.generic",
+        "template_version": 1,
+        "permission_code": "notification.privacy.receive",
+        "purpose_code": "privacy_action_notification",
+        "source_state": "action_required",
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CHANNEL_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "push_endpoint_revoked_denied",
+      "overrides": {
+        "channel": "push",
+        "endpoint_status": "revoked",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_ENDPOINT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "push_endpoint_reassigned_denied",
+      "overrides": {
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_owner_match": false,
+        "endpoint_protection_status": "encrypted_tokenized",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_ENDPOINT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "email_endpoint_unverified_denied",
+      "overrides": {
+        "channel": "email",
+        "endpoint_status": "active",
+        "endpoint_verified": false,
+        "endpoint_protection_status": "encrypted_endpoint",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_subject_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_ENDPOINT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "push_token_protection_missing_denied",
+      "overrides": {
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "plaintext",
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_ENDPOINT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "unallowlisted_template_code_denied",
+      "overrides": {
+        "template_code": "notification.attendance.detailed"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "unallowlisted_template_version_denied",
+      "overrides": {
+        "template_version": 2
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "unknown_content_class_denied",
+      "overrides": {
+        "content_class": "student_detail"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "signed_url_content_denied",
+      "overrides": {
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "opaque_resource_ref",
+          "created_at",
+          "expires_at",
+          "signed_url"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "missing_required_content_field_denied",
+      "overrides": {
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "created_at",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "unallowlisted_content_field_denied",
+      "overrides": {
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "opaque_resource_ref",
+          "created_at",
+          "expires_at",
+          "direct_resource_url"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONTENT_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "source_rejected_denied",
+      "overrides": {
+        "content_class": "violation_update",
+        "template_code": "notification.violation.generic",
+        "template_version": 1,
+        "permission_code": "notification.violation.receive",
+        "purpose_code": "violation_notification",
+        "source_state": "rejected"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SOURCE_NOT_ELIGIBLE",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "source_notification_ineligible_denied",
+      "overrides": {
+        "source_notification_eligible": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SOURCE_NOT_ELIGIBLE",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "source_retention_expired_denied",
+      "overrides": {
+        "source_retention_status": "expired"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SOURCE_NOT_ELIGIBLE",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "notification_expired_denied",
+      "overrides": {
+        "notification_expiry_status": "expired"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_EXPIRED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "source_expired_denied",
+      "overrides": {
+        "source_expiry_status": "expired"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_EXPIRED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "notification_cancelled_denied",
+      "overrides": {
+        "notification_state": "cancelled"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CANCELLED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "duplicate_suppressed",
+      "overrides": {
+        "deduplication_state": "duplicate"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DUPLICATE_SUPPRESSED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "invalid_sensitivity_denied",
+      "overrides": {
+        "notification_sensitivity": "Low"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_SENSITIVITY_INVALID",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "authorization_dependency_unavailable",
+      "overrides": {
+        "authorization_dependencies_available": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DEPENDENCY_UNAVAILABLE",
+      "expected_public_error": "NOTIFICATION_DELIVERY_UNAVAILABLE"
+    },
+    {
+      "case_code": "push_provider_dependency_unavailable",
+      "overrides": {
+        "channel": "push",
+        "endpoint_status": "active",
+        "endpoint_protection_status": "encrypted_tokenized",
+        "provider_dependency_available": false,
+        "content_fields": [
+          "template_code",
+          "template_version",
+          "generic_title_code",
+          "generic_body_code",
+          "opaque_notification_ref",
+          "allowlisted_route_code",
+          "expires_at"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DEPENDENCY_UNAVAILABLE",
+      "expected_public_error": "NOTIFICATION_DELIVERY_UNAVAILABLE"
+    },
+    {
+      "case_code": "retry_allowed",
+      "overrides": {
+        "operation": "retry"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_RETRY_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "retry_limit_missing_denied",
+      "overrides": {
+        "operation": "retry",
+        "retry_limit_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RETRY_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "retry_attempt_over_limit_denied",
+      "overrides": {
+        "operation": "retry",
+        "retry_attempt_status": "over_limit"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RETRY_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "retry_window_expired_denied",
+      "overrides": {
+        "operation": "retry",
+        "retry_window_status": "after_expiry"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RETRY_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "retry_payload_not_minimized_denied",
+      "overrides": {
+        "operation": "retry",
+        "retry_payload_minimized": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RETRY_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "dead_letter_allowed",
+      "overrides": {
+        "operation": "dead_letter"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DEAD_LETTER_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "dead_letter_token_field_denied",
+      "overrides": {
+        "operation": "dead_letter",
+        "dead_letter_fields": [
+          "opaque_notification_ref",
+          "opaque_recipient_ref",
+          "opaque_resource_ref",
+          "channel",
+          "template_version",
+          "policy_version",
+          "purpose_code",
+          "attempt_count",
+          "next_attempt_at",
+          "expires_at",
+          "correlation_id",
+          "stable_failure_category",
+          "device_token"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DEAD_LETTER_PAYLOAD_INVALID",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "dead_letter_outlives_source_denied",
+      "overrides": {
+        "operation": "dead_letter",
+        "dead_letter_expiry_status": "after_source_expiry"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DEAD_LETTER_PAYLOAD_INVALID",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "open_allowed",
+      "overrides": {
+        "operation": "open"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_OPEN_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "open_wrong_recipient_denied",
+      "overrides": {
+        "operation": "open",
+        "recipient_relationship": "unrelated_child"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_RECIPIENT_SCOPE_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "open_stale_permission_denied",
+      "overrides": {
+        "operation": "open",
+        "permission_status": "revoked"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_PERMISSION_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "open_withdrawn_consent_denied",
+      "overrides": {
+        "operation": "open",
+        "consent_status": "withdrawn"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CONSENT_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "open_resource_authorization_denied",
+      "overrides": {
+        "operation": "open",
+        "open_resource_authorization_status": "denied"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_OPEN_REAUTHORIZATION_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "open_dependency_unavailable",
+      "overrides": {
+        "operation": "open",
+        "authorization_dependencies_available": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_DEPENDENCY_UNAVAILABLE",
+      "expected_public_error": "NOTIFICATION_DELIVERY_UNAVAILABLE"
+    },
+    {
+      "case_code": "open_expired_denied",
+      "overrides": {
+        "operation": "open",
+        "notification_expiry_status": "expired"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_EXPIRED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "open_cancelled_denied",
+      "overrides": {
+        "operation": "open",
+        "notification_state": "cancelled"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CANCELLED",
+      "expected_public_error": "NOTIFICATION_NOT_AVAILABLE"
+    },
+    {
+      "case_code": "cancel_consent_withdrawal_allowed",
+      "overrides": {
+        "operation": "cancel"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_CANCELLATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "cancel_permission_revoked_allowed",
+      "overrides": {
+        "operation": "cancel",
+        "cancellation_trigger": "permission_revoked"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_CANCELLATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "cancel_source_rejected_allowed",
+      "overrides": {
+        "operation": "cancel",
+        "cancellation_trigger": "source_rejected"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_CANCELLATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "cancel_unsupported_trigger_denied",
+      "overrides": {
+        "operation": "cancel",
+        "cancellation_trigger": "manual_convenience"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CANCELLATION_DENIED",
+      "expected_public_error": "NOTIFICATION_REQUEST_INVALID"
+    },
+    {
+      "case_code": "cancel_owner_unauthorized_denied",
+      "overrides": {
+        "operation": "cancel",
+        "cancellation_owner_authorized": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "NOTIFICATION_CANCELLATION_DENIED",
+      "expected_public_error": "NOTIFICATION_NOT_FOUND"
+    },
+    {
+      "case_code": "correction_notification_allowed",
+      "overrides": {
+        "content_class": "correction_update",
+        "template_code": "notification.correction.generic",
+        "template_version": 1,
+        "permission_code": "notification.correction.receive",
+        "purpose_code": "correction_notification",
+        "source_state": "corrected"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "NOTIFICATION_DISPATCH_ALLOWED",
+      "expected_public_error": ""
+    }
+  ]
+}
