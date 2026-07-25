@@ -1,0 +1,717 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "policy_version": "evidence_access_policy_v1",
+  "opaque_references": {
+    "actor_id": "test_actor_0001",
+    "tenant_id": "test_tenant_0001",
+    "school_id": "test_school_0001",
+    "evidence_object_id": "test_evidence_0001",
+    "resource_id": "test_resource_0001",
+    "request_id": "test_request_0001",
+    "correlation_id": "test_correlation_0001"
+  },
+  "default_context": {
+    "actor_authenticated": true,
+    "actor_kind": "human",
+    "actor_role": "subject_self",
+    "trusted_service_identity": false,
+    "service_permission_granted": false,
+    "service_permission_code": "",
+    "delegation_status": "not_required",
+    "requested_action": "view_metadata",
+    "permission_code": "evidence.view_metadata",
+    "tenant_scope_match": true,
+    "school_scope_match": true,
+    "object_scope_match": true,
+    "relationship_scope": "own_staff_record",
+    "purpose_status": "approved",
+    "consent_requirement": "not_required",
+    "consent_status": "not_required",
+    "evidence_sensitivity": "high",
+    "resource_exists": true,
+    "evidence_state": "available",
+    "retention_status": "active",
+    "legal_hold_status": "none",
+    "authorization_dependencies_available": true,
+    "reason_code": "",
+    "url_ttl_seconds": null,
+    "export_approval_status": "not_required",
+    "export_recipient_status": "not_required",
+    "export_artifact_ttl_seconds": null
+  },
+  "cases": [
+    {
+      "case_code": "self_own_metadata_allowed",
+      "overrides": {},
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "self_own_thumbnail_default_ttl",
+      "overrides": {
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "self_original_denied",
+      "overrides": {
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "VIOLATION_REVIEW"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "self_wrong_object_denied",
+      "overrides": {
+        "object_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_OBJECT_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "parent_linked_thumbnail_allowed",
+      "overrides": {
+        "actor_role": "parent_guardian",
+        "relationship_scope": "linked_child",
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "parent_unlinked_child_denied",
+      "overrides": {
+        "actor_role": "parent_guardian",
+        "relationship_scope": "unlinked_child"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_OBJECT_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "teacher_subject_assignment_allowed",
+      "overrides": {
+        "actor_role": "teacher_subject",
+        "relationship_scope": "assigned_class_schedule_task"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "teacher_wrong_class_denied",
+      "overrides": {
+        "actor_role": "teacher_subject",
+        "relationship_scope": "other_class"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_OBJECT_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "homeroom_thumbnail_allowed",
+      "overrides": {
+        "actor_role": "teacher_homeroom",
+        "relationship_scope": "assigned_homeroom",
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "hr_original_allowed",
+      "overrides": {
+        "actor_role": "hr_officer",
+        "relationship_scope": "assigned_hr_unit",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "TIMEKEEPING_AUDIT"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "hr_wrong_unit_denied",
+      "overrides": {
+        "actor_role": "hr_officer",
+        "relationship_scope": "other_hr_unit"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_OBJECT_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "bgh_download_max_ttl_allowed",
+      "overrides": {
+        "actor_role": "bgh",
+        "relationship_scope": "assigned_school",
+        "requested_action": "download",
+        "permission_code": "evidence.download",
+        "reason_code": "MANAGEMENT_REPORT",
+        "url_ttl_seconds": 300
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 300
+    },
+    {
+      "case_code": "bgh_cross_school_denied",
+      "overrides": {
+        "actor_role": "bgh",
+        "relationship_scope": "assigned_school",
+        "school_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_SCHOOL_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "kitchen_original_allowed",
+      "overrides": {
+        "actor_role": "kitchen_manager",
+        "relationship_scope": "assigned_kitchen_zone_shift",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "BUSINESS_REVIEW"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "security_reviewer_original_allowed",
+      "overrides": {
+        "actor_role": "security_reviewer",
+        "relationship_scope": "assigned_zone_camera",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "VIOLATION_REVIEW"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "privacy_ticket_metadata_allowed",
+      "overrides": {
+        "actor_role": "privacy_officer",
+        "relationship_scope": "approved_privacy_ticket"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "privacy_thumbnail_denied",
+      "overrides": {
+        "actor_role": "privacy_officer",
+        "relationship_scope": "approved_privacy_ticket",
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "auditor_ticket_metadata_allowed",
+      "overrides": {
+        "actor_role": "auditor",
+        "relationship_scope": "approved_audit_ticket"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "auditor_original_denied",
+      "overrides": {
+        "actor_role": "auditor",
+        "relationship_scope": "approved_audit_ticket",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "SECURITY_INVESTIGATION"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "school_admin_default_denied",
+      "overrides": {
+        "actor_role": "school_admin",
+        "relationship_scope": "assigned_school"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "system_admin_default_denied",
+      "overrides": {
+        "actor_role": "system_admin",
+        "relationship_scope": "system"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "technical_operator_default_denied",
+      "overrides": {
+        "actor_role": "technical_operator",
+        "relationship_scope": "operations"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "evidence_service_delegated_allowed",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "evidence_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.evidence.deliver",
+        "delegation_status": "approved",
+        "relationship_scope": "delegated_authorized_scope",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "VIOLATION_REVIEW"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 60
+    },
+    {
+      "case_code": "evidence_service_missing_delegation",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "evidence_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.evidence.deliver",
+        "delegation_status": "missing",
+        "relationship_scope": "delegated_authorized_scope"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_DELEGATION_REQUIRED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "evidence_service_untrusted_identity",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "evidence_service",
+        "trusted_service_identity": false,
+        "service_permission_granted": true,
+        "service_permission_code": "service.evidence.deliver",
+        "delegation_status": "approved",
+        "relationship_scope": "delegated_authorized_scope"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_SERVICE_IDENTITY_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "evidence_service_wrong_permission_denied",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "evidence_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.report.export",
+        "delegation_status": "approved",
+        "relationship_scope": "delegated_authorized_scope"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_SERVICE_IDENTITY_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "report_service_export_allowed",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "report_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.report.export",
+        "delegation_status": "approved",
+        "relationship_scope": "approved_export_scope",
+        "requested_action": "export",
+        "permission_code": "evidence.export",
+        "reason_code": "MANAGEMENT_REPORT",
+        "url_ttl_seconds": 120,
+        "export_approval_status": "approved",
+        "export_recipient_status": "approved_internal_recipient",
+        "export_artifact_ttl_seconds": 604800
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": 120
+    },
+    {
+      "case_code": "report_service_export_approval_missing",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "report_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.report.export",
+        "delegation_status": "approved",
+        "relationship_scope": "approved_export_scope",
+        "requested_action": "export",
+        "permission_code": "evidence.export",
+        "reason_code": "MANAGEMENT_REPORT",
+        "export_approval_status": "missing",
+        "export_recipient_status": "approved_internal_recipient",
+        "export_artifact_ttl_seconds": 604800
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_EXPORT_APPROVAL_REQUIRED",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "report_service_export_recipient_invalid",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "report_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.report.export",
+        "delegation_status": "approved",
+        "relationship_scope": "approved_export_scope",
+        "requested_action": "export",
+        "permission_code": "evidence.export",
+        "reason_code": "MANAGEMENT_REPORT",
+        "export_approval_status": "approved",
+        "export_recipient_status": "uncontrolled",
+        "export_artifact_ttl_seconds": 604800
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_EXPORT_RECIPIENT_INVALID",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "report_service_export_artifact_ttl_over_limit",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "report_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.report.export",
+        "delegation_status": "approved",
+        "relationship_scope": "approved_export_scope",
+        "requested_action": "export",
+        "permission_code": "evidence.export",
+        "reason_code": "MANAGEMENT_REPORT",
+        "export_approval_status": "approved",
+        "export_recipient_status": "approved_internal_recipient",
+        "export_artifact_ttl_seconds": 604801
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_EXPORT_ARTIFACT_TTL_INVALID",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "notification_service_media_access_denied",
+      "overrides": {
+        "actor_kind": "service",
+        "actor_role": "notification_service",
+        "trusted_service_identity": true,
+        "service_permission_granted": true,
+        "service_permission_code": "service.notification.reference_only",
+        "relationship_scope": "notification"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "missing_resource_concealed",
+      "overrides": {
+        "resource_exists": false,
+        "evidence_state": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_NOT_FOUND",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "cross_tenant_concealed",
+      "overrides": {
+        "tenant_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_TENANT_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "direct_object_id_not_authority",
+      "overrides": {
+        "object_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_OBJECT_SCOPE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "purpose_missing_denied",
+      "overrides": {
+        "purpose_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_PURPOSE_REQUIRED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "purpose_not_approved_denied",
+      "overrides": {
+        "purpose_status": "denied"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_PURPOSE_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "withdrawn_consent_denied",
+      "overrides": {
+        "consent_requirement": "required",
+        "consent_status": "blocked",
+        "evidence_sensitivity": "critical"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_CONSENT_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "missing_required_consent_denied",
+      "overrides": {
+        "consent_requirement": "required",
+        "consent_status": "not_required",
+        "evidence_sensitivity": "critical"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_CONSENT_REQUIRED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "expired_retention_with_hold_denied",
+      "overrides": {
+        "retention_status": "expired",
+        "legal_hold_status": "active"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_RETENTION_EXPIRED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "active_hold_does_not_block_authorized_view",
+      "overrides": {
+        "legal_hold_status": "active"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "EVIDENCE_ACCESS_ALLOWED",
+      "expected_public_error": "",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "unresolved_hold_denied",
+      "overrides": {
+        "legal_hold_status": "unknown"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_LEGAL_HOLD_UNRESOLVED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "pending_upload_denied",
+      "overrides": {
+        "evidence_state": "pending_upload"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_UPLOAD_PENDING",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "quarantined_denied",
+      "overrides": {
+        "evidence_state": "quarantined"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_QUARANTINED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "deleted_denied",
+      "overrides": {
+        "evidence_state": "deleted"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_DELETED",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "delete_pending_denied",
+      "overrides": {
+        "evidence_state": "delete_pending"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_NOT_AVAILABLE",
+      "expected_public_error": "EVIDENCE_NOT_AVAILABLE",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "signed_get_zero_ttl_denied",
+      "overrides": {
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail",
+        "url_ttl_seconds": 0
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_URL_TTL_INVALID",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "signed_get_negative_ttl_denied",
+      "overrides": {
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail",
+        "url_ttl_seconds": -1
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_URL_TTL_INVALID",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "signed_get_over_hard_max_denied",
+      "overrides": {
+        "requested_action": "view_thumbnail",
+        "permission_code": "evidence.view_thumbnail",
+        "url_ttl_seconds": 301
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_URL_TTL_INVALID",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "original_missing_reason_denied",
+      "overrides": {
+        "actor_role": "hr_officer",
+        "relationship_scope": "assigned_hr_unit",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": ""
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_REASON_REQUIRED",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "original_invalid_reason_denied",
+      "overrides": {
+        "actor_role": "hr_officer",
+        "relationship_scope": "assigned_hr_unit",
+        "requested_action": "view_original",
+        "permission_code": "evidence.view_original",
+        "reason_code": "UNAPPROVED_REASON"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_REASON_INVALID",
+      "expected_public_error": "EVIDENCE_ACCESS_INVALID",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "explicit_permission_missing_denied",
+      "overrides": {
+        "permission_code": ""
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_PERMISSION_DENIED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "anonymous_actor_denied",
+      "overrides": {
+        "actor_authenticated": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_ACTOR_UNAUTHENTICATED",
+      "expected_public_error": "EVIDENCE_NOT_FOUND",
+      "expected_ttl_seconds": null
+    },
+    {
+      "case_code": "authorization_dependency_failure",
+      "overrides": {
+        "authorization_dependencies_available": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "EVIDENCE_AUTHZ_DEPENDENCY_UNAVAILABLE",
+      "expected_public_error": "EVIDENCE_ACCESS_UNAVAILABLE",
+      "expected_ttl_seconds": null
+    }
+  ]
+}
