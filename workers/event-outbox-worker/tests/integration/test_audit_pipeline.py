@@ -24,7 +24,7 @@ from event_outbox_worker.__main__ import TrustedContextAppender
 from event_outbox_worker.audit_delivery import DeliverAuditIntents
 from sqlalchemy.engine import make_url
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 ADAPTER_ROOT = REPO_ROOT / "services" / "ansvis-adapter"
 AUDIT_ROOT = REPO_ROOT / "services" / "audit-log-service"
 SIGNING_KEY = b"synthetic-audit-integrity-key-32b!"
