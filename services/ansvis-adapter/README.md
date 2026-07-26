@@ -96,13 +96,17 @@ and changed-content reuse records a stable `EVENT_IDEMPOTENCY_CONFLICT` quaranti
 come only from `EventScopeResolver`; the repository neither queries nor foreign-keys another service's
 schema. Retention has no code default and must be supplied from an approved bounded policy.
 
-Outbox delivery is at-least-once. One dispatcher claim is leased for 30 seconds, failures use
-5/10/20/40-second exponential base delays plus bounded 0–20% jitter, and the fifth failure becomes
+Outbox delivery is at-least-once. Claims are leased for 30 seconds; `claim_batch` leases up to 50 due
+messages in recorded order under `FOR UPDATE SKIP LOCKED` and `mark_published_batch` acknowledges the
+whole batch in one transaction (`claim_next`/`mark_published` delegate to the same paths). Failures
+use 5/10/20/40-second exponential base delays plus bounded 0–20% jitter, and the fifth failure becomes
 `failed`/dead-lettered. Replay accepts only an
 explicit typed operator authorization with an opaque actor UUID and allowlisted reason code; it writes
 an append-only replay attempt before returning the message to `pending`. A concrete broker publisher
 is injected through `EventPublisher`; the default application does not start a worker or guess a queue
-connection. Downstream consumers must remain idempotent.
+connection. The supervised drain runtime lives in `workers/event-outbox-worker/` (`DrainOutboxBatch`
+use case + RabbitMQ publisher under confirms, exchange `camera-ai.events.v1`). Downstream consumers
+must remain idempotent.
 
 Stored JSONB contracts are allowlisted as `event_metadata_v1`, `detection_attributes_v1` and
 `normalized_outbox_v1`. They cannot contain raw ANSVIS payloads, media URLs/binary, base64, RTSP data,

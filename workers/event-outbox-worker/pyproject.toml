@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-event-outbox-worker"
+version = "0.1.0"
+description = "Supervised outbox drain worker publishing normalized events to RabbitMQ"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "camera-ai-ansvis-adapter==0.1.0",
+    "pika==1.4.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

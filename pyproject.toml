@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-include = ["scripts/**/*.py", "services/**/*.py", "packages/**/*.py"]
+include = ["scripts/**/*.py", "services/**/*.py", "packages/**/*.py", "workers/**/*.py"]
 
 [tool.ruff.lint]
 select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
@@ -20,6 +20,7 @@ files = [
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
     "services/timekeeping-service/src",
+    "workers/event-outbox-worker/src",
 ]
 pretty = true
 show_error_codes = true
@@ -33,7 +34,12 @@ mypy_path = [
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
     "services/timekeeping-service/src",
+    "workers/event-outbox-worker/src",
 ]
+
+[[tool.mypy.overrides]]
+module = "pika.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -47,6 +53,7 @@ testpaths = [
     "services/camera-registry-service/tests",
     "services/ansvis-adapter/tests",
     "services/timekeeping-service/tests",
+    "workers/event-outbox-worker/tests",
 ]
 pythonpath = [
     ".",
@@ -58,6 +65,7 @@ pythonpath = [
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
     "services/timekeeping-service/src",
+    "workers/event-outbox-worker/src",
 ]
 addopts = ["--strict-config", "--strict-markers", "--import-mode=importlib"]
 asyncio_mode = "strict"

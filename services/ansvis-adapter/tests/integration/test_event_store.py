@@ -12,7 +12,7 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
-from ansvis_adapter.application.outbox import DispatchOutboxMessage
+from ansvis_adapter.application.outbox import DispatchOutboxMessage, DrainOutboxBatch
 from ansvis_adapter.application.ports import AuthenticatedSource, ReceiptOutcome
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.ingestion import DispatchOutcome, ReplayAuthorization, ResolvedEventScope
@@ -362,6 +362,118 @@ def test_event_store_migration_idempotency_quarantine_outbox_and_minimization() 
         command.downgrade(config, "base")
         upgraded = False
         assert inspect(engine).has_schema("events") is False
+    finally:
+        if upgraded:
+            command.downgrade(config, "base")
+        engine.dispose()
+
+
+def test_outbox_batch_claim_lease_isolation_and_batch_acknowledgement() -> None:
+    """Batch drain against a real database: ordering, lease isolation, batch ack, recovery."""
+
+    database_uri = _test_database_uri()
+    engine = sa.create_engine(database_uri, poolclass=sa.pool.NullPool)
+    config = _alembic_config()
+    upgraded = False
+    seeded = 60
+    try:
+        command.downgrade(config, "base")
+        command.upgrade(config, "head")
+        upgraded = True
+
+        clock = MutableClock(NOW)
+        repository = PostgresEventIngestionRepository(
+            engine,
+            scopes=StaticScopes(),
+            retention_days=30,
+            now=clock,
+        )
+        deriver = ContractIdempotencyDeriver(fallback_keys=PrimaryOnlyKeys())
+        for index in range(seeded):
+            clock.value = NOW + timedelta(seconds=index)
+            event = parse_and_normalize_event(
+                _event_payload(
+                    source_event_id=f"event_test_batch_{index:04d}",
+                    correlation_id=f"corr_test_batch_{index:04d}",
+                )
+            )
+            receipt = repository.record(event, SOURCE, deriver.derive(event, SOURCE))
+            assert receipt.outcome is ReceiptOutcome.ACCEPTED
+
+        claim_time = NOW + timedelta(seconds=seeded)
+
+        # Bounds are enforced before any SQL runs.
+        with pytest.raises(ValueError, match="1..50"):
+            repository.claim_batch(now=claim_time, limit=0)
+        with pytest.raises(ValueError, match="1..50"):
+            repository.claim_batch(now=claim_time, limit=51)
+
+        first = repository.claim_batch(now=claim_time, limit=50)
+        assert len(first) == 50
+        second = repository.claim_batch(now=claim_time, limit=50)
+        assert len(second) == 10  # leased rows are invisible to a concurrent claimer
+        assert {m.outbox_message_id for m in first}.isdisjoint(
+            {m.outbox_message_id for m in second}
+        )
+
+        # A foreign confirmation pair must fail the whole batch acknowledgement.
+        with pytest.raises(AnsvisAdapterError, match="EVENT_DURABLE_RECEIPT_UNAVAILABLE"):
+            repository.mark_published_batch(
+                [(first[0].outbox_message_id, second[0].claim_token)],
+                published_at=claim_time,
+            )
+
+        repository.mark_published_batch(
+            [(message.outbox_message_id, message.claim_token) for message in first],
+            published_at=claim_time,
+        )
+
+        # An expired lease is reclaimable; an active one is not.
+        assert repository.claim_batch(now=claim_time, limit=50) == ()
+        recovered = repository.claim_batch(now=claim_time + timedelta(seconds=31), limit=50)
+        assert len(recovered) == 10
+        repository.mark_published_batch(
+            [(message.outbox_message_id, message.claim_token) for message in recovered],
+            published_at=claim_time + timedelta(seconds=31),
+        )
+
+        with engine.connect() as connection:
+            statuses = (
+                connection.execute(
+                    sa.text(
+                        "SELECT publish_status, count(*) AS total"
+                        " FROM events.outbox_messages GROUP BY publish_status"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        assert {row["publish_status"]: row["total"] for row in statuses} == {"published": seeded}
+
+        # End-to-end drain use case over a fresh backlog, one poison message included.
+        for index in range(seeded, seeded + 12):
+            clock.value = NOW + timedelta(seconds=index)
+            event = parse_and_normalize_event(
+                _event_payload(
+                    source_event_id=f"event_test_batch_{index:04d}",
+                    correlation_id=f"corr_test_batch_{index:04d}",
+                )
+            )
+            repository.record(event, SOURCE, deriver.derive(event, SOURCE))
+
+        publisher = TogglePublisher(fail=False)
+        drain = DrainOutboxBatch(
+            repository,
+            publisher,
+            now=lambda: NOW + timedelta(seconds=200),
+            jitter=lambda maximum: 0,
+        )
+        result = drain.execute()
+        assert result.claimed == 12
+        assert result.published == 12
+        assert result.retry_scheduled == 0
+        assert len(publisher.published) == 12
+        assert drain.execute().empty is True
     finally:
         if upgraded:
             command.downgrade(config, "base")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -107,10 +107,21 @@ class OutboxRepository(Protocol):
     def claim_next(self, *, now: datetime) -> PendingOutboxMessage | None:
         """Lease one due message without allowing another worker to claim it."""
 
+    def claim_batch(self, *, now: datetime, limit: int) -> tuple[PendingOutboxMessage, ...]:
+        """Lease up to `limit` due messages in recorded order with skip-locked semantics."""
+
     def mark_published(
         self, message_id: UUID, claim_token: UUID, *, published_at: datetime
     ) -> None:
         """Confirm publish for the exact active lease."""
+
+    def mark_published_batch(
+        self,
+        confirmations: Sequence[tuple[UUID, UUID]],
+        *,
+        published_at: datetime,
+    ) -> None:
+        """Confirm publish for every `(message_id, claim_token)` lease in one transaction."""
 
     def record_failure(
         self,

@@ -28,8 +28,18 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "consent-withdrawal-policy": ((python, "scripts/check_consent_withdrawal_policy.py"),),
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "lint": (
-            (python, "-m", "ruff", "check", "scripts", "services", "packages"),
-            (python, "-m", "ruff", "format", "--check", "scripts", "services", "packages"),
+            (python, "-m", "ruff", "check", "scripts", "services", "packages", "workers"),
+            (
+                python,
+                "-m",
+                "ruff",
+                "format",
+                "--check",
+                "scripts",
+                "services",
+                "packages",
+                "workers",
+            ),
         ),
         "typecheck": (
             (python, "-m", "mypy", "scripts"),
@@ -103,6 +113,13 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "services/timekeeping-service/src",
                 "services/timekeeping-service/tests",
             ),
+            (
+                python,
+                "-m",
+                "mypy",
+                "workers/event-outbox-worker/src",
+                "workers/event-outbox-worker/tests",
+            ),
         ),
         "unit": (
             (
@@ -121,6 +138,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "services/ansvis-adapter/tests",
                 "services/attendance-service/tests",
                 "services/timekeeping-service/tests",
+                "workers/event-outbox-worker/tests",
             ),
         ),
     }

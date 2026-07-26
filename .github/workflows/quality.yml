@@ -59,6 +59,7 @@ jobs:
             services/ansvis-adapter/pyproject.toml
             services/attendance-service/pyproject.toml
             services/timekeeping-service/pyproject.toml
+            workers/event-outbox-worker/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
         run: >-
@@ -74,6 +75,7 @@ jobs:
           -e "services/ansvis-adapter[test]"
           -e "services/attendance-service[test]"
           -e "services/timekeeping-service[test]"
+          -e "workers/event-outbox-worker[test]"
 
       - name: Run repository quality gates
         run: python scripts/quality.py all
