@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID, uuid4
@@ -398,11 +398,17 @@ class PostgresEventIngestionRepository(
         )
 
     def claim_next(self, *, now: datetime) -> PendingOutboxMessage | None:
+        messages = self.claim_batch(now=now, limit=1)
+        return messages[0] if messages else None
+
+    def claim_batch(self, *, now: datetime, limit: int) -> tuple[PendingOutboxMessage, ...]:
+        if not 1 <= limit <= 50:
+            raise ValueError("outbox claim batch size must stay within 1..50")
         current = _utc(now)
         token = uuid4()
         try:
             with self._engine.begin() as connection:
-                row = (
+                rows = (
                     connection.execute(
                         sa.select(outbox_messages)
                         .where(
@@ -417,46 +423,68 @@ class PostgresEventIngestionRepository(
                             outbox_messages.c.recorded_at, outbox_messages.c.outbox_message_id
                         )
                         .with_for_update(skip_locked=True)
-                        .limit(1)
+                        .limit(limit)
                     )
                     .mappings()
-                    .one_or_none()
+                    .all()
                 )
-                if row is None:
-                    return None
-                message_id = cast(UUID, row["outbox_message_id"])
-                connection.execute(
+                if not rows:
+                    return ()
+                message_ids = [cast(UUID, row["outbox_message_id"]) for row in rows]
+                claimed = connection.execute(
                     sa.update(outbox_messages)
-                    .where(outbox_messages.c.outbox_message_id == message_id)
+                    .where(outbox_messages.c.outbox_message_id.in_(message_ids))
                     .values(
                         claim_token=token,
                         claim_expires_at=current + timedelta(seconds=self._claim_seconds),
                     )
                 )
-                payload = cast(Mapping[str, object], row["payload"])
-                return PendingOutboxMessage(
-                    outbox_message_id=message_id,
-                    normalized_event_id=cast(UUID, row["normalized_event_id"]),
-                    claim_token=token,
-                    topic=str(row["topic"]),
-                    contract_version=str(row["contract_version"]),
-                    payload=payload,
-                    attempt_count=int(row["attempt_count"]),
+                if claimed.rowcount != len(message_ids):
+                    raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
+                return tuple(
+                    PendingOutboxMessage(
+                        outbox_message_id=cast(UUID, row["outbox_message_id"]),
+                        normalized_event_id=cast(UUID, row["normalized_event_id"]),
+                        claim_token=token,
+                        topic=str(row["topic"]),
+                        contract_version=str(row["contract_version"]),
+                        payload=cast(Mapping[str, object], row["payload"]),
+                        attempt_count=int(row["attempt_count"]),
+                    )
+                    for row in rows
                 )
+        except AnsvisAdapterError:
+            raise
         except SQLAlchemyError:
             raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE") from None
 
     def mark_published(
         self, message_id: UUID, claim_token: UUID, *, published_at: datetime
     ) -> None:
+        self.mark_published_batch(((message_id, claim_token),), published_at=published_at)
+
+    def mark_published_batch(
+        self,
+        confirmations: Sequence[tuple[UUID, UUID]],
+        *,
+        published_at: datetime,
+    ) -> None:
+        if not confirmations:
+            return
         current = _utc(published_at)
+        pairs = [
+            sa.tuple_(sa.literal(message_id), sa.literal(claim_token))
+            for message_id, claim_token in confirmations
+        ]
         try:
             with self._engine.begin() as connection:
                 result = connection.execute(
                     sa.update(outbox_messages)
                     .where(
-                        outbox_messages.c.outbox_message_id == message_id,
-                        outbox_messages.c.claim_token == claim_token,
+                        sa.tuple_(
+                            outbox_messages.c.outbox_message_id,
+                            outbox_messages.c.claim_token,
+                        ).in_(pairs),
                         outbox_messages.c.publish_status == "pending",
                     )
                     .values(
@@ -466,7 +494,7 @@ class PostgresEventIngestionRepository(
                         claim_expires_at=None,
                     )
                 )
-                if result.rowcount != 1:
+                if result.rowcount != len(confirmations):
                     raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
         except AnsvisAdapterError:
             raise

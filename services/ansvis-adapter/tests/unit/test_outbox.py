@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -45,10 +46,24 @@ class FakeRepository:
         self.claim_times.append(now)
         return self.message
 
+    def claim_batch(self, *, now: datetime, limit: int) -> tuple[PendingOutboxMessage, ...]:
+        del limit
+        self.claim_times.append(now)
+        return () if self.message is None else (self.message,)
+
     def mark_published(
         self, message_id: UUID, claim_token: UUID, *, published_at: datetime
     ) -> None:
         self.published.append((message_id, claim_token, published_at))
+
+    def mark_published_batch(
+        self,
+        confirmations: Sequence[tuple[UUID, UUID]],
+        *,
+        published_at: datetime,
+    ) -> None:
+        for message_id, claim_token in confirmations:
+            self.published.append((message_id, claim_token, published_at))
 
     def record_failure(
         self,
