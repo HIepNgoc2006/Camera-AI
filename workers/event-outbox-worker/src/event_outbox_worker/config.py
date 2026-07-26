@@ -116,3 +116,36 @@ def _bounded_float(
     if not low <= value <= high:
         raise WorkerConfigurationError(f"{name} must stay within {low}..{high}")
     return value
+
+
+@dataclass(frozen=True, slots=True)
+class AuditDeliverySettings:
+    """Audit delivery inputs; the integrity key has no printable representation."""
+
+    retention_days: int
+    integrity_key: bytes = field(repr=False)
+
+
+def load_audit_delivery_settings(
+    environ: Mapping[str, str] | None = None,
+) -> AuditDeliverySettings:
+    """Load the approved audit retention and the injected integrity key, fail closed."""
+
+    source = os.environ if environ is None else environ
+    environment = source.get("APP_ENV", "development").strip().lower()
+    if environment not in ALLOWED_ENVIRONMENTS:
+        raise WorkerConfigurationError("APP_ENV must be an approved environment label")
+    retention_days = _bounded_int(source, "AUDIT_RETENTION_DAYS", default=1_825, low=30, high=3_650)
+    raw_key = source.get("AUDIT_INTEGRITY_KEY", "")
+    if len(raw_key.encode("utf-8")) < 32:
+        raise WorkerConfigurationError("AUDIT_INTEGRITY_KEY must provide at least 32 bytes")
+    if environment in {"staging", "production"} and any(
+        marker in raw_key.casefold() for marker in PLACEHOLDER_MARKERS
+    ):
+        raise WorkerConfigurationError(
+            "placeholder integrity key is forbidden outside local/test environments"
+        )
+    return AuditDeliverySettings(
+        retention_days=retention_days,
+        integrity_key=raw_key.encode("utf-8"),
+    )

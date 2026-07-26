@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "camera-ai-ansvis-adapter==0.1.0",
+    "camera-ai-audit-log-service==0.1.0",
+    "camera-ai-audit-producer==0.1.0",
     "camera-ai-metrics-runtime==0.1.0",
     "pika==1.4.2",
 ]

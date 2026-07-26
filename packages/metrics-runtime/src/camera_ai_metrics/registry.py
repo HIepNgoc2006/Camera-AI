@@ -96,6 +96,12 @@ _SPECS: tuple[MetricSpec, ...] = (
         outcomes=("event_outbox_dlq_untriaged", "event_outbox_oldest_message"),
     ),
     MetricSpec(
+        name="event_audit_delivery_total",
+        kind=MetricKind.COUNTER,
+        help_text="Audit-intent delivery attempts by bounded outcome.",
+        outcomes=("dead_lettered", "delivered", "duplicate", "empty", "retry_scheduled"),
+    ),
+    MetricSpec(
         name="event_ingestion_ack_seconds",
         kind=MetricKind.HISTOGRAM,
         help_text="Ingestion request handling time to acknowledgement.",
@@ -116,6 +122,11 @@ _SPECS: tuple[MetricSpec, ...] = (
         name="event_outbox_oldest_pending_seconds",
         kind=MetricKind.GAUGE,
         help_text="Age of the oldest pending outbox message at the latest snapshot.",
+    ),
+    MetricSpec(
+        name="event_audit_outbox_oldest_pending_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Age of the oldest undelivered audit intent at the latest snapshot.",
     ),
 )
 

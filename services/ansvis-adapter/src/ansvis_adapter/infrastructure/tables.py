@@ -130,3 +130,22 @@ outbox_messages = sa.Table(
     sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
 )
+
+audit_outbox = sa.Table(
+    "audit_outbox",
+    metadata,
+    sa.Column("audit_outbox_id", postgresql.UUID(as_uuid=True), primary_key=True),
+    sa.Column("source_service", sa.Text(), nullable=False),
+    sa.Column("source_event_id", postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column("school_id", postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column("payload", postgresql.JSONB(), nullable=False),
+    sa.Column("publish_status", sa.Text(), nullable=False),
+    sa.Column("attempt_count", sa.Integer(), nullable=False),
+    sa.Column("next_attempt_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("claim_token", postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column("claim_expires_at", sa.DateTime(timezone=True), nullable=True),
+    sa.Column("last_error_code", sa.Text(), nullable=True),
+    sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("delivered_at", sa.DateTime(timezone=True), nullable=True),
+    sa.UniqueConstraint("source_service", "source_event_id", name="uq_events_audit_outbox_source"),
+)

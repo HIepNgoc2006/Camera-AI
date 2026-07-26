@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+from camera_ai_audit import AuditIntentRecorder
 from camera_ai_metrics import PrometheusMetricsSink, start_internal_metrics_server
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -39,6 +40,7 @@ def create_app(
     idempotency_deriver: IdempotencyDeriver | None = None,
     receipt_port: DurableReceiptPort | None = None,
     metrics: MetricsSink | None = None,
+    audit_recorder: AuditIntentRecorder | None = None,
     request_logger: logging.Logger | None = None,
     now: Callable[[], datetime] = system_utc_now,
 ) -> FastAPI:
@@ -88,7 +90,9 @@ def create_app(
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.include_router(health_router)
-    application.include_router(create_event_router(service, metrics=runtime_metrics))
+    application.include_router(
+        create_event_router(service, metrics=runtime_metrics, audit=audit_recorder)
+    )
     return application
 
 

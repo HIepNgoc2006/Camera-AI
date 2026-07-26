@@ -11,6 +11,7 @@ python_version = "3.12"
 strict = true
 files = [
     "scripts",
+    "packages/audit-producer/src",
     "packages/crypto-runtime/src",
     "packages/metrics-runtime/src",
     "services/api-gateway/src",
@@ -26,6 +27,7 @@ files = [
 pretty = true
 show_error_codes = true
 mypy_path = [
+    "packages/audit-producer/src",
     "packages/crypto-runtime/src",
     "packages/metrics-runtime/src",
     "services/api-gateway/src",
@@ -46,6 +48,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = [
     "scripts/tests",
+    "packages/audit-producer/tests",
     "packages/crypto-runtime/tests",
     "packages/metrics-runtime/tests",
     "services/api-gateway/tests",
@@ -60,6 +63,7 @@ testpaths = [
 ]
 pythonpath = [
     ".",
+    "packages/audit-producer/src",
     "packages/crypto-runtime/src",
     "packages/metrics-runtime/src",
     "services/api-gateway/src",

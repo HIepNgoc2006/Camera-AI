@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
+import re
+from datetime import UTC, datetime
 from time import perf_counter
+from uuid import uuid4
 
+from camera_ai_audit import AuditIntent, AuditIntentRecorder, IntentResult
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -15,6 +20,17 @@ from ansvis_adapter.config import MAX_EVENT_BODY_BYTES
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.schemas.events import load_json_object
 from ansvis_adapter.schemas.responses import ErrorResponse, IngestionAck
+
+AUDIT_SOURCE_SERVICE = "ansvis-adapter-service"
+SOURCE_AUTH_DENIAL_CODES = frozenset(
+    {
+        "EVENT_AUTH_TOKEN_EXPIRED",
+        "EVENT_AUTH_TOKEN_INVALID",
+        "EVENT_SOURCE_MAPPING_DENIED",
+        "EVENT_SOURCE_UNAUTHORIZED",
+    }
+)
+_AUDIT_REQUEST_ID = re.compile(r"^req_[A-Za-z0-9_-]{8,120}$")
 
 
 def _rejected_metric(metrics: MetricsSink) -> None:
@@ -29,6 +45,34 @@ def _ack_duration_metric(metrics: MetricsSink, started_at: float) -> None:
         metrics.observe("event_ingestion_ack_seconds", seconds=perf_counter() - started_at)
     except Exception:
         return
+
+
+def _audit_request_id(candidate: str) -> str:
+    return candidate if _AUDIT_REQUEST_ID.fullmatch(candidate) else f"req_{uuid4().hex}"
+
+
+def _record_auth_denial(
+    audit: AuditIntentRecorder | None, *, reason_code: str, request_id: str
+) -> None:
+    """Best-effort denial evidence: the request is already denied fail-closed, so a broken
+    audit path must not turn a 401 into an availability incident; recorder failures are
+    swallowed here and surface through the audit-outbox backlog gauge instead."""
+
+    if audit is None:
+        return
+    with contextlib.suppress(Exception):
+        audit.record(
+            AuditIntent(
+                source_service=AUDIT_SOURCE_SERVICE,
+                source_event_id=uuid4(),
+                action="ANSVIS_SOURCE_AUTH_DENIED",
+                resource_type="ansvis_source",
+                request_id=_audit_request_id(request_id),
+                result=IntentResult.DENIED,
+                reason_code=reason_code,
+                occurred_at=datetime.now(UTC),
+            )
+        )
 
 
 async def _bounded_json_body(request: Request) -> bytes:
@@ -53,7 +97,10 @@ async def _bounded_json_body(request: Request) -> bytes:
 
 
 def create_event_router(
-    service: IngestAnsvisEvent, *, metrics: MetricsSink | None = None
+    service: IngestAnsvisEvent,
+    *,
+    metrics: MetricsSink | None = None,
+    audit: AuditIntentRecorder | None = None,
 ) -> APIRouter:
     router = APIRouter(tags=["ansvis-integration"])
     runtime_metrics = metrics or NullMetricsSink()
@@ -87,6 +134,10 @@ def create_event_router(
         except AnsvisAdapterError as exc:
             if not dispatched:
                 _rejected_metric(runtime_metrics)
+            if exc.code in SOURCE_AUTH_DENIAL_CODES:
+                _record_auth_denial(
+                    audit, reason_code=exc.code, request_id=request_id_from(request)
+                )
             _ack_duration_metric(runtime_metrics, started_at)
             return adapter_error_response(request, exc.code)
 

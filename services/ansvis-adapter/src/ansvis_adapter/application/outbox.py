@@ -27,8 +27,8 @@ def bounded_jitter(maximum_seconds: int) -> int:
 
 
 def _compute_retry_at(
-    message: PendingOutboxMessage,
     *,
+    attempt_count: int,
     now: datetime,
     jitter: Callable[[int], int],
     max_attempts: int,
@@ -36,7 +36,7 @@ def _compute_retry_at(
 ) -> tuple[bool, datetime | None]:
     """Return `(dead_lettered, retry_at)` under the normalized_outbox_v1 backoff policy."""
 
-    next_attempt = message.attempt_count + 1
+    next_attempt = attempt_count + 1
     dead_lettered = next_attempt >= max_attempts
     if dead_lettered:
         return True, None
@@ -64,6 +64,7 @@ class DispatchOutboxMessage:
         jitter: Callable[[int], int] = bounded_jitter,
         max_attempts: int = 5,
         base_backoff_seconds: int = 5,
+        on_dead_letter: Callable[[PendingOutboxMessage], None] | None = None,
     ) -> None:
         if max_attempts != 5 or base_backoff_seconds != 5:
             raise ValueError("outbox retry policy must match normalized_outbox_v1")
@@ -74,6 +75,7 @@ class DispatchOutboxMessage:
         self._jitter = jitter
         self._max_attempts = max_attempts
         self._base_backoff_seconds = base_backoff_seconds
+        self._on_dead_letter = on_dead_letter
 
     def execute(self) -> DispatchOutcome:
         now = self._aware_now()
@@ -85,12 +87,16 @@ class DispatchOutboxMessage:
             self._publisher.publish(topic=message.topic, payload=message.payload)
         except Exception:
             dead_lettered, retry_at = _compute_retry_at(
-                message,
+                attempt_count=message.attempt_count,
                 now=now,
                 jitter=self._jitter,
                 max_attempts=self._max_attempts,
                 base_backoff_seconds=self._base_backoff_seconds,
             )
+            if dead_lettered and self._on_dead_letter is not None:
+                # Audit-before-persist: an unauditable dead-letter transition must not
+                # happen; the raise leaves the lease to expire and the message retries.
+                self._on_dead_letter(message)
             persisted_dead_letter = self._repository.record_failure(
                 message,
                 failed_at=now,
@@ -186,6 +192,7 @@ class DrainOutboxBatch:
         batch_size: int = 50,
         max_attempts: int = 5,
         base_backoff_seconds: int = 5,
+        on_dead_letter: Callable[[PendingOutboxMessage], None] | None = None,
     ) -> None:
         if max_attempts != 5 or base_backoff_seconds != 5:
             raise ValueError("outbox retry policy must match normalized_outbox_v1")
@@ -199,6 +206,7 @@ class DrainOutboxBatch:
         self._batch_size = batch_size
         self._max_attempts = max_attempts
         self._base_backoff_seconds = base_backoff_seconds
+        self._on_dead_letter = on_dead_letter
 
     def execute(self) -> BatchDrainResult:
         now = self._aware_now()
@@ -215,12 +223,16 @@ class DrainOutboxBatch:
                 self._publisher.publish(topic=message.topic, payload=message.payload)
             except Exception:
                 message_dead, retry_at = _compute_retry_at(
-                    message,
+                    attempt_count=message.attempt_count,
                     now=now,
                     jitter=self._jitter,
                     max_attempts=self._max_attempts,
                     base_backoff_seconds=self._base_backoff_seconds,
                 )
+                if message_dead and self._on_dead_letter is not None:
+                    # Audit-before-persist: raising here aborts the batch and leaves the
+                    # lease to expire, so the transition never happens unaudited.
+                    self._on_dead_letter(message)
                 persisted_dead_letter = self._repository.record_failure(
                     message,
                     failed_at=now,

@@ -9,6 +9,9 @@ Chứa contract và thư viện dùng chung có ownership rõ, ví dụ API/even
 
 Thư viện runtime hiện có:
 
+- `audit-producer/`: builder `AuditIntent` shape-validated + port `AuditIntentRecorder` fail-closed cho
+  phía phát audit; action policy cuối cùng vẫn do audit-log-service enforce khi append.
+
 - `crypto-runtime/`: `ENCV1` field encryption (AES-256-GCM envelope, AAD binding, dual-read
   rotation) và `LOOKUP-V1` exact lookup HMAC có domain separation, kèm `KeyProvider` port fail
   closed và helper CHECK cho migration; không chứa key material, secret hay business state.
