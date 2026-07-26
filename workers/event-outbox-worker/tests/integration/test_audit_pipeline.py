@@ -15,7 +15,7 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
-from ansvis_adapter.infrastructure.audit_outbox import PendingAuditIntent, PostgresAuditOutbox
+from ansvis_adapter.infrastructure.audit_outbox import PostgresAuditOutbox
 from audit_log_service.application.service import AppendAuditEventService
 from audit_log_service.infrastructure.integrity import HmacSha256IntegritySigner
 from audit_log_service.infrastructure.repository import SqlAlchemyAuditRepository
@@ -56,6 +56,19 @@ def denial_intent() -> AuditIntent:
         result=IntentResult.DENIED,
         reason_code="EVENT_SOURCE_UNAUTHORIZED",
         occurred_at=datetime(2026, 7, 26, 13, 0, tzinfo=UTC),
+    )
+
+
+def denial_intent_b() -> AuditIntent:
+    return AuditIntent(
+        source_service="ansvis-adapter-service",
+        source_event_id=UUID("00000000-0000-4000-8000-000000000912"),
+        action="ANSVIS_SOURCE_AUTH_DENIED",
+        resource_type="ansvis_source",
+        request_id="req_test_audit_pipeline_0002",
+        result=IntentResult.DENIED,
+        reason_code="EVENT_AUTH_TOKEN_INVALID",
+        occurred_at=datetime(2026, 7, 26, 13, 5, tzinfo=UTC),
     )
 
 
@@ -113,34 +126,26 @@ def test_intent_flows_into_immutable_audit_evidence_exactly_once() -> None:
         assert row["reason_code"] == "EVENT_SOURCE_UNAUTHORIZED"
         assert row["school_id"] is None
 
-        # A re-appended intent is duplicate-as-success: one evidence row, no error.
-        claimed = outbox.claim_batch(now=datetime.now(UTC), limit=1)
-        assert claimed == ()  # already delivered; nothing pending
-        assert appender.append(_redeliver_view()) is True
+        # A retried delivery of the SAME leased row is duplicate-as-success:
+        # identical semantics, one evidence row, no conflict and no error.
+        assert outbox.claim_batch(now=datetime.now(UTC), limit=1) == ()
+        second = denial_intent_b()
+        outbox.record(second)
+        (leased,) = outbox.claim_batch(now=datetime.now(UTC), limit=1)
+        assert appender.append(leased) is False
+        assert appender.append(leased) is True  # simulated redelivery after a crash
+        outbox.mark_delivered_batch(
+            [(leased.audit_outbox_id, leased.claim_token)],
+            delivered_at=datetime.now(UTC),
+        )
         with audit_engine.connect() as connection:
             total = connection.execute(
                 sa.text("SELECT count(*) FROM audit.audit_events")
             ).scalar_one()
-        assert total == 1
+        assert total == 2
     finally:
         if upgraded:
             command.downgrade(audit_config, "base")
             command.downgrade(adapter_config, "base")
         audit_engine.dispose()
         event_engine.dispose()
-
-
-def _redeliver_view() -> PendingAuditIntent:
-    from uuid import uuid4
-
-    intent = denial_intent()
-    return PendingAuditIntent(
-        audit_outbox_id=uuid4(),
-        claim_token=uuid4(),
-        source_service=intent.source_service,
-        source_event_id=intent.source_event_id,
-        school_id=None,
-        payload=intent.publisher_payload(),
-        attempt_count=0,
-        recorded_at=datetime.now(UTC),
-    )

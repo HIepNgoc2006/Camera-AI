@@ -114,11 +114,13 @@ class TrustedContextAppender:
         self._retention_days = retention_days
 
     def append(self, intent: PendingAuditIntent) -> bool:
-        recorded = datetime.now(UTC)
+        # Retention derives from the outbox row's stable timestamp, never the delivery clock:
+        # a retried delivery must produce byte-identical semantics so the audit store can
+        # recognize it as the same evidence instead of a conflicting one.
         context = TrustedAuditContext(
             source_service=intent.source_service,
             actor_type=ActorType.SERVICE,
-            retention_until=recorded + timedelta(days=self._retention_days),
+            retention_until=intent.recorded_at + timedelta(days=self._retention_days),
             school_id=intent.school_id,
         )
         outcome = self._service.append(dict(intent.payload), context)
