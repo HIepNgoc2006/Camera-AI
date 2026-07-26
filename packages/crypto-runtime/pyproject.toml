@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-crypto-runtime"
+version = "0.1.0"
+description = "ENCV1 field encryption and LOOKUP-V1 exact-lookup runtime for the Camera AI platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography==49.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

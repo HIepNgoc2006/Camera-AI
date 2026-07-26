@@ -28,11 +28,18 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "consent-withdrawal-policy": ((python, "scripts/check_consent_withdrawal_policy.py"),),
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "lint": (
-            (python, "-m", "ruff", "check", "scripts", "services"),
-            (python, "-m", "ruff", "format", "--check", "scripts", "services"),
+            (python, "-m", "ruff", "check", "scripts", "services", "packages"),
+            (python, "-m", "ruff", "format", "--check", "scripts", "services", "packages"),
         ),
         "typecheck": (
             (python, "-m", "mypy", "scripts"),
+            (
+                python,
+                "-m",
+                "mypy",
+                "packages/crypto-runtime/src",
+                "packages/crypto-runtime/tests",
+            ),
             (
                 python,
                 "-m",
@@ -104,6 +111,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "pytest",
                 "-q",
                 "scripts/tests",
+                "packages/crypto-runtime/tests",
                 "services/api-gateway/tests",
                 "services/identity-service/tests",
                 "services/school-service/tests",
