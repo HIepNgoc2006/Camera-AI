@@ -1,0 +1,1251 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "fixture_id": "test_consent_withdrawal_policy_v1_cases",
+  "synthetic_only": true,
+  "contains_real_personal_data": false,
+  "contains_real_biometric_or_media": false,
+  "contains_real_database_or_provider_data": false,
+  "default_context": {
+    "operation": "request",
+    "policy_version_status": "active",
+    "runtime_approval_status": "approved",
+    "destructive_change_record_status": "authorized",
+    "actor_authenticated": true,
+    "actor_role": "parent_guardian",
+    "actor_permission_code": "privacy.withdrawal.request.guardian",
+    "actor_relationship": "active_verified_guardian_of_subject",
+    "subject_type": "student",
+    "maturity_authority_status": "resolved_authorized",
+    "tenant_scope_match": true,
+    "school_scope_match": true,
+    "subject_scope_match": true,
+    "purpose_code": "biometric_processing",
+    "purpose_status": "approved",
+    "actor_identity_status": "verified",
+    "subject_identity_status": "verified",
+    "reason_code": "guardian_request",
+    "idempotency_status": "new",
+    "request_version_status": "current",
+    "current_state": "requested",
+    "transition_to": "requested",
+    "correction_overwrites_effective": false,
+    "deny_committed_before_disposal": true,
+    "store_class": "privacy_consent_record",
+    "canonical_owner": "privacy_service",
+    "disposition": "retain_restricted_proof",
+    "activation_dependency_status": "approved",
+    "owner_acknowledgement_status": "acknowledged",
+    "all_required_owner_acknowledged": true,
+    "dependency_available": true,
+    "destructive_execution_requested": false,
+    "physical_disposition_requested": false,
+    "legal_hold_active": false,
+    "legal_hold_scope_status": "exact",
+    "legal_hold_authority_status": "approved",
+    "lawful_basis_active": false,
+    "lawful_basis_scope_status": "exact",
+    "lawful_basis_purpose_status": "exact",
+    "lawful_basis_owner_status": "approved",
+    "lawful_basis_version_status": "active",
+    "restricted_retention_applied": false,
+    "checkpoint_status": "valid",
+    "reconciliation_status": "bounded",
+    "partial_failure_open": false,
+    "restore_reapply_pending": false,
+    "restore_reapply_authorized": true,
+    "completion_evidence_fields": [
+      "policy_id",
+      "policy_version",
+      "opaque_withdrawal_ref",
+      "opaque_subject_ref",
+      "opaque_resource_ref",
+      "canonical_owner",
+      "disposition",
+      "outcome",
+      "stable_reason_code",
+      "resource_count",
+      "started_at",
+      "completed_at",
+      "opaque_approver_ref",
+      "correlation_id"
+    ],
+    "superseding_version_linked": true
+  },
+  "cases": [
+    {
+      "case_code": "guardian_request_allowed",
+      "overrides": {},
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_REQUEST_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "student_self_request_allowed",
+      "overrides": {
+        "actor_role": "student_self",
+        "actor_permission_code": "privacy.withdrawal.request.self",
+        "actor_relationship": "own_student_subject",
+        "reason_code": "subject_request"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_REQUEST_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "staff_self_request_allowed",
+      "overrides": {
+        "actor_role": "staff_self",
+        "actor_permission_code": "privacy.withdrawal.request.self",
+        "actor_relationship": "own_staff_subject",
+        "subject_type": "staff",
+        "maturity_authority_status": "not_required",
+        "reason_code": "subject_request"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_REQUEST_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "privacy_officer_delegated_request_allowed",
+      "overrides": {
+        "actor_role": "privacy_officer",
+        "actor_permission_code": "privacy.withdrawal.request.delegated",
+        "actor_relationship": "approved_privacy_case_delegation"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_REQUEST_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "service_orchestrator_request_allowed",
+      "overrides": {
+        "actor_role": "service_orchestrator",
+        "actor_permission_code": "service.privacy.withdrawal.orchestrate",
+        "actor_relationship": "approved_service_delegation",
+        "maturity_authority_status": "preverified"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_REQUEST_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "exact_duplicate_request_replayed",
+      "overrides": {
+        "idempotency_status": "duplicate_exact",
+        "reason_code": "duplicate_replay"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_DUPLICATE_REPLAYED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "identity_verification_allowed",
+      "overrides": {
+        "operation": "verify_identity",
+        "current_state": "requested",
+        "transition_to": "identity_verified"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_IDENTITY_VERIFICATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "make_effective_allowed",
+      "overrides": {
+        "operation": "make_effective",
+        "current_state": "identity_verified",
+        "transition_to": "effective"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_EFFECTIVE_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "request_rejection_allowed",
+      "overrides": {
+        "operation": "reject",
+        "current_state": "requested",
+        "transition_to": "rejected",
+        "reason_code": "request_rejected"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_REJECTION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "effective_version_supersession_allowed",
+      "overrides": {
+        "operation": "supersede",
+        "current_state": "effective",
+        "transition_to": "superseded",
+        "reason_code": "policy_superseded"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_SUPERSESSION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "effective_processing_denied",
+      "overrides": {
+        "operation": "processing_access",
+        "current_state": "effective",
+        "transition_to": "effective"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PROCESSING_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "pending_request_never_authorizes_processing",
+      "overrides": {
+        "operation": "processing_access"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_SEPARATE_PROCESSING_AUTHORIZATION_REQUIRED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "privacy_proof_propagation_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "identity_biometric_unlink_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "identity_biometric_reference",
+        "canonical_owner": "identity_service",
+        "disposition": "unlink_identity",
+        "destructive_execution_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "ansvis_enrollment_delete_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "ansvis_face_enrollment",
+        "canonical_owner": "ansvis_adapter",
+        "disposition": "delete_exact_media_or_reference",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "ansvis_task_mapping_unlink_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "ansvis_task_subject_mapping",
+        "canonical_owner": "ansvis_adapter",
+        "disposition": "unlink_identity",
+        "destructive_execution_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "attendance_identity_unlink_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "attendance_identity_link",
+        "canonical_owner": "attendance_service",
+        "disposition": "unlink_identity",
+        "destructive_execution_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "timekeeping_identity_unlink_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "timekeeping_identity_link",
+        "canonical_owner": "timekeeping_service",
+        "disposition": "unlink_identity",
+        "destructive_execution_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "violation_approved_anonymization_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "violation_subject_link",
+        "canonical_owner": "violation_service",
+        "disposition": "anonymize_approved_fields",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "private_evidence_delete_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "private_evidence_object",
+        "canonical_owner": "evidence_service",
+        "disposition": "delete_exact_media_or_reference",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "notification_cancellation_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "notification_pending_or_retry",
+        "canonical_owner": "notification_service",
+        "disposition": "deactivate"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "report_export_delete_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "report_export_artifact",
+        "canonical_owner": "reporting_service",
+        "disposition": "delete_exact_media_or_reference",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "cache_invalidation_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "cache_entry",
+        "canonical_owner": "owning_service",
+        "disposition": "delete_exact_media_or_reference",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "queue_tombstone_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "queue_or_dead_letter_envelope",
+        "canonical_owner": "owning_service",
+        "disposition": "deactivate"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "read_model_anonymization_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "read_model",
+        "canonical_owner": "reporting_service",
+        "disposition": "anonymize_approved_fields",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "backup_reapplication_index_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "backup_restore_reapplication_index",
+        "canonical_owner": "backup_restore_owner",
+        "disposition": "retain_restricted_proof"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "anonymous_aggregate_preservation_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "approved_anonymous_aggregate",
+        "canonical_owner": "reporting_service",
+        "disposition": "preserve_approved_anonymous_aggregate"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "owner_acknowledgement_allowed",
+      "overrides": {
+        "operation": "acknowledge",
+        "current_state": "propagating",
+        "transition_to": "propagating"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_ACKNOWLEDGEMENT_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "partial_reconciliation_allowed",
+      "overrides": {
+        "operation": "reconcile",
+        "current_state": "partially_completed",
+        "transition_to": "propagating"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_RECONCILIATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "restore_reapplication_reconcile_allowed",
+      "overrides": {
+        "operation": "reconcile",
+        "current_state": "partially_completed",
+        "transition_to": "propagating",
+        "store_class": "backup_restore_reapplication_index",
+        "canonical_owner": "backup_restore_owner",
+        "restore_reapply_pending": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_RECONCILIATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "completion_allowed",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed"
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_COMPLETION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "scoped_lawful_basis_restricted_retention_allowed",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "private_evidence_object",
+        "canonical_owner": "evidence_service",
+        "disposition": "retain_restricted_proof",
+        "lawful_basis_active": true,
+        "restricted_retention_applied": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "inactive_policy_denied",
+      "overrides": {
+        "policy_version_status": "inactive"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_POLICY_INACTIVE",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "missing_runtime_approval_denied",
+      "overrides": {
+        "runtime_approval_status": "pending"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RUNTIME_APPROVAL_MISSING",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "unauthenticated_actor_denied",
+      "overrides": {
+        "actor_authenticated": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_ACTOR_UNAUTHENTICATED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "unknown_actor_role_denied",
+      "overrides": {
+        "actor_role": "school_admin"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_ACTOR_AUTHORITY_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "wrong_actor_permission_denied",
+      "overrides": {
+        "actor_permission_code": "privacy.withdrawal.read"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_ACTOR_AUTHORITY_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "stale_guardian_relationship_denied",
+      "overrides": {
+        "actor_relationship": "former_guardian"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RELATIONSHIP_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "guardian_staff_subject_denied",
+      "overrides": {
+        "subject_type": "staff"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_ACTOR_AUTHORITY_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "ambiguous_student_maturity_denied",
+      "overrides": {
+        "maturity_authority_status": "ambiguous"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_MATURITY_AUTHORITY_AMBIGUOUS",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "cross_tenant_request_denied",
+      "overrides": {
+        "tenant_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_SCOPE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "cross_school_request_denied",
+      "overrides": {
+        "school_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_SCOPE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "direct_subject_scope_request_denied",
+      "overrides": {
+        "subject_scope_match": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_SCOPE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "missing_purpose_denied",
+      "overrides": {
+        "purpose_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PURPOSE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "wrong_purpose_denied",
+      "overrides": {
+        "purpose_code": "general_analytics"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PURPOSE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "unverified_actor_identity_denied",
+      "overrides": {
+        "actor_identity_status": "unverified"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_IDENTITY_NOT_VERIFIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "unverified_subject_identity_denied",
+      "overrides": {
+        "subject_identity_status": "ambiguous"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_IDENTITY_NOT_VERIFIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "free_form_reason_denied",
+      "overrides": {
+        "reason_code": "free_form_text"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_REASON_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "stale_request_version_denied",
+      "overrides": {
+        "request_version_status": "stale"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_VERSION_STALE",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "invalid_idempotency_denied",
+      "overrides": {
+        "idempotency_status": "invalid"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_IDEMPOTENCY_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "conflicting_duplicate_denied",
+      "overrides": {
+        "idempotency_status": "duplicate_conflict"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_IDEMPOTENCY_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "duplicate_non_request_operation_denied",
+      "overrides": {
+        "operation": "make_effective",
+        "current_state": "identity_verified",
+        "transition_to": "effective",
+        "idempotency_status": "duplicate_exact"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_IDEMPOTENCY_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "effective_overwrite_correction_denied",
+      "overrides": {
+        "operation": "supersede",
+        "current_state": "effective",
+        "transition_to": "superseded",
+        "correction_overwrites_effective": true
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_CORRECTION_OVERWRITE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "invalid_identity_transition_denied",
+      "overrides": {
+        "operation": "verify_identity",
+        "transition_to": "effective"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "effective_without_identity_state_denied",
+      "overrides": {
+        "operation": "make_effective",
+        "current_state": "requested",
+        "transition_to": "effective"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "effective_without_deny_commit_denied",
+      "overrides": {
+        "operation": "make_effective",
+        "current_state": "identity_verified",
+        "transition_to": "effective",
+        "deny_committed_before_disposal": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_DENY_BEFORE_DISPOSE_MISSING",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "rejected_processing_never_authorized",
+      "overrides": {
+        "operation": "processing_access",
+        "current_state": "rejected",
+        "transition_to": "rejected"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_SEPARATE_PROCESSING_AUTHORIZATION_REQUIRED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "propagating_processing_denied",
+      "overrides": {
+        "operation": "processing_access",
+        "current_state": "propagating",
+        "transition_to": "propagating"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PROCESSING_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "partial_processing_denied",
+      "overrides": {
+        "operation": "processing_access",
+        "current_state": "partially_completed",
+        "transition_to": "partially_completed"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PROCESSING_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "completed_processing_denied",
+      "overrides": {
+        "operation": "processing_access",
+        "current_state": "completed",
+        "transition_to": "completed"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PROCESSING_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "superseded_effective_processing_denied",
+      "overrides": {
+        "operation": "processing_access",
+        "current_state": "superseded",
+        "transition_to": "superseded"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PROCESSING_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "unknown_store_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "unknown_store"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_OWNER_SCOPE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "wrong_store_owner_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "canonical_owner": "identity_service"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_OWNER_SCOPE_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_NOT_FOUND"
+    },
+    {
+      "case_code": "unknown_disposition_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "disposition": "expire"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_DISPOSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "wrong_store_disposition_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "disposition": "delete_exact_media_or_reference"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_DISPOSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "activation_dependency_missing_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "activation_dependency_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_ACTIVATION_DEPENDENCY_MISSING",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "owner_dependency_unavailable_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "dependency_available": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_DEPENDENCY_UNAVAILABLE",
+      "expected_public_error": "WITHDRAWAL_SERVICE_UNAVAILABLE"
+    },
+    {
+      "case_code": "physical_disposition_without_destructive_gate_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "private_evidence_object",
+        "canonical_owner": "evidence_service",
+        "disposition": "delete_exact_media_or_reference",
+        "physical_disposition_requested": true
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_CHANGE_RECORD_REQUIRED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "destructive_change_record_missing_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "private_evidence_object",
+        "canonical_owner": "evidence_service",
+        "disposition": "delete_exact_media_or_reference",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true,
+        "destructive_change_record_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_CHANGE_RECORD_REQUIRED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "legal_hold_broad_scope_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "legal_hold_active": true,
+        "legal_hold_scope_status": "broad"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_LEGAL_HOLD_SCOPE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "legal_hold_missing_authority_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "legal_hold_active": true,
+        "legal_hold_authority_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_LEGAL_HOLD_SCOPE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "legal_hold_pauses_exact_object_disposition",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "private_evidence_object",
+        "canonical_owner": "evidence_service",
+        "disposition": "delete_exact_media_or_reference",
+        "destructive_execution_requested": true,
+        "physical_disposition_requested": true,
+        "legal_hold_active": true
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_DISPOSITION_PAUSED_LEGAL_HOLD",
+      "expected_public_error": "WITHDRAWAL_PROCESSING_PENDING"
+    },
+    {
+      "case_code": "legal_hold_does_not_keep_identity_link_active",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "store_class": "identity_biometric_reference",
+        "canonical_owner": "identity_service",
+        "disposition": "unlink_identity",
+        "destructive_execution_requested": true,
+        "legal_hold_active": true
+      },
+      "expected_decision": "allow",
+      "expected_reason_code": "WITHDRAWAL_PROPAGATION_ALLOWED",
+      "expected_public_error": ""
+    },
+    {
+      "case_code": "lawful_basis_broad_scope_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "lawful_basis_active": true,
+        "lawful_basis_scope_status": "broad"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_LAWFUL_BASIS_SCOPE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "lawful_basis_wrong_purpose_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "lawful_basis_active": true,
+        "lawful_basis_purpose_status": "different"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_LAWFUL_BASIS_SCOPE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "lawful_basis_owner_unapproved_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "lawful_basis_active": true,
+        "lawful_basis_owner_status": "unapproved"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_LAWFUL_BASIS_SCOPE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "lawful_basis_inactive_version_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "lawful_basis_active": true,
+        "lawful_basis_version_status": "inactive"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_LAWFUL_BASIS_SCOPE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "lawful_basis_requires_restricted_disposition",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "lawful_basis_active": true
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RESTRICTED_RETENTION_REQUIRED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "lawful_basis_requires_restricted_flag",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "lawful_basis_active": true,
+        "disposition": "retain_restricted_proof"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RESTRICTED_RETENTION_REQUIRED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "invalid_checkpoint_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "propagating",
+        "checkpoint_status": "missing"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_CHECKPOINT_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "unbounded_reconciliation_denied",
+      "overrides": {
+        "operation": "reconcile",
+        "current_state": "partially_completed",
+        "transition_to": "propagating",
+        "reconciliation_status": "unbounded"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RECONCILIATION_UNBOUNDED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "stale_restore_blocks_completion",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed",
+        "restore_reapply_pending": true
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RESTORE_REAPPLY_PENDING",
+      "expected_public_error": "WITHDRAWAL_PROCESSING_PENDING"
+    },
+    {
+      "case_code": "restore_reconcile_requires_authority",
+      "overrides": {
+        "operation": "reconcile",
+        "current_state": "partially_completed",
+        "transition_to": "propagating",
+        "restore_reapply_pending": true,
+        "restore_reapply_authorized": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_RESTORE_REAPPLY_PENDING",
+      "expected_public_error": "WITHDRAWAL_PROCESSING_PENDING"
+    },
+    {
+      "case_code": "owner_acknowledgement_missing_denied",
+      "overrides": {
+        "operation": "acknowledge",
+        "current_state": "propagating",
+        "transition_to": "propagating",
+        "owner_acknowledgement_status": "pending"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_OWNER_ACKNOWLEDGEMENT_MISSING",
+      "expected_public_error": "WITHDRAWAL_PROCESSING_PENDING"
+    },
+    {
+      "case_code": "propagation_invalid_target_denied",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "rejected"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "propagation_cannot_bypass_completion_gate",
+      "overrides": {
+        "operation": "propagate",
+        "current_state": "effective",
+        "transition_to": "completed"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "reconcile_invalid_state_denied",
+      "overrides": {
+        "operation": "reconcile",
+        "current_state": "completed",
+        "transition_to": "completed"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "reconcile_cannot_bypass_completion_gate",
+      "overrides": {
+        "operation": "reconcile",
+        "current_state": "partially_completed",
+        "transition_to": "completed"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "completion_invalid_transition_denied",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "effective",
+        "transition_to": "propagating"
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_TRANSITION_DENIED",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    },
+    {
+      "case_code": "completion_partial_failure_denied",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed",
+        "partial_failure_open": true
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_PARTIAL_FAILURE_OPEN",
+      "expected_public_error": "WITHDRAWAL_PROCESSING_PENDING"
+    },
+    {
+      "case_code": "completion_missing_owner_ack_denied",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed",
+        "all_required_owner_acknowledged": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_OWNER_ACKNOWLEDGEMENT_MISSING",
+      "expected_public_error": "WITHDRAWAL_PROCESSING_PENDING"
+    },
+    {
+      "case_code": "completion_missing_required_field_denied",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed",
+        "completion_evidence_fields": [
+          "policy_id",
+          "policy_version",
+          "opaque_withdrawal_ref",
+          "opaque_subject_ref",
+          "opaque_resource_ref",
+          "canonical_owner",
+          "disposition",
+          "outcome",
+          "stable_reason_code",
+          "resource_count",
+          "started_at",
+          "completed_at",
+          "correlation_id"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_COMPLETION_EVIDENCE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "completion_personal_value_field_denied",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed",
+        "completion_evidence_fields": [
+          "policy_id",
+          "policy_version",
+          "opaque_withdrawal_ref",
+          "opaque_subject_ref",
+          "opaque_resource_ref",
+          "canonical_owner",
+          "disposition",
+          "outcome",
+          "stable_reason_code",
+          "resource_count",
+          "started_at",
+          "completed_at",
+          "opaque_approver_ref",
+          "correlation_id",
+          "personal_before_value"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_COMPLETION_EVIDENCE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "completion_unknown_field_denied",
+      "overrides": {
+        "operation": "complete",
+        "current_state": "partially_completed",
+        "transition_to": "completed",
+        "completion_evidence_fields": [
+          "policy_id",
+          "policy_version",
+          "opaque_withdrawal_ref",
+          "opaque_subject_ref",
+          "opaque_resource_ref",
+          "canonical_owner",
+          "disposition",
+          "outcome",
+          "stable_reason_code",
+          "resource_count",
+          "started_at",
+          "completed_at",
+          "opaque_approver_ref",
+          "correlation_id",
+          "debug_payload"
+        ]
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_COMPLETION_EVIDENCE_INVALID",
+      "expected_public_error": "WITHDRAWAL_REQUEST_INVALID"
+    },
+    {
+      "case_code": "supersession_missing_link_denied",
+      "overrides": {
+        "operation": "supersede",
+        "current_state": "effective",
+        "transition_to": "superseded",
+        "superseding_version_linked": false
+      },
+      "expected_decision": "deny",
+      "expected_reason_code": "WITHDRAWAL_VERSION_STALE",
+      "expected_public_error": "WITHDRAWAL_REQUEST_CONFLICT"
+    }
+  ]
+}

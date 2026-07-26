@@ -1,0 +1,568 @@
+{
+  "policy_id": "consent_withdrawal_policy_v1",
+  "version": 1,
+  "status": "approved_for_implementation",
+  "owner": "privacy_consent_owner",
+  "data_classifications": {
+    "consent_subject_guardian_and_biometric_reference": "Critical",
+    "subject_linked_business_evidence_and_propagation_state": "High_or_Critical",
+    "withdrawal_proof_completion_and_operational_metadata": "High_minimized"
+  },
+  "runtime_activation": {
+    "status": "blocked_pending_named_approvals_and_change_record",
+    "required_approvals": {
+      "privacy_legal": "pending",
+      "security_ops": "pending",
+      "business_owner": "pending",
+      "store_owners": "pending"
+    },
+    "destructive_execution_requires_separate_change_record": true,
+    "missing_or_inactive_policy_behavior": "deny",
+    "synthetic_allow_cases_assume_future_named_approvals": true
+  },
+  "operations": [
+    "request",
+    "verify_identity",
+    "make_effective",
+    "processing_access",
+    "propagate",
+    "acknowledge",
+    "reconcile",
+    "complete",
+    "reject",
+    "supersede"
+  ],
+  "states": [
+    "requested",
+    "identity_verified",
+    "effective",
+    "propagating",
+    "partially_completed",
+    "completed",
+    "rejected",
+    "superseded"
+  ],
+  "state_transitions": {
+    "requested": [
+      "identity_verified",
+      "rejected",
+      "superseded"
+    ],
+    "identity_verified": [
+      "effective",
+      "rejected",
+      "superseded"
+    ],
+    "effective": [
+      "propagating",
+      "partially_completed",
+      "completed",
+      "superseded"
+    ],
+    "propagating": [
+      "partially_completed",
+      "completed",
+      "superseded"
+    ],
+    "partially_completed": [
+      "propagating",
+      "completed",
+      "superseded"
+    ],
+    "completed": [
+      "superseded"
+    ],
+    "rejected": [
+      "superseded"
+    ],
+    "superseded": []
+  },
+  "state_precedence": {
+    "deny_processing_states": [
+      "effective",
+      "propagating",
+      "partially_completed",
+      "completed",
+      "superseded"
+    ],
+    "deny_before_dispose_required": true,
+    "effective_denies_new_biometric_processing": true,
+    "effective_denies_recognition_and_enrollment": true,
+    "effective_denies_subject_linked_notification": true,
+    "effective_denies_evidence_access": true,
+    "effective_denies_new_report_and_export_use": true,
+    "effective_version_remains_deny_after_correction_or_supersession": true,
+    "correction_never_overwrites_effective_withdrawal": true,
+    "legal_hold_never_changes_withdrawal_state_or_access": true,
+    "independent_lawful_basis_never_changes_withdrawal_state_or_access": true
+  },
+  "authority_matrix": {
+    "student_self": {
+      "relationships": [
+        "own_student_subject"
+      ],
+      "permission_code": "privacy.withdrawal.request.self",
+      "maturity_authority_review": "required",
+      "allowed_subject_types": [
+        "student"
+      ]
+    },
+    "parent_guardian": {
+      "relationships": [
+        "active_verified_guardian_of_subject"
+      ],
+      "permission_code": "privacy.withdrawal.request.guardian",
+      "maturity_authority_review": "required",
+      "allowed_subject_types": [
+        "student"
+      ]
+    },
+    "staff_self": {
+      "relationships": [
+        "own_staff_subject"
+      ],
+      "permission_code": "privacy.withdrawal.request.self",
+      "maturity_authority_review": "not_required",
+      "allowed_subject_types": [
+        "staff"
+      ]
+    },
+    "privacy_officer": {
+      "relationships": [
+        "approved_privacy_case_delegation"
+      ],
+      "permission_code": "privacy.withdrawal.request.delegated",
+      "maturity_authority_review": "required_for_student",
+      "allowed_subject_types": [
+        "student",
+        "staff"
+      ]
+    },
+    "service_orchestrator": {
+      "relationships": [
+        "approved_service_delegation"
+      ],
+      "permission_code": "service.privacy.withdrawal.orchestrate",
+      "maturity_authority_review": "decision_must_be_preverified",
+      "allowed_subject_types": [
+        "student",
+        "staff"
+      ]
+    }
+  },
+  "reason_taxonomy": [
+    "subject_request",
+    "guardian_request",
+    "purpose_ended",
+    "consent_invalidated",
+    "authority_corrected",
+    "duplicate_replay",
+    "request_rejected",
+    "policy_superseded"
+  ],
+  "dispositions": [
+    "deactivate",
+    "unlink_identity",
+    "delete_exact_media_or_reference",
+    "anonymize_approved_fields",
+    "retain_restricted_proof",
+    "preserve_approved_anonymous_aggregate"
+  ],
+  "owner_disposition_matrix": {
+    "privacy_consent_record": {
+      "canonical_owner": "privacy_service",
+      "data_classification": "Critical",
+      "withdrawal_effect": "record_effective_and_deny_processing",
+      "disposition": "retain_restricted_proof",
+      "activation_dependency": "approved_consent_proof_retention_rule",
+      "acknowledgement": "privacy_owner_ack",
+      "completion_evidence": "opaque_withdrawal_version_and_outcome",
+      "legal_hold_behavior": "retain_exact_restricted_proof_without_access_grant"
+    },
+    "identity_biometric_reference": {
+      "canonical_owner": "identity_service",
+      "data_classification": "Critical",
+      "withdrawal_effect": "deactivate_and_block_biometric_lookup",
+      "disposition": "unlink_identity",
+      "activation_dependency": "approved_identity_unlink_rule",
+      "acknowledgement": "identity_owner_ack",
+      "completion_evidence": "opaque_reference_unlinked_count",
+      "legal_hold_behavior": "pause_physical_disposition_only"
+    },
+    "ansvis_face_enrollment": {
+      "canonical_owner": "ansvis_adapter",
+      "data_classification": "Critical",
+      "withdrawal_effect": "disable_recognition_and_enrollment_mapping",
+      "disposition": "delete_exact_media_or_reference",
+      "activation_dependency": "approved_ansvis_enrollment_owner_and_provider_action",
+      "acknowledgement": "ansvis_owner_ack",
+      "completion_evidence": "opaque_provider_action_outcome",
+      "legal_hold_behavior": "pause_exact_provider_disposition_only"
+    },
+    "ansvis_task_subject_mapping": {
+      "canonical_owner": "ansvis_adapter",
+      "data_classification": "Critical",
+      "withdrawal_effect": "remove_subject_from_task_scope",
+      "disposition": "unlink_identity",
+      "activation_dependency": "approved_ansvis_task_mapping_rule",
+      "acknowledgement": "ansvis_owner_ack",
+      "completion_evidence": "opaque_mapping_unlinked_count",
+      "legal_hold_behavior": "hold_never_keeps_active_task_mapping"
+    },
+    "attendance_identity_link": {
+      "canonical_owner": "attendance_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "deny_future_biometric_event_identity_use",
+      "disposition": "unlink_identity",
+      "activation_dependency": "approved_attendance_subject_link_rule",
+      "acknowledgement": "attendance_owner_ack",
+      "completion_evidence": "opaque_link_action_count",
+      "legal_hold_behavior": "retain_business_record_restricted_without_biometric_link"
+    },
+    "timekeeping_identity_link": {
+      "canonical_owner": "timekeeping_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "deny_future_biometric_event_identity_use",
+      "disposition": "unlink_identity",
+      "activation_dependency": "approved_timekeeping_subject_link_rule",
+      "acknowledgement": "timekeeping_owner_ack",
+      "completion_evidence": "opaque_link_action_count",
+      "legal_hold_behavior": "retain_business_record_restricted_without_biometric_link"
+    },
+    "violation_subject_link": {
+      "canonical_owner": "violation_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "deny_withdrawn_purpose_use_and_subject_access",
+      "disposition": "anonymize_approved_fields",
+      "activation_dependency": "approved_violation_anonymization_field_set",
+      "acknowledgement": "violation_owner_ack",
+      "completion_evidence": "opaque_anonymization_action_count",
+      "legal_hold_behavior": "pause_exact_field_disposition_without_access_grant"
+    },
+    "private_evidence_object": {
+      "canonical_owner": "evidence_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "deny_view_decrypt_signed_url_and_export",
+      "disposition": "delete_exact_media_or_reference",
+      "activation_dependency": "approved_evidence_object_disposition_rule",
+      "acknowledgement": "evidence_owner_ack",
+      "completion_evidence": "opaque_object_action_and_count",
+      "legal_hold_behavior": "pause_exact_object_disposition_without_access_grant"
+    },
+    "notification_pending_or_retry": {
+      "canonical_owner": "notification_service",
+      "data_classification": "High",
+      "withdrawal_effect": "cancel_subject_linked_delivery_and_open",
+      "disposition": "deactivate",
+      "activation_dependency": "active_notification_cancellation_contract",
+      "acknowledgement": "notification_owner_ack",
+      "completion_evidence": "opaque_cancelled_delivery_count",
+      "legal_hold_behavior": "hold_never_preserves_delivery_authority"
+    },
+    "report_export_artifact": {
+      "canonical_owner": "reporting_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "deny_generation_download_and_reuse",
+      "disposition": "delete_exact_media_or_reference",
+      "activation_dependency": "approved_export_artifact_disposition_rule",
+      "acknowledgement": "reporting_owner_ack",
+      "completion_evidence": "opaque_export_action_count",
+      "legal_hold_behavior": "pause_exact_artifact_disposition_without_access_grant"
+    },
+    "cache_entry": {
+      "canonical_owner": "owning_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "invalidate_before_next_read_or_processing",
+      "disposition": "delete_exact_media_or_reference",
+      "activation_dependency": "versioned_cache_invalidation_contract",
+      "acknowledgement": "cache_owner_ack",
+      "completion_evidence": "opaque_cache_generation_and_count",
+      "legal_hold_behavior": "hold_never_preserves_cache_access"
+    },
+    "queue_or_dead_letter_envelope": {
+      "canonical_owner": "owning_service",
+      "data_classification": "High_minimized",
+      "withdrawal_effect": "cancel_or_tombstone_subject_linked_work",
+      "disposition": "deactivate",
+      "activation_dependency": "versioned_queue_cancellation_contract",
+      "acknowledgement": "queue_owner_ack",
+      "completion_evidence": "opaque_cancelled_work_count",
+      "legal_hold_behavior": "hold_never_preserves_processing_authority"
+    },
+    "read_model": {
+      "canonical_owner": "reporting_service",
+      "data_classification": "High_or_Critical",
+      "withdrawal_effect": "deny_stale_read_and_rebuild_without_subject_link",
+      "disposition": "anonymize_approved_fields",
+      "activation_dependency": "approved_read_model_anonymization_field_set",
+      "acknowledgement": "read_model_owner_ack",
+      "completion_evidence": "opaque_rebuild_version_and_count",
+      "legal_hold_behavior": "pause_exact_disposition_without_read_access"
+    },
+    "backup_restore_reapplication_index": {
+      "canonical_owner": "backup_restore_owner",
+      "data_classification": "High_minimized",
+      "withdrawal_effect": "reapply_deny_and_disposition_after_restore",
+      "disposition": "retain_restricted_proof",
+      "activation_dependency": "approved_backup_restore_reconciliation_contract",
+      "acknowledgement": "backup_restore_owner_ack",
+      "completion_evidence": "opaque_restore_checkpoint_and_outcome",
+      "legal_hold_behavior": "hold_scope_reapplied_without_access_grant"
+    },
+    "approved_anonymous_aggregate": {
+      "canonical_owner": "reporting_service",
+      "data_classification": "Medium_or_High",
+      "withdrawal_effect": "prove_irreversible_subject_unlinking",
+      "disposition": "preserve_approved_anonymous_aggregate",
+      "activation_dependency": "approved_anonymization_field_set_and_reidentification_review",
+      "acknowledgement": "reporting_owner_ack",
+      "completion_evidence": "aggregate_policy_version_and_count_only",
+      "legal_hold_behavior": "hold_not_required_after_approved_irreversible_anonymization"
+    }
+  },
+  "legal_hold_and_lawful_basis": {
+    "legal_hold_required_inputs": [
+      "approved_hold_authority",
+      "exact_object_scope",
+      "exact_purpose",
+      "reason_code",
+      "effective_at",
+      "review_or_expiry_at",
+      "approver",
+      "audit_reference"
+    ],
+    "legal_hold_pauses_only_exact_physical_disposition": true,
+    "legal_hold_never_grants_consent_processing_access_decrypt_or_export": true,
+    "independent_lawful_basis_required_inputs": [
+      "basis_code",
+      "exact_object_scope",
+      "exact_purpose",
+      "canonical_owner",
+      "active_version",
+      "effective_at",
+      "review_or_expiry_at",
+      "approver",
+      "audit_reference"
+    ],
+    "independent_lawful_basis_retains_only_necessary_restricted_record": true,
+    "independent_lawful_basis_never_silently_preserves_every_copy": true,
+    "missing_ambiguous_expired_or_broad_scope_behavior": "deny_and_escalate"
+  },
+  "orchestration": {
+    "canonical_deny_commit_precedes_propagation": true,
+    "outbox_after_deny_commit": true,
+    "owners_never_delete_another_owner_schema_or_store": true,
+    "cross_store_transaction_prohibited": true,
+    "owner_acknowledgement_required": true,
+    "idempotent_resource_action_required": true,
+    "checkpoint_resume_required": true,
+    "bounded_retry_and_reconciliation_required": true,
+    "partial_failure_state": "partially_completed",
+    "partial_failure_never_reenables_processing": true,
+    "completion_requires_all_required_owner_acknowledgements": true,
+    "restore_must_reapply_effective_withdrawals_before_access": true,
+    "stale_restore_blocks_access_until_reconciled": true,
+    "metrics": [
+      "withdrawal_effective_total",
+      "withdrawal_owner_ack_pending",
+      "withdrawal_partial_failure_total",
+      "withdrawal_reconciliation_lag",
+      "withdrawal_restore_reapply_pending",
+      "withdrawal_completion_age"
+    ],
+    "metric_labels_are_low_cardinality_and_redacted": true
+  },
+  "completion_evidence": {
+    "required_fields": [
+      "policy_id",
+      "policy_version",
+      "opaque_withdrawal_ref",
+      "opaque_subject_ref",
+      "opaque_resource_ref",
+      "canonical_owner",
+      "disposition",
+      "outcome",
+      "stable_reason_code",
+      "resource_count",
+      "started_at",
+      "completed_at",
+      "opaque_approver_ref",
+      "correlation_id"
+    ],
+    "optional_minimized_fields": [
+      "checkpoint_ref",
+      "retry_count",
+      "hold_ref",
+      "lawful_basis_ref",
+      "next_reconciliation_at"
+    ],
+    "forbidden_fields": [
+      "subject_name",
+      "guardian_name",
+      "student_code",
+      "staff_code",
+      "email_address",
+      "phone_number",
+      "personal_before_value",
+      "personal_after_value",
+      "consent_free_text",
+      "biometric_reference",
+      "face_embedding",
+      "face_image",
+      "media_binary",
+      "image_base64",
+      "signed_url",
+      "bucket_name",
+      "object_key",
+      "provider_identifier",
+      "device_token",
+      "credential",
+      "raw_ansvis_payload",
+      "database_row",
+      "backup_content",
+      "free_form_note"
+    ],
+    "deleted_content_is_never_copied_into_evidence": true
+  },
+  "audit": {
+    "actions": [
+      "CONSENT_WITHDRAWAL_REQUESTED",
+      "CONSENT_WITHDRAWAL_IDENTITY_VERIFIED",
+      "CONSENT_WITHDRAWAL_EFFECTIVE",
+      "CONSENT_WITHDRAWAL_PROPAGATION_STARTED",
+      "CONSENT_WITHDRAWAL_OWNER_ACKNOWLEDGED",
+      "CONSENT_WITHDRAWAL_PARTIALLY_COMPLETED",
+      "CONSENT_WITHDRAWAL_COMPLETED",
+      "CONSENT_WITHDRAWAL_REJECTED",
+      "CONSENT_WITHDRAWAL_SUPERSEDED",
+      "CONSENT_WITHDRAWAL_RECONCILIATION_SCHEDULED",
+      "CONSENT_WITHDRAWAL_RESTORE_REAPPLIED",
+      "CONSENT_WITHDRAWAL_PROCESSING_DENIED",
+      "CONSENT_WITHDRAWAL_DISPOSITION_PAUSED"
+    ],
+    "required_fields": [
+      "opaque_actor_or_service_ref",
+      "opaque_subject_ref",
+      "tenant_ref",
+      "school_ref",
+      "opaque_withdrawal_ref",
+      "withdrawal_version",
+      "purpose_code",
+      "action",
+      "outcome",
+      "stable_reason_code",
+      "request_id",
+      "correlation_id",
+      "occurred_at"
+    ],
+    "optional_minimized_fields": [
+      "canonical_owner",
+      "store_class",
+      "disposition",
+      "opaque_resource_ref",
+      "resource_count",
+      "checkpoint_ref"
+    ],
+    "forbidden_fields": [
+      "subject_name",
+      "guardian_name",
+      "student_code",
+      "staff_code",
+      "email_address",
+      "phone_number",
+      "personal_before_value",
+      "personal_after_value",
+      "consent_free_text",
+      "biometric_reference",
+      "face_embedding",
+      "face_image",
+      "media_binary",
+      "image_base64",
+      "signed_url",
+      "bucket_name",
+      "object_key",
+      "provider_identifier",
+      "device_token",
+      "credential",
+      "raw_ansvis_payload",
+      "database_row",
+      "backup_content",
+      "free_form_note"
+    ],
+    "allowed_denied_paused_and_failed_are_append_only": true
+  },
+  "stable_reason_codes": {
+    "request_allowed": "WITHDRAWAL_REQUEST_ALLOWED",
+    "identity_verification_allowed": "WITHDRAWAL_IDENTITY_VERIFICATION_ALLOWED",
+    "effective_allowed": "WITHDRAWAL_EFFECTIVE_ALLOWED",
+    "propagation_allowed": "WITHDRAWAL_PROPAGATION_ALLOWED",
+    "acknowledgement_allowed": "WITHDRAWAL_ACKNOWLEDGEMENT_ALLOWED",
+    "reconciliation_allowed": "WITHDRAWAL_RECONCILIATION_ALLOWED",
+    "completion_allowed": "WITHDRAWAL_COMPLETION_ALLOWED",
+    "rejection_allowed": "WITHDRAWAL_REJECTION_ALLOWED",
+    "supersession_allowed": "WITHDRAWAL_SUPERSESSION_ALLOWED",
+    "duplicate_replayed": "WITHDRAWAL_DUPLICATE_REPLAYED",
+    "processing_denied": "WITHDRAWAL_PROCESSING_DENIED",
+    "processing_requires_separate_authorization": "WITHDRAWAL_SEPARATE_PROCESSING_AUTHORIZATION_REQUIRED",
+    "policy_inactive": "WITHDRAWAL_POLICY_INACTIVE",
+    "runtime_approval_missing": "WITHDRAWAL_RUNTIME_APPROVAL_MISSING",
+    "change_record_required": "WITHDRAWAL_CHANGE_RECORD_REQUIRED",
+    "actor_unauthenticated": "WITHDRAWAL_ACTOR_UNAUTHENTICATED",
+    "actor_authority_denied": "WITHDRAWAL_ACTOR_AUTHORITY_DENIED",
+    "relationship_denied": "WITHDRAWAL_RELATIONSHIP_DENIED",
+    "maturity_authority_ambiguous": "WITHDRAWAL_MATURITY_AUTHORITY_AMBIGUOUS",
+    "scope_denied": "WITHDRAWAL_SCOPE_DENIED",
+    "purpose_denied": "WITHDRAWAL_PURPOSE_DENIED",
+    "identity_not_verified": "WITHDRAWAL_IDENTITY_NOT_VERIFIED",
+    "reason_denied": "WITHDRAWAL_REASON_DENIED",
+    "idempotency_denied": "WITHDRAWAL_IDEMPOTENCY_DENIED",
+    "version_stale": "WITHDRAWAL_VERSION_STALE",
+    "transition_denied": "WITHDRAWAL_TRANSITION_DENIED",
+    "correction_overwrite_denied": "WITHDRAWAL_CORRECTION_OVERWRITE_DENIED",
+    "deny_before_dispose_missing": "WITHDRAWAL_DENY_BEFORE_DISPOSE_MISSING",
+    "owner_scope_denied": "WITHDRAWAL_OWNER_SCOPE_DENIED",
+    "disposition_denied": "WITHDRAWAL_DISPOSITION_DENIED",
+    "activation_dependency_missing": "WITHDRAWAL_ACTIVATION_DEPENDENCY_MISSING",
+    "owner_acknowledgement_missing": "WITHDRAWAL_OWNER_ACKNOWLEDGEMENT_MISSING",
+    "dependency_unavailable": "WITHDRAWAL_DEPENDENCY_UNAVAILABLE",
+    "legal_hold_scope_invalid": "WITHDRAWAL_LEGAL_HOLD_SCOPE_INVALID",
+    "disposition_paused_legal_hold": "WITHDRAWAL_DISPOSITION_PAUSED_LEGAL_HOLD",
+    "lawful_basis_scope_invalid": "WITHDRAWAL_LAWFUL_BASIS_SCOPE_INVALID",
+    "restricted_retention_required": "WITHDRAWAL_RESTRICTED_RETENTION_REQUIRED",
+    "checkpoint_invalid": "WITHDRAWAL_CHECKPOINT_INVALID",
+    "reconciliation_unbounded": "WITHDRAWAL_RECONCILIATION_UNBOUNDED",
+    "partial_failure_open": "WITHDRAWAL_PARTIAL_FAILURE_OPEN",
+    "restore_reapply_pending": "WITHDRAWAL_RESTORE_REAPPLY_PENDING",
+    "completion_evidence_invalid": "WITHDRAWAL_COMPLETION_EVIDENCE_INVALID"
+  },
+  "public_errors": {
+    "concealed": "WITHDRAWAL_REQUEST_NOT_FOUND",
+    "invalid": "WITHDRAWAL_REQUEST_INVALID",
+    "conflict": "WITHDRAWAL_REQUEST_CONFLICT",
+    "pending": "WITHDRAWAL_PROCESSING_PENDING",
+    "dependency_unavailable": "WITHDRAWAL_SERVICE_UNAVAILABLE"
+  },
+  "supersession": {
+    "published_versions_are_immutable": true,
+    "requires_new_version_for": [
+      "state_or_transition_change",
+      "actor_authority_or_maturity_change",
+      "reason_or_disposition_change",
+      "owner_store_or_completion_evidence_change",
+      "legal_hold_or_lawful_basis_change",
+      "retry_reconciliation_or_restore_change",
+      "audit_or_error_change",
+      "customer_legal_privacy_or_security_finding",
+      "runtime_activation_change"
+    ],
+    "required_evidence": [
+      "owner_disposition_matrix",
+      "synthetic_compatibility_matrix",
+      "privacy_legal_approval",
+      "security_ops_approval",
+      "business_owner_approval",
+      "affected_store_owner_approvals",
+      "rollback_and_supersession_record"
+    ]
+  }
+}

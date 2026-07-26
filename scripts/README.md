@@ -24,6 +24,10 @@ Các entry point hiện có:
 - `check_notification_privacy_policy.py`: kiểm channel/content minimization, recipient/object/purpose,
   endpoint protection, retry/DLQ, cancellation/open re-authorization và audit bằng dữ liệu giả lập;
   không tạo notification, provider call hoặc đọc endpoint/token thật.
+- `check_consent_withdrawal_policy.py`: kiểm authority/maturity, state precedence,
+  deny-before-dispose, owner disposition, legal hold/lawful basis, retry/reconciliation, restore và
+  completion evidence bằng dữ liệu giả lập; không xóa/anonymize record, gọi provider hoặc đọc dữ liệu
+  thật.
 - `check_ansvis_event_contract.py`: kiểm JSON Schema, Bearer source auth/replay/idempotency/ACK policy
   và ma trận contract ANSVIS giả lập mà không in payload bị từ chối.
 
