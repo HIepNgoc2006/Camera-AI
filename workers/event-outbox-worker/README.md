@@ -33,6 +33,21 @@ Metrics (registry `metrics_registry_v1`): counters dispatch/replay/alerts, histo
 `EVENT_OUTBOX_OLDEST_MESSAGE` (120s warning / 600s critical) được đánh giá mỗi chu kỳ snapshot,
 log bằng stable code và đếm vào `event_operational_alerts_total`.
 
+## Audit delivery (Issue #138)
+
+Cùng vòng drain, worker giao audit intent từ `events.audit_outbox` (adapter ghi) vào
+`audit.audit_events` qua `AppendAuditEventService` của audit-log-service:
+
+- Trusted context bind tại delivery: `actor_type=service`, retention `AUDIT_RETENTION_DAYS`
+  (mặc định 1825 ngày), school scope từ cột outbox.
+- Duplicate append = success-already-recorded (không retry storm, không double evidence).
+- Dead-letter transition của event outbox được audit **trước khi persist**
+  (`EVENT_PROCESSING_DEAD_LETTERED`): audit outbox không ghi được ⇒ transition bị hủy, lease hết
+  hạn và thử lại — không có dead-letter nào không có bằng chứng.
+- Env bổ sung: `AUDIT_DATABASE_URI` (bắt buộc), `AUDIT_INTEGRITY_KEY` (≥32 byte, cấm placeholder
+  ngoài local/test), `AUDIT_RETENTION_DAYS` (30..3650). Gauge
+  `event_audit_outbox_oldest_pending_seconds` cảnh báo tồn đọng theo ngưỡng #35 (60s warning).
+
 ## Hành vi an toàn
 
 - Broker chưa kết nối được ⇒ không claim message nào (không đốt attempt), chờ

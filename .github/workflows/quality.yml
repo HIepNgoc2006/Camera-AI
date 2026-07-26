@@ -49,6 +49,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements-quality.txt
+            packages/audit-producer/pyproject.toml
             packages/crypto-runtime/pyproject.toml
             packages/metrics-runtime/pyproject.toml
             services/api-gateway/pyproject.toml
@@ -66,6 +67,7 @@ jobs:
         run: >-
           python -m pip install --disable-pip-version-check
           -r requirements-quality.txt
+          -e "packages/audit-producer[test]"
           -e "packages/crypto-runtime[test]"
           -e "packages/metrics-runtime[test]"
           -e "services/api-gateway[test]"

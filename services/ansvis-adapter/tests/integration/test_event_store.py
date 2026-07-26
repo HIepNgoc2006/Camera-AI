@@ -32,6 +32,7 @@ TASK_ID = UUID("00000000-0000-4000-8000-000000000624")
 ZONE_ID = UUID("00000000-0000-4000-8000-000000000625")
 ACTOR_ID = UUID("00000000-0000-4000-8000-000000000626")
 EXPECTED_TABLES = {
+    "audit_outbox",
     "event_detections",
     "ingestion_receipts",
     "normalized_events",

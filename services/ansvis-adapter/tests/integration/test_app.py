@@ -241,3 +241,53 @@ def test_health_is_minimal_and_production_docs_are_disabled() -> None:
     assert production.docs_url is None
     assert production.redoc_url is None
     assert production.openapi_url is None
+
+
+def test_source_auth_denial_records_audit_intent_when_recorder_is_wired() -> None:
+    from camera_ai_audit import AuditIntent
+
+    class RecordingAuditRecorder:
+        def __init__(self) -> None:
+            self.intents: list[AuditIntent] = []
+
+        def record(self, intent: AuditIntent) -> None:
+            self.intents.append(intent)
+
+    recorder = RecordingAuditRecorder()
+    app = create_app(
+        Settings(environment="test", log_level="CRITICAL"),
+        audit_recorder=recorder,
+    )
+    with TestClient(app, base_url="https://testserver") as client:
+        response = client.post(
+            "/integration/ansvis/events",
+            json=event_payload(),
+            headers={"X-Request-ID": "req_test_audit_denial_0001"},
+        )
+
+    assert response.status_code == 401
+    assert len(recorder.intents) == 1
+    intent = recorder.intents[0]
+    assert intent.action == "ANSVIS_SOURCE_AUTH_DENIED"
+    assert intent.source_service == "ansvis-adapter-service"
+    assert intent.resource_type == "ansvis_source"
+    assert intent.result.value == "denied"
+    assert intent.reason_code == "EVENT_SOURCE_UNAUTHORIZED"
+    assert intent.request_id == "req_test_audit_denial_0001"
+    payload = intent.publisher_payload()
+    assert "message" not in payload and "authorization" not in str(payload)
+
+
+def test_source_auth_denial_with_broken_recorder_still_returns_401() -> None:
+    class BrokenRecorder:
+        def record(self, intent: object) -> None:
+            raise RuntimeError("audit outbox down; denial must still be denied")
+
+    app = create_app(
+        Settings(environment="test", log_level="CRITICAL"),
+        audit_recorder=BrokenRecorder(),
+    )
+    with TestClient(app, base_url="https://testserver") as client:
+        response = client.post("/integration/ansvis/events", json=event_payload())
+
+    assert response.status_code == 401

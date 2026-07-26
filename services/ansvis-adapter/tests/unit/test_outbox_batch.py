@@ -211,3 +211,51 @@ def test_repository_dead_letter_disagreement_fails_closed() -> None:
 def test_counter_reconciliation_is_enforced() -> None:
     with pytest.raises(ValueError, match="reconcile"):
         BatchDrainResult(claimed=2, published=1, retry_scheduled=0, dead_lettered=0)
+
+
+def test_dead_letter_hook_runs_before_persist_and_aborts_on_failure() -> None:
+    recorded: list[UUID] = []
+
+    def hook(poisoned: PendingOutboxMessage) -> None:
+        recorded.append(poisoned.outbox_message_id)
+
+    repository = FakeBatchRepository([message(0, attempt_count=4)])
+    publisher = SelectivePublisher(frozenset({0}))
+    result = DrainOutboxBatch(
+        repository,
+        publisher,
+        now=lambda: NOW,
+        jitter=lambda maximum: 0,
+        on_dead_letter=hook,
+    ).execute()
+
+    assert result.dead_lettered == 1
+    assert recorded == [message(0).outbox_message_id]
+
+    def failing_hook(poisoned: PendingOutboxMessage) -> None:
+        raise RuntimeError("audit outbox unavailable; transition must not proceed")
+
+    aborting = FakeBatchRepository([message(0, attempt_count=4)])
+    with pytest.raises(RuntimeError, match="must not proceed"):
+        DrainOutboxBatch(
+            aborting,
+            SelectivePublisher(frozenset({0})),
+            now=lambda: NOW,
+            jitter=lambda maximum: 0,
+            on_dead_letter=failing_hook,
+        ).execute()
+    assert aborting.failures == []  # nothing persisted: lease expiry will retry
+
+
+def test_dead_letter_hook_not_called_for_retries() -> None:
+    calls: list[UUID] = []
+    repository = FakeBatchRepository([message(0)])
+    DrainOutboxBatch(
+        repository,
+        SelectivePublisher(frozenset({0})),
+        now=lambda: NOW,
+        jitter=lambda maximum: 0,
+        on_dead_letter=lambda poisoned: calls.append(poisoned.outbox_message_id),
+    ).execute()
+
+    assert calls == []
