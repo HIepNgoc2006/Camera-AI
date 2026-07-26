@@ -140,11 +140,19 @@ class FakeMetrics:
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
         self.values: list[tuple[str, str]] = []
+        self.observations: list[tuple[str, float]] = []
+        self.gauges: list[tuple[str, float]] = []
 
     def increment(self, metric: str, *, outcome: str) -> None:
         if self.fail:
             raise RuntimeError("synthetic telemetry outage")
         self.values.append((metric, outcome))
+
+    def observe(self, metric: str, *, seconds: float) -> None:
+        self.observations.append((metric, seconds))
+
+    def set_gauge(self, metric: str, *, value: float) -> None:
+        self.gauges.append((metric, value))
 
 
 def fixed_now() -> datetime:

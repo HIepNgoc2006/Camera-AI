@@ -27,6 +27,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "notification-privacy-policy": ((python, "scripts/check_notification_privacy_policy.py"),),
         "consent-withdrawal-policy": ((python, "scripts/check_consent_withdrawal_policy.py"),),
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
+        "metrics-registry": ((python, "scripts/check_metrics_registry.py"),),
         "lint": (
             (python, "-m", "ruff", "check", "scripts", "services", "packages", "workers"),
             (
@@ -49,6 +50,13 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "mypy",
                 "packages/crypto-runtime/src",
                 "packages/crypto-runtime/tests",
+            ),
+            (
+                python,
+                "-m",
+                "mypy",
+                "packages/metrics-runtime/src",
+                "packages/metrics-runtime/tests",
             ),
             (
                 python,
@@ -129,6 +137,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
                 "-q",
                 "scripts/tests",
                 "packages/crypto-runtime/tests",
+                "packages/metrics-runtime/tests",
                 "services/api-gateway/tests",
                 "services/identity-service/tests",
                 "services/school-service/tests",
@@ -171,6 +180,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "notification-privacy-policy",
                 "consent-withdrawal-policy",
                 "ansvis-contract",
+                "metrics-registry",
                 "lint",
                 "typecheck",
                 "unit",

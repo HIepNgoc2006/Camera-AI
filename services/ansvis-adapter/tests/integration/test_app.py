@@ -79,9 +79,17 @@ class FakeReceiptPort:
 class FakeMetrics:
     def __init__(self) -> None:
         self.values: list[tuple[str, str]] = []
+        self.observations: list[tuple[str, float]] = []
+        self.gauges: list[tuple[str, float]] = []
 
     def increment(self, metric: str, *, outcome: str) -> None:
         self.values.append((metric, outcome))
+
+    def observe(self, metric: str, *, seconds: float) -> None:
+        self.observations.append((metric, seconds))
+
+    def set_gauge(self, metric: str, *, value: float) -> None:
+        self.gauges.append((metric, value))
 
 
 def fixed_now() -> datetime:

@@ -50,6 +50,7 @@ jobs:
           cache-dependency-path: |
             requirements-quality.txt
             packages/crypto-runtime/pyproject.toml
+            packages/metrics-runtime/pyproject.toml
             services/api-gateway/pyproject.toml
             services/identity-service/pyproject.toml
             services/school-service/pyproject.toml
@@ -66,6 +67,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           -r requirements-quality.txt
           -e "packages/crypto-runtime[test]"
+          -e "packages/metrics-runtime[test]"
           -e "services/api-gateway[test]"
           -e "services/identity-service[test]"
           -e "services/school-service[test]"

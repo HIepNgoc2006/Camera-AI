@@ -12,6 +12,7 @@ strict = true
 files = [
     "scripts",
     "packages/crypto-runtime/src",
+    "packages/metrics-runtime/src",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
@@ -26,6 +27,7 @@ pretty = true
 show_error_codes = true
 mypy_path = [
     "packages/crypto-runtime/src",
+    "packages/metrics-runtime/src",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
@@ -45,6 +47,7 @@ ignore_missing_imports = true
 testpaths = [
     "scripts/tests",
     "packages/crypto-runtime/tests",
+    "packages/metrics-runtime/tests",
     "services/api-gateway/tests",
     "services/identity-service/tests",
     "services/school-service/tests",
@@ -58,6 +61,7 @@ testpaths = [
 pythonpath = [
     ".",
     "packages/crypto-runtime/src",
+    "packages/metrics-runtime/src",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",

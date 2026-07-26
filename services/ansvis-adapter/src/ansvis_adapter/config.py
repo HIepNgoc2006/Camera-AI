@@ -25,6 +25,7 @@ class Settings:
 
     environment: str = "development"
     log_level: str = "INFO"
+    metrics_port: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,16 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         raise ConfigurationError("APP_ENV must be an approved environment label")
     if log_level not in ALLOWED_LOG_LEVELS:
         raise ConfigurationError("LOG_LEVEL must be an approved logging level")
-    return Settings(environment=environment, log_level=log_level)
+
+    default_metrics_port = "0" if environment == "test" else "9464"
+    raw_metrics_port = source.get("METRICS_PORT", default_metrics_port).strip()
+    try:
+        metrics_port = int(raw_metrics_port)
+    except ValueError as exc:
+        raise ConfigurationError("METRICS_PORT must be an integer") from exc
+    if metrics_port != 0 and not 1_024 <= metrics_port <= 65_535:
+        raise ConfigurationError("METRICS_PORT must be 0 (disabled) or within 1024..65535")
+    return Settings(environment=environment, log_level=log_level, metrics_port=metrics_port)
 
 
 def load_event_database_settings(

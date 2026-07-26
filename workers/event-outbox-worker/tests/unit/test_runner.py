@@ -124,3 +124,47 @@ def test_stable_code_extraction_is_conservative() -> None:
     )
     assert _stable_code(RuntimeError("boom with details")) == "EVENT_OUTBOX_DRAIN_FAILED"
     assert _stable_code(RuntimeError("secret=abc UPPER")) == "EVENT_OUTBOX_DRAIN_FAILED"
+
+
+def test_housekeeping_runs_on_interval_and_failures_do_not_stop_the_loop() -> None:
+    drain = ScriptedDrain([result(claimed=1, published=1)])
+    broker = ScriptedBroker([True])
+    ticks: list[str] = []
+    clock = iter([0.0, 10.0, 70.0, 80.0])
+
+    def housekeeping() -> None:
+        ticks.append("tick")
+        if len(ticks) == 2:
+            raise RuntimeError("synthetic snapshot failure")
+
+    runner = WorkerRunner(
+        drain,
+        broker,
+        logger=logging.getLogger("event-outbox-worker-test"),
+        idle_sleep_seconds=0.001,
+        broker_retry_seconds=0.001,
+        max_iterations=4,
+        housekeeping=housekeeping,
+        housekeeping_interval_seconds=60.0,
+        monotonic=lambda: next(clock),
+    )
+
+    assert runner.run() == 0
+    # iterations at t=0, 10, 70, 80: interval 60 fires at t=0 and t=70 only;
+    # the failing second run is logged and swallowed, the loop completes.
+    assert ticks == ["tick", "tick"]
+
+
+def test_housekeeping_interval_must_be_positive() -> None:
+    drain = ScriptedDrain([result()])
+    broker = ScriptedBroker([True])
+    with pytest.raises(ValueError, match="housekeeping interval"):
+        WorkerRunner(
+            drain,
+            broker,
+            logger=logging.getLogger("event-outbox-worker-test"),
+            idle_sleep_seconds=0.001,
+            broker_retry_seconds=0.001,
+            housekeeping=lambda: None,
+            housekeeping_interval_seconds=0,
+        )

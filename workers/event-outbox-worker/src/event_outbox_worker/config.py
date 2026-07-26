@@ -31,6 +31,8 @@ class WorkerSettings:
     batch_size: int = MAX_BATCH_SIZE
     idle_sleep_seconds: float = 1.0
     broker_retry_seconds: float = 5.0
+    metrics_port: int = 0
+    snapshot_interval_seconds: float = 60.0
 
 
 def load_worker_settings(environ: Mapping[str, str] | None = None) -> WorkerSettings:
@@ -66,12 +68,25 @@ def load_worker_settings(environ: Mapping[str, str] | None = None) -> WorkerSett
     broker_retry = _bounded_float(
         source, "WORKER_BROKER_RETRY_SECONDS", default=5.0, low=1.0, high=300.0
     )
+    default_metrics_port = 0 if environment == "test" else 9_465
+    metrics_port = _bounded_int(
+        source, "WORKER_METRICS_PORT", default=default_metrics_port, low=0, high=65_535
+    )
+    if metrics_port != 0 and metrics_port < 1_024:
+        raise WorkerConfigurationError(
+            "WORKER_METRICS_PORT must be 0 (disabled) or within 1024..65535"
+        )
+    snapshot_interval = _bounded_float(
+        source, "WORKER_SNAPSHOT_INTERVAL_SECONDS", default=60.0, low=5.0, high=3_600.0
+    )
     return WorkerSettings(
         environment=environment,
         broker_url=broker_url,
         batch_size=batch_size,
         idle_sleep_seconds=idle_sleep,
         broker_retry_seconds=broker_retry,
+        metrics_port=metrics_port,
+        snapshot_interval_seconds=snapshot_interval,
     )
 
 

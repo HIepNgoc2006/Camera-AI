@@ -1,6 +1,11 @@
-"""Low-cardinality ingestion metrics and approved operational alert evaluation."""
+"""Low-cardinality ingestion metrics and approved operational alert evaluation.
+
+The metric vocabulary comes from the shared `metrics_registry_v1`; this module never widens it.
+"""
 
 from __future__ import annotations
+
+from camera_ai_metrics import validate_counter, validate_gauge, validate_observation
 
 from ansvis_adapter.domain.ingestion import (
     AlertSeverity,
@@ -8,34 +13,22 @@ from ansvis_adapter.domain.ingestion import (
     OperationalAlert,
 )
 
-ALLOWED_METRICS = frozenset(
-    {
-        "event_ingestion_total",
-        "event_outbox_dispatch_total",
-        "event_outbox_replay_total",
-    }
-)
-ALLOWED_OUTCOMES = frozenset(
-    {
-        "accepted",
-        "conflict",
-        "dead_lettered",
-        "duplicate",
-        "empty",
-        "published",
-        "rejected",
-        "replayed",
-        "retry_scheduled",
-    }
-)
-
 
 class NullMetricsSink:
     """Validate the bounded metric vocabulary while emitting no runtime telemetry."""
 
     def increment(self, metric: str, *, outcome: str) -> None:
-        if metric not in ALLOWED_METRICS or outcome not in ALLOWED_OUTCOMES:
-            raise ValueError("metric label is not allowlisted")
+        validate_counter(metric, outcome)
+
+    def observe(self, metric: str, *, seconds: float) -> None:
+        validate_observation(metric)
+        if seconds < 0:
+            raise ValueError("observed duration must be non-negative")
+
+    def set_gauge(self, metric: str, *, value: float) -> None:
+        validate_gauge(metric)
+        if value < 0:
+            raise ValueError("gauge value must be non-negative")
 
 
 class EvaluateOperationalAlerts:

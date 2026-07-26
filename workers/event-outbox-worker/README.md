@@ -23,7 +23,15 @@ cả batch một lần; retry/dead-letter đúng policy `normalized_outbox_v1`.
 | `WORKER_BATCH_SIZE` | không | 1..50, mặc định 50 |
 | `WORKER_IDLE_SLEEP_SECONDS` | không | 0.1..60, mặc định 1 |
 | `WORKER_BROKER_RETRY_SECONDS` | không | 1..300, mặc định 5 |
+| `WORKER_METRICS_PORT` | không | 0 = tắt; mặc định 9465 (0 khi `APP_ENV=test`); scrape chỉ bind 127.0.0.1 |
+| `WORKER_SNAPSHOT_INTERVAL_SECONDS` | không | 5..3600, mặc định 60 — chu kỳ cập nhật gauge backlog/oldest-age và đánh giá alert |
 | `APP_ENV`, `LOG_LEVEL` | không | như các service khác |
+
+Metrics (registry `metrics_registry_v1`): counters dispatch/replay/alerts, histogram
+`event_outbox_enqueue_to_publish_seconds`, gauges `event_outbox_backlog_messages` và
+`event_outbox_oldest_pending_seconds`. Alert `EVENT_OUTBOX_DLQ_UNTRIAGED` và
+`EVENT_OUTBOX_OLDEST_MESSAGE` (120s warning / 600s critical) được đánh giá mỗi chu kỳ snapshot,
+log bằng stable code và đếm vào `event_operational_alerts_total`.
 
 ## Hành vi an toàn
 

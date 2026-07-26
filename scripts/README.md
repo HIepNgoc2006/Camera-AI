@@ -30,6 +30,9 @@ Các entry point hiện có:
   thật.
 - `check_ansvis_event_contract.py`: kiểm JSON Schema, Bearer source auth/replay/idempotency/ACK policy
   và ma trận contract ANSVIS giả lập mà không in payload bị từ chối.
+- `check_metrics_registry.py`: kiểm registry `metrics_registry_v1` — baseline metric đầy đủ,
+  cardinality trong giới hạn, label không mang identifier, bucket histogram tăng dần; chỉ in tên
+  metric và số lượng.
 
 Xem `docs/quality-gates.md`, `docs/project-progress.md`,
 `docs/security/repository-protection.md` và `docs/security/secret-scanning.md` để cài tool và chạy

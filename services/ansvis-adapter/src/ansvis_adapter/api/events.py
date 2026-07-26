@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from time import perf_counter
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -18,6 +20,13 @@ from ansvis_adapter.schemas.responses import ErrorResponse, IngestionAck
 def _rejected_metric(metrics: MetricsSink) -> None:
     try:
         metrics.increment("event_ingestion_total", outcome="rejected")
+    except Exception:
+        return
+
+
+def _ack_duration_metric(metrics: MetricsSink, started_at: float) -> None:
+    try:
+        metrics.observe("event_ingestion_ack_seconds", seconds=perf_counter() - started_at)
     except Exception:
         return
 
@@ -65,6 +74,7 @@ def create_event_router(
         summary="Receive one normalized ANSVIS event",
     )
     async def ingest_event(request: Request) -> JSONResponse:
+        started_at = perf_counter()
         dispatched = False
         try:
             payload = load_json_object(await _bounded_json_body(request))
@@ -77,6 +87,7 @@ def create_event_router(
         except AnsvisAdapterError as exc:
             if not dispatched:
                 _rejected_metric(runtime_metrics)
+            _ack_duration_metric(runtime_metrics, started_at)
             return adapter_error_response(request, exc.code)
 
         correlation_id = payload.get("correlation_id")
@@ -89,6 +100,7 @@ def create_event_router(
             correlation_id=correlation_id,
         )
         status_code = 202 if receipt.outcome is ReceiptOutcome.ACCEPTED else 200
+        _ack_duration_metric(runtime_metrics, started_at)
         return JSONResponse(status_code=status_code, content=ack.model_dump())
 
     return router

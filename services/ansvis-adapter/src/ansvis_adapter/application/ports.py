@@ -157,3 +157,9 @@ class EventPublisher(Protocol):
 class MetricsSink(Protocol):
     def increment(self, metric: str, *, outcome: str) -> None:
         """Increment an allowlisted low-cardinality metric."""
+
+    def observe(self, metric: str, *, seconds: float) -> None:
+        """Record one duration observation on a registered histogram."""
+
+    def set_gauge(self, metric: str, *, value: float) -> None:
+        """Set a registered gauge to a non-negative value."""

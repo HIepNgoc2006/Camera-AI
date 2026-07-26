@@ -12,6 +12,9 @@ Thư viện runtime hiện có:
 - `crypto-runtime/`: `ENCV1` field encryption (AES-256-GCM envelope, AAD binding, dual-read
   rotation) và `LOOKUP-V1` exact lookup HMAC có domain separation, kèm `KeyProvider` port fail
   closed và helper CHECK cho migration; không chứa key material, secret hay business state.
+- `metrics-runtime/`: registry `metrics_registry_v1` (nguồn duy nhất của metric/label vocabulary,
+  cardinality chặn từ cấu trúc) và `PrometheusMetricsSink` + internal loopback-only scrape server;
+  label không bao giờ chứa identifier.
 
 Các contract hiện có:
 

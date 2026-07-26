@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-metrics-runtime"
+version = "0.1.0"
+description = "Versioned metric-name registry and Prometheus sink for the Camera AI platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "prometheus-client==0.26.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+camera_ai_metrics = ["py.typed"]

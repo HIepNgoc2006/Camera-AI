@@ -40,12 +40,15 @@ class PendingOutboxMessage:
     contract_version: str
     payload: Mapping[str, object]
     attempt_count: int
+    recorded_at: datetime
 
     def __post_init__(self) -> None:
         if (
             TOPIC_PATTERN.fullmatch(self.topic) is None
             or self.contract_version != "normalized_outbox_v1"
             or not 0 <= self.attempt_count < 5
+            or self.recorded_at.tzinfo is None
+            or self.recorded_at.utcoffset() is None
         ):
             raise ValueError("invalid pending outbox message")
 

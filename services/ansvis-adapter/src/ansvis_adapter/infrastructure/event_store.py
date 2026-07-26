@@ -450,6 +450,7 @@ class PostgresEventIngestionRepository(
                         contract_version=str(row["contract_version"]),
                         payload=cast(Mapping[str, object], row["payload"]),
                         attempt_count=int(row["attempt_count"]),
+                        recorded_at=_utc(cast(datetime, row["recorded_at"])),
                     )
                     for row in rows
                 )
