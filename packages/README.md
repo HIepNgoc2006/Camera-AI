@@ -7,6 +7,12 @@ Chứa contract và thư viện dùng chung có ownership rõ, ví dụ API/even
 - Tránh đưa business rule của nhiều domain vào một package dùng chung.
 - Mọi contract phải có version và test tương thích khi được triển khai.
 
+Thư viện runtime hiện có:
+
+- `crypto-runtime/`: `ENCV1` field encryption (AES-256-GCM envelope, AAD binding, dual-read
+  rotation) và `LOOKUP-V1` exact lookup HMAC có domain separation, kèm `KeyProvider` port fail
+  closed và helper CHECK cho migration; không chứa key material, secret hay business state.
+
 Các contract hiện có:
 
 - `consent-withdrawal-policy/consent-withdrawal-policy-v1.json`: policy versioned cho authority,

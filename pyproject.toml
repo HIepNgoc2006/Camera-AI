@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-include = ["scripts/**/*.py", "services/**/*.py"]
+include = ["scripts/**/*.py", "services/**/*.py", "packages/**/*.py"]
 
 [tool.ruff.lint]
 select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
@@ -11,6 +11,7 @@ python_version = "3.12"
 strict = true
 files = [
     "scripts",
+    "packages/crypto-runtime/src",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
@@ -23,6 +24,7 @@ files = [
 pretty = true
 show_error_codes = true
 mypy_path = [
+    "packages/crypto-runtime/src",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
@@ -36,6 +38,7 @@ mypy_path = [
 [tool.pytest.ini_options]
 testpaths = [
     "scripts/tests",
+    "packages/crypto-runtime/tests",
     "services/api-gateway/tests",
     "services/identity-service/tests",
     "services/school-service/tests",
@@ -47,6 +50,7 @@ testpaths = [
 ]
 pythonpath = [
     ".",
+    "packages/crypto-runtime/src",
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
