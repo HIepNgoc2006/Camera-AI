@@ -9,6 +9,10 @@ Chứa contract và thư viện dùng chung có ownership rõ, ví dụ API/even
 
 Các contract hiện có:
 
+- `consent-withdrawal-policy/consent-withdrawal-policy-v1.json`: policy versioned cho authority,
+  deny-before-dispose, owner disposition, legal hold/lawful basis, reconciliation/restore và
+  completion evidence; runtime/destructive activation vẫn fail closed tới khi đủ named approval và
+  change record riêng.
 - `evidence-access-policy/evidence-access-policy-v1.json`: policy versioned cho metadata, thumbnail,
   original, download/export, object authorization, signed GET TTL và audit; runtime activation vẫn
   fail closed tới khi đủ named approval.
