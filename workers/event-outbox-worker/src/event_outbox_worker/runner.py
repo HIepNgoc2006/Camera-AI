@@ -3,6 +3,8 @@
 The loop never claims messages while the broker is unreachable — claiming would burn bounded
 retry attempts on an outage that is not the message's fault. Shutdown finishes the in-flight
 batch and exits cleanly; the database lease expiry recovers anything left by a hard crash.
+An optional housekeeping callable runs on its own interval for snapshot gauges and the approved
+operational alert evaluation; its failures never stop the drain loop.
 """
 
 from __future__ import annotations
@@ -10,6 +12,8 @@ from __future__ import annotations
 import logging
 import signal
 import threading
+import time
+from collections.abc import Callable
 from typing import Protocol
 
 from ansvis_adapter.application.outbox import BatchDrainResult
@@ -38,11 +42,16 @@ class WorkerRunner:
         broker_retry_seconds: float,
         stop_event: threading.Event | None = None,
         max_iterations: int | None = None,
+        housekeeping: Callable[[], None] | None = None,
+        housekeeping_interval_seconds: float = 60.0,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if idle_sleep_seconds <= 0 or broker_retry_seconds <= 0:
             raise ValueError("runner sleep intervals must be positive")
         if max_iterations is not None and max_iterations < 1:
             raise ValueError("max_iterations must be positive when bounded")
+        if housekeeping_interval_seconds <= 0:
+            raise ValueError("housekeeping interval must be positive")
         self._drain = drain
         self._broker = broker
         self._logger = logger
@@ -50,6 +59,10 @@ class WorkerRunner:
         self._broker_retry_seconds = broker_retry_seconds
         self._stop = stop_event or threading.Event()
         self._max_iterations = max_iterations
+        self._housekeeping = housekeeping
+        self._housekeeping_interval = housekeeping_interval_seconds
+        self._monotonic = monotonic
+        self._last_housekeeping = float("-inf")
 
     @property
     def stop_event(self) -> threading.Event:
@@ -68,6 +81,7 @@ class WorkerRunner:
             if self._max_iterations is not None and iterations >= self._max_iterations:
                 break
             iterations += 1
+            self._run_housekeeping()
             if not self._broker.ensure_connected():
                 self._logger.warning(
                     "broker unavailable",
@@ -94,6 +108,21 @@ class WorkerRunner:
                 self._log_result("batch_drained", result)
         self._logger.info("worker stop", extra={"event": "worker_stopped"})
         return 0
+
+    def _run_housekeeping(self) -> None:
+        if self._housekeeping is None:
+            return
+        now = self._monotonic()
+        if now - self._last_housekeeping < self._housekeeping_interval:
+            return
+        self._last_housekeeping = now
+        try:
+            self._housekeeping()
+        except Exception as error:
+            self._logger.warning(
+                "housekeeping failed",
+                extra={"event": "housekeeping_failed", "error_code": _stable_code(error)},
+            )
 
     def _log_result(self, event: str, result: BatchDrainResult) -> None:
         self._logger.info(

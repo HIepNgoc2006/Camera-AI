@@ -108,6 +108,7 @@ class DispatchOutboxMessage:
             published_at=now,
         )
         self._metric("published")
+        self._observe_publish_delay(message, published_at=now)
         return DispatchOutcome.PUBLISHED
 
     def replay(self, message_id: UUID, authorization: ReplayAuthorization) -> None:
@@ -125,6 +126,17 @@ class DispatchOutboxMessage:
     def _increment(self, metric: str, outcome: str) -> None:
         try:
             self._metrics.increment(metric, outcome=outcome)
+        except Exception:
+            return
+
+    def _observe_publish_delay(
+        self, message: PendingOutboxMessage, *, published_at: datetime
+    ) -> None:
+        delay = (published_at - message.recorded_at).total_seconds()
+        try:
+            self._metrics.observe(
+                "event_outbox_enqueue_to_publish_seconds", seconds=max(delay, 0.0)
+            )
         except Exception:
             return
 
@@ -228,7 +240,12 @@ class DrainOutboxBatch:
                 self._metric("published")
 
         if published:
-            self._repository.mark_published_batch(published, published_at=self._aware_now())
+            acknowledged_at = self._aware_now()
+            self._repository.mark_published_batch(published, published_at=acknowledged_at)
+            published_ids = {message_id for message_id, _ in published}
+            for message in messages:
+                if message.outbox_message_id in published_ids:
+                    self._observe_publish_delay(message, published_at=acknowledged_at)
         return BatchDrainResult(
             claimed=len(messages),
             published=len(published),
@@ -242,6 +259,17 @@ class DrainOutboxBatch:
     def _increment(self, metric: str, outcome: str) -> None:
         try:
             self._metrics.increment(metric, outcome=outcome)
+        except Exception:
+            return
+
+    def _observe_publish_delay(
+        self, message: PendingOutboxMessage, *, published_at: datetime
+    ) -> None:
+        delay = (published_at - message.recorded_at).total_seconds()
+        try:
+            self._metrics.observe(
+                "event_outbox_enqueue_to_publish_seconds", seconds=max(delay, 0.0)
+            )
         except Exception:
             return
 

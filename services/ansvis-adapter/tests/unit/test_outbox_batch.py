@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -24,6 +24,7 @@ def message(index: int, *, attempt_count: int = 0) -> PendingOutboxMessage:
         contract_version="normalized_outbox_v1",
         payload={"schema_version": "normalized_outbox_v1", "index": index},
         attempt_count=attempt_count,
+        recorded_at=NOW - timedelta(seconds=45),
     )
 
 
@@ -94,9 +95,17 @@ class SelectivePublisher:
 class FakeMetrics:
     def __init__(self) -> None:
         self.values: list[tuple[str, str]] = []
+        self.observations: list[tuple[str, float]] = []
+        self.gauges: list[tuple[str, float]] = []
 
     def increment(self, metric: str, *, outcome: str) -> None:
         self.values.append((metric, outcome))
+
+    def observe(self, metric: str, *, seconds: float) -> None:
+        self.observations.append((metric, seconds))
+
+    def set_gauge(self, metric: str, *, value: float) -> None:
+        self.gauges.append((metric, value))
 
 
 def drain(

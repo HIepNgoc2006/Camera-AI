@@ -30,6 +30,7 @@ def pending_message(attempt_count: int = 0) -> PendingOutboxMessage:
         contract_version="normalized_outbox_v1",
         payload={"schema_version": "normalized_outbox_v1"},
         attempt_count=attempt_count,
+        recorded_at=NOW - timedelta(seconds=30),
     )
 
 
@@ -103,9 +104,17 @@ class FakePublisher:
 class FakeMetrics:
     def __init__(self) -> None:
         self.values: list[tuple[str, str]] = []
+        self.observations: list[tuple[str, float]] = []
+        self.gauges: list[tuple[str, float]] = []
 
     def increment(self, metric: str, *, outcome: str) -> None:
         self.values.append((metric, outcome))
+
+    def observe(self, metric: str, *, seconds: float) -> None:
+        self.observations.append((metric, seconds))
+
+    def set_gauge(self, metric: str, *, value: float) -> None:
+        self.gauges.append((metric, value))
 
 
 def test_empty_and_successful_dispatch_use_bounded_metrics() -> None:
@@ -235,7 +244,11 @@ def test_replay_requires_explicit_typed_authorization() -> None:
 def test_null_metrics_sink_rejects_unbounded_names_and_labels() -> None:
     metrics = NullMetricsSink()
     metrics.increment("event_outbox_dispatch_total", outcome="published")
-    with pytest.raises(ValueError, match="allowlisted"):
+    with pytest.raises(ValueError, match="not registered"):
         metrics.increment("event_id_611", outcome="published")
     with pytest.raises(ValueError, match="allowlisted"):
         metrics.increment("event_outbox_dispatch_total", outcome="camera_611")
+    with pytest.raises(ValueError, match="not a registered histogram"):
+        metrics.observe("event_outbox_dispatch_total", seconds=0.1)
+    with pytest.raises(ValueError, match="not a registered gauge"):
+        metrics.set_gauge("event_ingestion_ack_seconds", value=1.0)

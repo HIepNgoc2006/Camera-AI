@@ -114,11 +114,20 @@ credentials, face embeddings or producer `subject_external_id`. Face/emotion obs
 `consent_gate_status=not_evaluated`; this component never turns them into an identity or business
 decision.
 
-Telemetry uses only these low-cardinality counters/outcomes:
+Telemetry vocabulary comes from the shared `metrics_registry_v1` (`packages/metrics-runtime`) —
+low-cardinality only:
 
 - `event_ingestion_total{outcome=accepted|duplicate|rejected|conflict}`;
 - `event_outbox_dispatch_total{outcome=empty|published|retry_scheduled|dead_lettered}`;
-- `event_outbox_replay_total{outcome=replayed}`.
+- `event_outbox_replay_total{outcome=replayed}`;
+- `event_ingestion_ack_seconds` (histogram, request-to-ACK) and
+  `event_outbox_enqueue_to_publish_seconds` (histogram, record-to-confirmed-publish);
+- `event_outbox_backlog_messages` / `event_outbox_oldest_pending_seconds` gauges (worker
+  housekeeping) and `event_operational_alerts_total`.
+
+The runnable app defaults to the registry-backed Prometheus sink; when `METRICS_PORT` is non-zero
+(default 9464, `0` under `APP_ENV=test`) the exposition is served on a **loopback-only** internal
+port via the app lifespan — never through the API gateway. Tests inject `NullMetricsSink`.
 
 The internal `snapshot()` boundary exposes aggregate accepted, pending, published, failed, retry,
 conflict, delayed and oldest-pending values only; it has no tenant, school, camera, event, person or
