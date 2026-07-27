@@ -18,8 +18,10 @@ from consent_service.domain.models import (
     SubjectType,
     TrustedConsentContext,
     TrustedEvaluationContext,
+    TrustedProcessingContext,
     TrustedPurposeContext,
 )
+from consent_service.domain.processing import ProcessingConsentStatus
 from consent_service.infrastructure.repository import SqlAlchemyConsentRepository
 from sqlalchemy import Engine, inspect
 from sqlalchemy.engine import make_url
@@ -327,6 +329,116 @@ def test_migration_consent_lifecycle_idempotency_concurrency_and_audit_outbox() 
         command.downgrade(config, "base")
         upgraded = False
         assert inspect(engine).has_schema("privacy") is False
+    finally:
+        if upgraded:
+            command.downgrade(config, "base")
+        engine.dispose()
+
+
+def test_processing_gate_lookup_and_decisions_against_real_schema() -> None:
+    """Issue #139: the internal evaluation port against the real privacy schema."""
+
+    database_uri = _test_database_uri()
+    engine = sa.create_engine(database_uri, poolclass=sa.pool.NullPool)
+    config = _alembic_config()
+    upgraded = False
+    other_school = UUID("00000000-0000-4000-8000-000000000106")
+    try:
+        command.downgrade(config, "base")
+        command.upgrade(config, "head")
+        upgraded = True
+
+        repository = SqlAlchemyConsentRepository(engine)
+        service = ConsentApplicationService(repository, clock=lambda: NOW)
+        attendance_payload = dict(_purpose_payload())
+        attendance_payload["code"] = "attendance"
+        purpose = service.register_purpose(
+            attendance_payload,
+            TrustedPurposeContext(SCHOOL_ID, ACTOR_ID, can_manage_purposes=True),
+        )
+        emotion_payload = dict(_purpose_payload())
+        emotion_payload["code"] = "emotion"
+        emotion_payload["data_categories"] = ["biometric", "emotion"]
+        emotion_payload["requires_biometric_consent"] = False
+        service.register_purpose(
+            emotion_payload,
+            TrustedPurposeContext(SCHOOL_ID, ACTOR_ID, can_manage_purposes=True),
+        )
+
+        requested = service.request_consent(
+            _request_payload(purpose.purpose_id, SUBJECT_ID, "8888888888888888"),
+            _context(),
+        )
+        service.transition_consent(
+            _transition_payload(requested.consent.consent_id, "granted", 1, "9999999999999999"),
+            _context(),
+        )
+
+        def gate_payload(**overrides: object) -> dict[str, object]:
+            payload: dict[str, object] = {
+                "schema_version": 1,
+                "tenant_ref": "tenant_test_0001",
+                "school_ref": "school_test_0001",
+                "subject_ref": str(SUBJECT_ID),
+                "purpose": "attendance",
+                "policy_version": "consent_gate_v1",
+            }
+            payload.update(overrides)
+            return payload
+
+        def gate_context(school_id: UUID = SCHOOL_ID) -> TrustedProcessingContext:
+            return TrustedProcessingContext(
+                school_id=school_id,
+                source_service="event-ingestion-service",
+                gate_authorized=True,
+            )
+
+        allowed = service.evaluate_processing(gate_payload(), gate_context())
+        assert allowed.status is ProcessingConsentStatus.ALLOWED
+        assert allowed.policy_version == "consent_v1"
+
+        cross_school = service.evaluate_processing(gate_payload(), gate_context(other_school))
+        assert cross_school.status is ProcessingConsentStatus.BLOCKED
+        assert cross_school.reason_code == "CONSENT_PURPOSE_INACTIVE"
+
+        other_subject = service.evaluate_processing(
+            gate_payload(subject_ref=str(SECOND_SUBJECT_ID)), gate_context()
+        )
+        assert other_subject.status is ProcessingConsentStatus.BLOCKED
+        assert other_subject.reason_code == "CONSENT_NOT_FOUND"
+
+        not_required = service.evaluate_processing(
+            gate_payload(purpose="emotion", subject_ref=None), gate_context()
+        )
+        assert not_required.status is ProcessingConsentStatus.NOT_REQUIRED
+
+        withdrawn = service.transition_consent(
+            _transition_payload(
+                requested.consent.consent_id,
+                "withdrawn",
+                2,
+                "aaaaaaaaaaaaaaaa",
+                "AUTHORITY_WITHDRAWAL",
+            ),
+            _context(),
+        )
+        assert withdrawn.consent.status == "withdrawn"
+        blocked = service.evaluate_processing(gate_payload(), gate_context())
+        assert blocked.status is ProcessingConsentStatus.BLOCKED
+        assert blocked.reason_code == "CONSENT_WITHDRAWN"
+
+        ambiguous_payload = dict(attendance_payload)
+        ambiguous_payload["version"] = 2
+        service.register_purpose(
+            ambiguous_payload,
+            # A school-specific and a global active purpose can both match the
+            # same request. Two active versions within one school are rejected
+            # by uq_purposes_active_code before the gate is evaluated.
+            TrustedPurposeContext(None, ACTOR_ID, can_manage_purposes=True),
+        )
+        ambiguous = service.evaluate_processing(gate_payload(), gate_context())
+        assert ambiguous.status is ProcessingConsentStatus.BLOCKED
+        assert ambiguous.reason_code == "CONSENT_PURPOSE_AMBIGUOUS"
     finally:
         if upgraded:
             command.downgrade(config, "base")

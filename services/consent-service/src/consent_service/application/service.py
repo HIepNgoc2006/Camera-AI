@@ -21,12 +21,22 @@ from consent_service.domain.models import (
     PurposeStatus,
     TrustedConsentContext,
     TrustedEvaluationContext,
+    TrustedProcessingContext,
     TrustedPurposeContext,
 )
 from consent_service.domain.policies import AUDIT_ACTIONS, evaluate_consent
+from consent_service.domain.processing import (
+    PROCESSING_PURPOSES,
+    ProcessingConsentDecision,
+    ProcessingLookup,
+    decide_processing,
+    resolve_subject,
+)
 from consent_service.schemas.commands import (
     EvaluateConsentV1,
+    EvaluateProcessingV1,
     parse_evaluate_consent,
+    parse_evaluate_processing,
     parse_register_purpose,
     parse_request_consent,
     parse_transition_consent,
@@ -213,5 +223,41 @@ class ConsentApplicationService:
             expected_purpose_id=item.purpose_id,
             required_scope_codes=tuple(item.required_scope_codes),
             expected_version=item.expected_version,
+            evaluated_at=self._now(),
+        )
+
+    def evaluate_processing(
+        self,
+        payload: Mapping[str, object],
+        context: TrustedProcessingContext,
+    ) -> ProcessingConsentDecision:
+        """Issue #139 internal gate: strict tri-state output, deny on ambiguity.
+
+        Only repository unavailability escapes as ``CONSENT_UNAVAILABLE`` so the
+        ingestion caller can defer with a durable receipt; every evaluated
+        condition returns a decision. The subject reference is event data and
+        therefore resolves fail-closed instead of raising.
+        """
+
+        if not context.gate_authorized:
+            raise ConsentError("CONSENT_AUTHORITY_DENIED")
+        item: EvaluateProcessingV1 = parse_evaluate_processing(payload)
+        subject_id = resolve_subject(item.subject_ref)
+        mapping = PROCESSING_PURPOSES.get(item.purpose)
+        if mapping is None:
+            lookup = ProcessingLookup(purposes=(), consents=())
+        else:
+            lookup = self._repository.find_for_processing(
+                school_id=context.school_id,
+                subject_type=mapping.subject_type,
+                subject_id=subject_id,
+                purpose_code=mapping.code,
+            )
+        return decide_processing(
+            lookup,
+            school_id=context.school_id,
+            subject_id=subject_id,
+            purpose_code=item.purpose,
+            gate_policy_version=item.policy_version,
             evaluated_at=self._now(),
         )

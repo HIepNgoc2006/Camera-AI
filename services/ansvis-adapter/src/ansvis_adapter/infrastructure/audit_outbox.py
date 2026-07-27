@@ -17,7 +17,7 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from camera_ai_audit import AuditIntent
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from ansvis_adapter.domain.errors import AnsvisAdapterError
@@ -35,6 +35,31 @@ def _utc(value: datetime) -> datetime:
 
 def _system_utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def enqueue_audit_intent(connection: Connection, intent: AuditIntent, *, now: datetime) -> None:
+    """Idempotently enqueue one intent on an existing transaction.
+
+    Callers that must couple evidence with a state change (audit-before-persist)
+    use this inside their own transaction so both commit or neither does.
+    """
+
+    current = _utc(now)
+    connection.execute(
+        pg_insert(audit_outbox)
+        .values(
+            audit_outbox_id=uuid4(),
+            source_service=intent.source_service,
+            source_event_id=intent.source_event_id,
+            school_id=intent.school_id,
+            payload=intent.publisher_payload(),
+            publish_status="pending",
+            attempt_count=0,
+            next_attempt_at=current,
+            recorded_at=current,
+        )
+        .on_conflict_do_nothing(constraint="uq_events_audit_outbox_source")
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -62,24 +87,9 @@ class PostgresAuditOutbox:
         """Durably enqueue one intent; replaying the same intent is a no-op."""
 
         current = _utc(self._now())
-        statement = (
-            pg_insert(audit_outbox)
-            .values(
-                audit_outbox_id=uuid4(),
-                source_service=intent.source_service,
-                source_event_id=intent.source_event_id,
-                school_id=intent.school_id,
-                payload=intent.publisher_payload(),
-                publish_status="pending",
-                attempt_count=0,
-                next_attempt_at=current,
-                recorded_at=current,
-            )
-            .on_conflict_do_nothing(constraint="uq_events_audit_outbox_source")
-        )
         try:
             with self._engine.begin() as connection:
-                connection.execute(statement)
+                enqueue_audit_intent(connection, intent, now=current)
         except SQLAlchemyError:
             raise AnsvisAdapterError("AUDIT_OUTBOX_UNAVAILABLE") from None
 

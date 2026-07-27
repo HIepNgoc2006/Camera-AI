@@ -25,6 +25,7 @@ from ansvis_adapter.application.ports import (
 )
 from ansvis_adapter.application.telemetry import EvaluateOperationalAlerts
 from ansvis_adapter.config import load_event_database_settings, load_settings
+from ansvis_adapter.domain.consent import CONSENT_BLOCKED, CONSENT_GATE_POLICY_VERSION
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.ingestion import (
     AlertSeverity,
@@ -37,7 +38,12 @@ from ansvis_adapter.infrastructure.audit_outbox import (
     PostgresAuditOutbox,
     school_for_event,
 )
-from ansvis_adapter.infrastructure.event_store import PostgresEventIngestionRepository
+from ansvis_adapter.infrastructure.event_store import (
+    AUDIT_SOURCE_SERVICE,
+    CONSENT_AUDIT_ACTION,
+    PostgresEventIngestionRepository,
+)
+from ansvis_adapter.infrastructure.unavailable import UnavailableConsentGate
 from audit_log_service.application.service import AppendAuditEventService
 from audit_log_service.config import load_database_settings as load_audit_database_settings
 from audit_log_service.domain.models import ActorType, TrustedAuditContext
@@ -161,6 +167,43 @@ def build_dead_letter_hook(
     return hook
 
 
+def build_consent_refusal_hook(
+    engine: sa.Engine, audit_outbox: PostgresAuditOutbox
+) -> Callable[[PendingOutboxMessage], None]:
+    """Audit-before-persist hook for the consent fan-out guard (Issue #139).
+
+    A pending message that reaches dispatch without an allow/not-required
+    consent status is refused terminally; the deterministic intent identity
+    keeps re-claimed replays from producing duplicate evidence.
+    """
+
+    def hook(message: PendingOutboxMessage) -> None:
+        audit_outbox.record(
+            AuditIntent(
+                source_service=AUDIT_SOURCE_SERVICE,
+                source_event_id=uuid5(
+                    NAMESPACE_URL,
+                    f"camera-ai:consent-refused:{message.outbox_message_id}",
+                ),
+                action=CONSENT_AUDIT_ACTION,
+                resource_type="event",
+                resource_id=message.normalized_event_id,
+                request_id=f"req_outbox_{message.outbox_message_id.hex}",
+                result=IntentResult.DENIED,
+                reason_code=CONSENT_BLOCKED,
+                occurred_at=datetime.now(UTC),
+                school_id=school_for_event(engine, message.normalized_event_id),
+                reference_ids=(
+                    ("event_id", message.normalized_event_id),
+                    ("outbox_id", message.outbox_message_id),
+                ),
+                policy_versions=(("consent_policy", CONSENT_GATE_POLICY_VERSION),),
+            )
+        )
+
+    return hook
+
+
 def main() -> int:
     settings = load_settings()
     worker: WorkerSettings = load_worker_settings()
@@ -173,6 +216,7 @@ def main() -> int:
     store = PostgresEventIngestionRepository(
         engine,
         scopes=DrainOnlyScopeResolver(),
+        consent_gate=UnavailableConsentGate(),
         retention_days=_UNUSED_RETENTION_DAYS,
     )
     audit_outbox = PostgresAuditOutbox(engine)
@@ -187,6 +231,7 @@ def main() -> int:
         metrics=metrics,
         batch_size=worker.batch_size,
         on_dead_letter=build_dead_letter_hook(engine, audit_outbox),
+        on_consent_refused=build_consent_refusal_hook(engine, audit_outbox),
     )
     appender = TrustedContextAppender(
         AppendAuditEventService(

@@ -4,7 +4,8 @@ This service is the HTTP Trigger boundary between ANSVIS/AIBOX and the Camera AI
 provides the bounded JSON endpoint, strict V1 parser and typed normalized event families. Issue #19
 adds the strict `ansvis-login-bearer-v1` validation core and registered-source binding. Issue #20 adds
 the versioned idempotency descriptor and durable-receipt consistency contract. Issue #61 adds the
-co-located Event Ingestion persistence core and bounded transactional outbox. The service does not
+co-located Event Ingestion persistence core and bounded transactional outbox. Issue #139 wires the
+fail-closed consent gate into that ingestion path for face/emotion events. The service does not
 issue tokens, build or train an AI model, receive/store media, resolve biometric identity, or make
 attendance or disciplinary decisions.
 
@@ -20,6 +21,9 @@ Success is deliberately conditional on durable storage:
 - `200` with `outcome=duplicate` only after the receipt port confirms a committed identical receipt.
 - `409 EVENT_IDEMPOTENCY_CONFLICT` when one identity is reused with different canonical content.
 - `503 EVENT_DURABLE_RECEIPT_UNAVAILABLE` when the durable port cannot confirm commit.
+- `503 EVENT_CONSENT_UNAVAILABLE` when a face/emotion event cannot obtain a consent decision; the
+  deferred receipt is durable and the source must retry the identical event. A consent-`blocked`
+  event is acknowledged like any accepted event, so the ACK never discloses consent state.
 
 The runtime defaults still deny authentication, idempotency derivation and durable receipts. Issue #19
 provides a fixed HS256 JWS verifier, but it can authenticate only when signing-key, revocation and
@@ -110,15 +114,48 @@ must remain idempotent.
 
 Stored JSONB contracts are allowlisted as `event_metadata_v1`, `detection_attributes_v1` and
 `normalized_outbox_v1`. They cannot contain raw ANSVIS payloads, media URLs/binary, base64, RTSP data,
-credentials, face embeddings or producer `subject_external_id`. Face/emotion observations enter with
-`consent_gate_status=not_evaluated`; this component never turns them into an identity or business
-decision.
+credentials, face embeddings or producer `subject_external_id`. This component never turns an
+observation into an identity or business decision.
+
+### Consent gate (Issue #139)
+
+Face and emotion event types are evaluated through the `ConsentGate` port before anything is
+persisted. The gate maps `attendance.face.observed -> attendance`, `timekeeping.face.observed ->
+timekeeping` and `insight.emotion.observed -> emotion` and calls the consent-service internal
+evaluation port with `(tenant_ref, school_ref, subject_ref, purpose, policy_version)` under the
+pinned `consent_gate_v1` contract. Every stored event row and outbox payload carries the resolved
+`consent_gate_status` plus `consent_policy_version`; the migration CHECK forbids `not_evaluated` at
+rest for these types. Outcomes:
+
+- `allowed` / `not_required`: the full normalized record, detection row and outbox message persist.
+  Non-biometric event types map to `not_required` explicitly without calling the gate.
+- `blocked` (unresolvable subject, no/withdrawn/expired/restricted consent, inactive or ambiguous
+  purpose, unsupported policy version): only the minimized rejected link persists — scope, type,
+  time, correlation, model/config versions — with no confidence, no detection row and no outbox
+  message, and exactly one `EVENT_CONSENT_DENIED` audit intent (deterministic identity per receipt)
+  is enqueued in the same transaction. Blocked is final: the append-only trigger and DB CHECKs make
+  a later flip to a business record impossible.
+- gate unreachable/ambiguous transport failure: the receipt commits as `deferred` with
+  `EVENT_CONSENT_UNAVAILABLE`, no event row exists, an audit intent records the deferral once, and
+  the request fails `503` so the source retries idempotently. The retry re-evaluates and
+  materializes under the original receipt; the receipt row keeps its append-only `deferred` history
+  (aggregate `accepted_receipts` therefore counts only first-pass accepted receipts). Retries are
+  bounded by the source retry policy and the 300-second replay window.
+
+The dispatch paths add a defense-in-depth fan-out guard: any face/emotion outbox message whose
+payload does not prove `allowed`/`not_required` is refused terminally (`publish_status=refused`, a
+`consent-guard` dead-letter attempt with `EVENT_CONSENT_BLOCKED`, one audited
+`EVENT_CONSENT_DENIED` intent) and `replay_failed` cannot resurrect it. The default runtime gate is
+`UnavailableConsentGate`, so an unwired deployment defers every biometric event instead of guessing.
+`ConsentServiceGate` composes the consent-service evaluation port in-process with its own
+`CONSENT_DATABASE_URI` engine — no cross-schema SQL.
 
 Telemetry vocabulary comes from the shared `metrics_registry_v1` (`packages/metrics-runtime`) —
 low-cardinality only:
 
 - `event_ingestion_total{outcome=accepted|duplicate|rejected|conflict}`;
-- `event_outbox_dispatch_total{outcome=empty|published|retry_scheduled|dead_lettered}`;
+- `event_outbox_dispatch_total{outcome=empty|published|retry_scheduled|dead_lettered|refused}`;
+- `event_consent_gate_total{outcome=allowed|blocked|not_required|unavailable}`;
 - `event_outbox_replay_total{outcome=replayed}`;
 - `event_ingestion_ack_seconds` (histogram, request-to-ACK) and
   `event_outbox_enqueue_to_publish_seconds` (histogram, record-to-confirmed-publish);
@@ -144,8 +181,10 @@ public metrics endpoint; deployment must inject its internal telemetry exporter 
 `APP_ENV` and `LOG_LEVEL` are non-secret runtime labels. Alembic additionally requires
 `EVENT_DATABASE_URI`, which is secret-bearing, parsed without a printable representation and never
 loaded from a dotenv file by application code. Inject it from the approved credential store or secret
-manager. There is deliberately no environment variable for a signing key, Bearer token or fallback
-idempotency key; those values remain behind injected provider ports.
+manager. `CONSENT_DATABASE_URI` (same loader guarantees) is read only when deployment wires
+`ConsentServiceGate`; when it is absent the composition must keep the fail-closed
+`UnavailableConsentGate`. There is deliberately no environment variable for a signing key, Bearer
+token or fallback idempotency key; those values remain behind injected provider ports.
 
 ```powershell
 $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'

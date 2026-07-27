@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
+from ansvis_adapter.domain.consent import ConsentGateDecision, ConsentGateStatus
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.models import NormalizedAnsvisEvent
 from ansvis_adapter.infrastructure.event_store import (
@@ -57,7 +58,11 @@ def test_normalized_storage_and_outbox_contract_exclude_subject_and_media_shapes
         source_id=SOURCE_ID,
         camera_id=CAMERA_ID,
         task_id=TASK_ID,
-        consent_status="not_evaluated",
+        decision=ConsentGateDecision(
+            status=ConsentGateStatus.ALLOWED,
+            reason_code="CONSENT_ALLOWED",
+            policy_version="consent_policy_v1",
+        ),
     )
     serialized = json.dumps(
         {
@@ -69,6 +74,8 @@ def test_normalized_storage_and_outbox_contract_exclude_subject_and_media_shapes
     ).casefold()
 
     assert payload["schema_version"] == "normalized_outbox_v1"
+    assert payload["consent_gate_status"] == "allowed"
+    assert payload["consent_policy_version"] == "consent_policy_v1"
     assert payload["metadata"] == {
         "schema_version": "event_metadata_v1",
         "detection_count": 1,

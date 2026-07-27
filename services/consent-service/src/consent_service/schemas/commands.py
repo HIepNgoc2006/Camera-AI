@@ -229,6 +229,32 @@ class EvaluateConsentV1(StrictConsentModel):
         return self
 
 
+EXTERNAL_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+
+
+class EvaluateProcessingV1(StrictConsentModel):
+    """Internal Issue #139 gate request from the trusted event ingestion path.
+
+    ``subject_ref`` is publisher-influenced event data, so its format is
+    deliberately not validated here: an unresolvable reference must become a
+    ``blocked`` decision, never an input error the caller would retry forever.
+    """
+
+    schema_version: Literal[1]
+    tenant_ref: str = Field(min_length=1, max_length=128)
+    school_ref: str = Field(min_length=1, max_length=128)
+    subject_ref: str | None = Field(default=None, max_length=256)
+    purpose: StableCode
+    policy_version: StableCode
+
+    @field_validator("tenant_ref", "school_ref")
+    @classmethod
+    def validate_trusted_refs(cls, value: str) -> str:
+        if EXTERNAL_REF_PATTERN.fullmatch(value) is None:
+            raise ValueError("trusted references must use the approved opaque format")
+        return value
+
+
 def _fingerprint(model: BaseModel) -> bytes:
     encoded = json.dumps(
         model.model_dump(mode="json"),
@@ -261,3 +287,7 @@ def parse_transition_consent(value: Mapping[str, object]) -> TransitionConsentV1
 
 def parse_evaluate_consent(value: Mapping[str, object]) -> EvaluateConsentV1:
     return EvaluateConsentV1.model_validate(_parse(EvaluateConsentV1, value))
+
+
+def parse_evaluate_processing(value: Mapping[str, object]) -> EvaluateProcessingV1:
+    return EvaluateProcessingV1.model_validate(_parse(EvaluateProcessingV1, value))

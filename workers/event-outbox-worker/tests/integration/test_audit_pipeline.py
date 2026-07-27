@@ -15,12 +15,19 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from ansvis_adapter.application.outbox import DrainOutboxBatch
+from ansvis_adapter.application.ports import AuthenticatedSource
+from ansvis_adapter.domain.consent import ConsentGateDecision, ConsentGateRequest, ConsentGateStatus
+from ansvis_adapter.domain.ingestion import ResolvedEventScope
 from ansvis_adapter.infrastructure.audit_outbox import PostgresAuditOutbox
+from ansvis_adapter.infrastructure.event_store import PostgresEventIngestionRepository
+from ansvis_adapter.infrastructure.idempotency import ContractIdempotencyDeriver
+from ansvis_adapter.schemas.events import parse_and_normalize_event
 from audit_log_service.application.service import AppendAuditEventService
 from audit_log_service.infrastructure.integrity import HmacSha256IntegritySigner
 from audit_log_service.infrastructure.repository import SqlAlchemyAuditRepository
 from camera_ai_audit import AuditIntent, IntentResult
-from event_outbox_worker.__main__ import TrustedContextAppender
+from event_outbox_worker.__main__ import TrustedContextAppender, build_consent_refusal_hook
 from event_outbox_worker.audit_delivery import DeliverAuditIntents
 from sqlalchemy.engine import make_url
 
@@ -29,6 +36,49 @@ ADAPTER_ROOT = REPO_ROOT / "services" / "ansvis-adapter"
 AUDIT_ROOT = REPO_ROOT / "services" / "audit-log-service"
 SIGNING_KEY = b"synthetic-audit-integrity-key-32b!"
 EVENT_ID = UUID("00000000-0000-4000-8000-000000000911")
+CONSENT_NOW = datetime(2026, 7, 27, 9, 30, tzinfo=UTC)
+CONSENT_SCHOOL_ID = UUID("00000000-0000-4000-8000-000000000921")
+CONSENT_SOURCE_ID = UUID("00000000-0000-4000-8000-000000000922")
+CONSENT_CAMERA_ID = UUID("00000000-0000-4000-8000-000000000923")
+CONSENT_TASK_ID = UUID("00000000-0000-4000-8000-000000000924")
+
+CONSENT_SOURCE = AuthenticatedSource(
+    source_namespace="ansvis.test.source",
+    subject_ref="source_subject_test_0001",
+    tenant_ref="tenant_test_0001",
+    school_ref="school_test_0001",
+)
+
+
+class ConsentScopes:
+    def resolve(self, event: object, source: AuthenticatedSource) -> ResolvedEventScope:
+        del event, source
+        return ResolvedEventScope(
+            school_id=CONSENT_SCHOOL_ID,
+            source_id=CONSENT_SOURCE_ID,
+            camera_id=CONSENT_CAMERA_ID,
+            task_id=CONSENT_TASK_ID,
+            verified=True,
+        )
+
+
+class ConsentPrimaryOnlyKeys:
+    def key_for(self, version: str) -> bytes | None:
+        raise AssertionError(f"unexpected fallback key request for {version}")
+
+
+class FixedGate:
+    def __init__(self, decision: ConsentGateDecision) -> None:
+        self.decision = decision
+
+    def evaluate(self, request: ConsentGateRequest) -> ConsentGateDecision:
+        del request
+        return self.decision
+
+
+class ConfirmingPublisher:
+    def publish(self, *, topic: str, payload: object) -> None:
+        del topic, payload
 
 
 def _database_uri(name: str) -> str:
@@ -143,6 +193,141 @@ def test_intent_flows_into_immutable_audit_evidence_exactly_once() -> None:
                 sa.text("SELECT count(*) FROM audit.audit_events")
             ).scalar_one()
         assert total == 2
+    finally:
+        if upgraded:
+            command.downgrade(audit_config, "base")
+            command.downgrade(adapter_config, "base")
+        audit_engine.dispose()
+        event_engine.dispose()
+
+
+def test_consent_denial_evidence_flows_from_gate_and_guard_to_audit_store() -> None:
+    """Issue #139: blocked ingestion and guard refusal both land as immutable
+    EVENT_CONSENT_DENIED evidence through the authoritative action policy."""
+
+    event_uri = _database_uri("EVENT_DATABASE_URI")
+    audit_uri = _database_uri("AUDIT_DATABASE_URI")
+    event_engine = sa.create_engine(event_uri, poolclass=sa.pool.NullPool)
+    audit_engine = sa.create_engine(audit_uri, poolclass=sa.pool.NullPool)
+    adapter_config = Config(str(ADAPTER_ROOT / "alembic.ini"))
+    audit_config = Config(str(AUDIT_ROOT / "alembic.ini"))
+    upgraded = False
+    try:
+        command.downgrade(adapter_config, "base")
+        command.downgrade(audit_config, "base")
+        command.upgrade(adapter_config, "head")
+        command.upgrade(audit_config, "head")
+        upgraded = True
+
+        deriver = ContractIdempotencyDeriver(fallback_keys=ConsentPrimaryOnlyKeys())
+
+        def face_payload(marker: str) -> dict[str, object]:
+            return {
+                "schema_version": "ansvis_http_trigger_v1",
+                "source_namespace": "ansvis.test.source",
+                "source_event_id": f"event_test_consent_{marker}",
+                "event_type": "attendance.face.observed",
+                "tenant_ref": "tenant_test_0001",
+                "school_ref": "school_test_0001",
+                "camera_external_id": "camera_test_0001",
+                "task_external_id": "task_test_0001",
+                "event_time": "2026-07-27T09:30:00Z",
+                "correlation_id": f"corr_test_consent_{marker}",
+                "attributes": {
+                    "subject_external_id": "synthetic_subject_reference",
+                    "confidence": 0.9,
+                    "model_version": "face_model_v1",
+                    "config_version": "camera_config_v1",
+                },
+            }
+
+        blocked_store = PostgresEventIngestionRepository(
+            event_engine,
+            scopes=ConsentScopes(),
+            consent_gate=FixedGate(
+                ConsentGateDecision(
+                    status=ConsentGateStatus.BLOCKED,
+                    reason_code="CONSENT_WITHDRAWN",
+                    policy_version="consent_policy_v1",
+                )
+            ),
+            retention_days=30,
+            now=lambda: CONSENT_NOW,
+        )
+        blocked_event = parse_and_normalize_event(face_payload("blocked"))
+        blocked_store.record(
+            blocked_event, CONSENT_SOURCE, deriver.derive(blocked_event, CONSENT_SOURCE)
+        )
+
+        allowed_store = PostgresEventIngestionRepository(
+            event_engine,
+            scopes=ConsentScopes(),
+            consent_gate=FixedGate(
+                ConsentGateDecision(
+                    status=ConsentGateStatus.ALLOWED,
+                    reason_code="CONSENT_ALLOWED",
+                    policy_version="consent_policy_v1",
+                )
+            ),
+            retention_days=30,
+            now=lambda: CONSENT_NOW,
+        )
+        legacy_event = parse_and_normalize_event(face_payload("legacy"))
+        allowed_store.record(
+            legacy_event, CONSENT_SOURCE, deriver.derive(legacy_event, CONSENT_SOURCE)
+        )
+        with event_engine.begin() as connection:
+            connection.execute(
+                sa.text(
+                    "UPDATE events.outbox_messages SET payload = jsonb_set("
+                    "payload, '{consent_gate_status}', '\"not_evaluated\"'::jsonb, true)"
+                )
+            )
+
+        audit_outbox = PostgresAuditOutbox(event_engine, now=lambda: CONSENT_NOW)
+        drain = DrainOutboxBatch(
+            allowed_store,
+            ConfirmingPublisher(),
+            now=lambda: CONSENT_NOW,
+            jitter=lambda _: 0,
+            on_consent_refused=build_consent_refusal_hook(event_engine, audit_outbox),
+        )
+        result = drain.execute()
+        assert result.claimed == 1
+        assert result.refused == 1
+
+        appender = TrustedContextAppender(
+            AppendAuditEventService(
+                SqlAlchemyAuditRepository(audit_engine),
+                HmacSha256IntegritySigner(SIGNING_KEY),
+            ),
+            retention_days=1_825,
+        )
+        audit_drain = DeliverAuditIntents(audit_outbox, appender, now=lambda: CONSENT_NOW)
+        delivered = audit_drain.execute()
+        assert delivered.claimed == 2
+        assert delivered.published == 2
+        assert audit_drain.execute().empty is True
+
+        with audit_engine.connect() as connection:
+            rows = (
+                connection.execute(
+                    sa.text(
+                        "SELECT source_service, action, result, reason_code, school_id,"
+                        " purpose_code FROM audit.audit_events ORDER BY occurred_at, reason_code"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        assert len(rows) == 2
+        reasons = {row["reason_code"] for row in rows}
+        assert reasons == {"CONSENT_WITHDRAWN", "EVENT_CONSENT_BLOCKED"}
+        for row in rows:
+            assert row["source_service"] == "event-ingestion-service"
+            assert row["action"] == "EVENT_CONSENT_DENIED"
+            assert row["result"] == "denied"
+            assert row["school_id"] == CONSENT_SCHOOL_ID
     finally:
         if upgraded:
             command.downgrade(audit_config, "base")

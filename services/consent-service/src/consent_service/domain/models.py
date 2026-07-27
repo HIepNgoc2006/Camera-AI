@@ -252,6 +252,25 @@ class TrustedEvaluationContext:
 
 
 @dataclass(frozen=True, slots=True)
+class TrustedProcessingContext:
+    """Machine-path gate authority resolved by the trusted ingestion caller.
+
+    ``school_id`` is the scope already resolved from the authenticated source,
+    never a publisher-controlled value; ``gate_authorized`` must be asserted by
+    the internal composition, so a default construction cannot evaluate.
+    """
+
+    school_id: UUID
+    source_service: str
+    gate_authorized: bool = False
+
+    def __post_init__(self) -> None:
+        _nonzero(self.school_id)
+        if STABLE_CODE.fullmatch(self.source_service) is None:
+            raise ConsentError("CONSENT_INPUT_INVALID")
+
+
+@dataclass(frozen=True, slots=True)
 class ConsentEvent:
     consent_event_id: UUID
     school_id: UUID

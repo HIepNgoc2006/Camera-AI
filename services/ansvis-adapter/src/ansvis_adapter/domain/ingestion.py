@@ -58,6 +58,7 @@ class DispatchOutcome(StrEnum):
     PUBLISHED = "published"
     RETRY_SCHEDULED = "retry_scheduled"
     DEAD_LETTERED = "dead_lettered"
+    REFUSED = "refused"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

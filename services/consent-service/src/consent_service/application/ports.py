@@ -12,8 +12,10 @@ from consent_service.domain.models import (
     ConsentEvent,
     ConsentTransitionRequest,
     Purpose,
+    SubjectType,
     TrustedConsentContext,
 )
+from consent_service.domain.processing import ProcessingLookup
 
 
 class ConsentRepository(Protocol):
@@ -44,3 +46,13 @@ class ConsentRepository(Protocol):
         school_id: UUID,
     ) -> tuple[Consent | None, Purpose | None]:
         """Read a consent and its exact purpose with a mandatory tenant filter."""
+
+    def find_for_processing(
+        self,
+        *,
+        school_id: UUID,
+        subject_type: SubjectType,
+        subject_id: UUID | None,
+        purpose_code: str,
+    ) -> ProcessingLookup:
+        """Return the bounded purpose/consent snapshot for one gate evaluation."""

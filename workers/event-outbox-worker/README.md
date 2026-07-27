@@ -44,6 +44,11 @@ Cùng vòng drain, worker giao audit intent từ `events.audit_outbox` (adapter 
 - Dead-letter transition của event outbox được audit **trước khi persist**
   (`EVENT_PROCESSING_DEAD_LETTERED`): audit outbox không ghi được ⇒ transition bị hủy, lease hết
   hạn và thử lại — không có dead-letter nào không có bằng chứng.
+- Consent fan-out guard (Issue #139): message face/emotion mà payload không chứng minh
+  `consent_gate_status ∈ {allowed, not_required}` bị từ chối vĩnh viễn (`publish_status=refused`,
+  attempt `consent-guard`/`EVENT_CONSENT_BLOCKED`), audit `EVENT_CONSENT_DENIED` **trước khi
+  persist** với identity xác định theo outbox message — replay không thể biến event bị chặn thành
+  business record. Store của worker wire `UnavailableConsentGate` (drain-only, không ghi event).
 - Env bổ sung: `AUDIT_DATABASE_URI` (bắt buộc), `AUDIT_INTEGRITY_KEY` (≥32 byte, cấm placeholder
   ngoài local/test), `AUDIT_RETENTION_DAYS` (30..3650). Gauge
   `event_audit_outbox_oldest_pending_seconds` cảnh báo tồn đọng theo ngưỡng #35 (60s warning).

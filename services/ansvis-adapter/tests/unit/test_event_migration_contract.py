@@ -9,6 +9,12 @@ MIGRATION = (
     / "versions"
     / "20260721_0001_create_event_ingestion_baseline.py"
 )
+CONSENT_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / "20260727_0003_enforce_consent_gate_at_rest.py"
+)
 
 
 def test_migration_owns_only_the_approved_event_ingestion_objects() -> None:
@@ -79,3 +85,48 @@ def test_migration_json_contracts_are_allowlisted_and_forbid_sensitive_shapes() 
         "subject_external_id",
     ):
         assert forbidden not in source
+
+
+def test_consent_migration_enforces_the_gate_at_rest_without_cross_schema_reads() -> None:
+    source = CONSENT_MIGRATION.read_text(encoding="utf-8")
+
+    for marker in (
+        "ck_events_normalized_consent_at_rest",
+        "ck_events_normalized_consent_policy_version",
+        "consent_policy_version",
+        '"attendance.face.observed"',
+        '"timekeeping.face.observed"',
+        '"insight.emotion.observed"',
+        "AND consent_gate_status = 'not_evaluated')",
+        '"pending", "published", "failed", "refused"',
+        '"accepted", "duplicate", "rejected", "deferred"',
+        "pre_gate_disposition_v1",
+        "DISABLE TRIGGER normalized_events_reject_mutation",
+        "ENABLE TRIGGER normalized_events_reject_mutation",
+    ):
+        assert marker in source
+    for cross_schema in (
+        "identity.",
+        "school.",
+        "privacy.",
+        "camera.cameras",
+        "integration.",
+        "attendance.attendance_",
+        "evidence.",
+        "audit.audit_",
+    ):
+        assert re.search(rf"(?<![a-z_]){re.escape(cross_schema)}", source) is None
+    for forbidden in ("raw_payload", "face_image", "base64", "subject_external_id"):
+        assert forbidden not in source.casefold()
+
+
+def test_consent_migration_downgrade_removes_strict_payload_check_before_rewrite() -> None:
+    source = CONSENT_MIGRATION.read_text(encoding="utf-8")
+    downgrade = source[source.index("def downgrade() -> None:") :]
+    drop_allowlist = downgrade.index('op.drop_constraint("ck_events_outbox_payload_allowlist"')
+    strip_policy_version = downgrade.index("\"SET payload = payload - 'consent_policy_version' \"")
+    recreate_allowlist = downgrade.index(
+        'op.create_check_constraint(\n        "ck_events_outbox_payload_allowlist"'
+    )
+
+    assert drop_allowlist < strip_policy_version < recreate_allowlist

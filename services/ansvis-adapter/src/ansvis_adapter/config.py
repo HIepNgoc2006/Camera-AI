@@ -63,22 +63,40 @@ def load_event_database_settings(
 ) -> EventDatabaseSettings:
     """Load the injected event-store URL without logging or copying it into source files."""
 
+    return _load_database_settings("EVENT_DATABASE_URI", environ)
+
+
+def load_consent_database_settings(
+    environ: Mapping[str, str] | None = None,
+) -> EventDatabaseSettings:
+    """Load the consent gate database URL (Issue #139) with the same guarantees.
+
+    The URL is absent by design until an operator wires the approved consent
+    store; callers must fall back to the fail-closed unavailable gate instead
+    of inventing a default.
+    """
+
+    return _load_database_settings("CONSENT_DATABASE_URI", environ)
+
+
+def _load_database_settings(
+    variable: str,
+    environ: Mapping[str, str] | None,
+) -> EventDatabaseSettings:
     source = os.environ if environ is None else environ
     environment = source.get("APP_ENV", "development").strip().lower()
     if environment not in ALLOWED_ENVIRONMENTS:
         raise ConfigurationError("APP_ENV must be an approved environment label")
 
-    raw_url = source.get("EVENT_DATABASE_URI", "").strip()
+    raw_url = source.get(variable, "").strip()
     if not raw_url:
-        raise ConfigurationError("EVENT_DATABASE_URI is required")
+        raise ConfigurationError(f"{variable} is required")
     try:
         database_url = make_url(raw_url)
     except ArgumentError as exc:
-        raise ConfigurationError("EVENT_DATABASE_URI must be a valid URL") from exc
+        raise ConfigurationError(f"{variable} must be a valid URL") from exc
     if database_url.drivername != "postgresql+psycopg" or not database_url.database:
-        raise ConfigurationError(
-            "EVENT_DATABASE_URI must use postgresql+psycopg and name a database"
-        )
+        raise ConfigurationError(f"{variable} must use postgresql+psycopg and name a database")
     if environment in {"staging", "production"}:
         components = (
             database_url.username,
