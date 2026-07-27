@@ -284,7 +284,7 @@ def test_consent_denial_evidence_flows_from_gate_and_guard_to_audit_store() -> N
                 )
             )
 
-        audit_outbox = PostgresAuditOutbox(event_engine)
+        audit_outbox = PostgresAuditOutbox(event_engine, now=lambda: CONSENT_NOW)
         drain = DrainOutboxBatch(
             allowed_store,
             ConfirmingPublisher(),
@@ -303,7 +303,7 @@ def test_consent_denial_evidence_flows_from_gate_and_guard_to_audit_store() -> N
             ),
             retention_days=1_825,
         )
-        audit_drain = DeliverAuditIntents(audit_outbox, appender)
+        audit_drain = DeliverAuditIntents(audit_outbox, appender, now=lambda: CONSENT_NOW)
         delivered = audit_drain.execute()
         assert delivered.claimed == 2
         assert delivered.published == 2
