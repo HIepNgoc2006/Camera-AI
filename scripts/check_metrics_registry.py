@@ -16,6 +16,7 @@ BASELINE_METRICS = (
     "event_outbox_replay_total",
     "event_operational_alerts_total",
     "event_audit_delivery_total",
+    "event_consent_gate_total",
     "event_ingestion_ack_seconds",
     "event_outbox_enqueue_to_publish_seconds",
     "event_outbox_backlog_messages",

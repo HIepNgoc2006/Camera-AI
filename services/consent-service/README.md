@@ -54,6 +54,25 @@ withdrawn, restricted, expired, future, inactive, wrong-scope, and stale-version
 stable code. Cross-tenant absence is intentionally indistinguishable from not found to avoid an
 identifier oracle.
 
+## Processing gate port (Issue #139)
+
+`evaluate_processing` is the internal port the event-ingestion path calls for face/emotion events.
+Input is the strict `EvaluateProcessingV1` shape — `(tenant_ref, school_ref, subject_ref, purpose,
+policy_version)` — under a `TrustedProcessingContext` whose `school_id` was resolved by the trusted
+caller and whose `gate_authorized` flag must be set by the internal composition. Output maps the
+full evaluation onto exactly `allowed | blocked | not_required` plus the policy version the decision
+was made under (the consent's own `policy_version` when a consent was evaluated, otherwise the
+pinned `consent_gate_v1` contract version).
+
+Fail-closed rules: an unsupported gate policy version, unsupported purpose code, inactive or
+ambiguous purpose version, unresolvable `subject_ref` (event-supplied data never raises), missing or
+non-granted consent, and any ambiguity all return `blocked` with a stable reason code. A purpose
+whose `requires_biometric_consent` is false returns `not_required`. Only repository unavailability
+raises (`CONSENT_UNAVAILABLE`) so the caller can defer with a durable receipt instead of persisting
+an unevaluated biometric event. Approved purposes are pinned in `domain/processing.py`:
+`attendance` (student), `timekeeping` (staff), `emotion` (student), each with its required scope
+codes.
+
 ## Database ownership and audit intent
 
 The migration creates exactly these Issue #15 objects:

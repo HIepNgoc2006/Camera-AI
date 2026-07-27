@@ -50,6 +50,7 @@ normalized_events = sa.Table(
     sa.Column("correlation_id", sa.Text(), nullable=False),
     sa.Column("sanitized_metadata", postgresql.JSONB(), nullable=False),
     sa.Column("consent_gate_status", sa.Text(), nullable=False),
+    sa.Column("consent_policy_version", sa.Text(), nullable=False),
     sa.Column("retention_until", sa.DateTime(timezone=True), nullable=False),
     sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),

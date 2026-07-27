@@ -133,6 +133,7 @@ class WorkerRunner:
                 "published": result.published,
                 "retry_scheduled": result.retry_scheduled,
                 "dead_lettered": result.dead_lettered,
+                "refused": result.refused,
             },
         )
 

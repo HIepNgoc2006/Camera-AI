@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 import pytest
@@ -14,10 +15,17 @@ from alembic import command
 from alembic.config import Config
 from ansvis_adapter.application.outbox import DispatchOutboxMessage, DrainOutboxBatch
 from ansvis_adapter.application.ports import AuthenticatedSource, ReceiptOutcome
+from ansvis_adapter.domain.consent import (
+    CONSENT_GATE_POLICY_VERSION,
+    ConsentGateDecision,
+    ConsentGateRequest,
+    ConsentGateStatus,
+)
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.ingestion import DispatchOutcome, ReplayAuthorization, ResolvedEventScope
 from ansvis_adapter.infrastructure.event_store import PostgresEventIngestionRepository
 from ansvis_adapter.infrastructure.idempotency import ContractIdempotencyDeriver
+from ansvis_adapter.infrastructure.unavailable import UnavailableConsentGate
 from ansvis_adapter.schemas.events import parse_and_normalize_event
 from sqlalchemy import Engine, inspect
 from sqlalchemy.engine import make_url
@@ -128,6 +136,36 @@ class FailingScopes:
         raise RuntimeError("synthetic registry detail must stay masked")
 
 
+ALLOWED_DECISION = ConsentGateDecision(
+    status=ConsentGateStatus.ALLOWED,
+    reason_code="CONSENT_ALLOWED",
+    policy_version="consent_policy_v1",
+)
+
+
+class StaticGate:
+    """Serve one configurable decision and record every request it saw."""
+
+    def __init__(self, decision: ConsentGateDecision = ALLOWED_DECISION) -> None:
+        self.decision = decision
+        self.requests: list[ConsentGateRequest] = []
+
+    def evaluate(self, request: ConsentGateRequest) -> ConsentGateDecision:
+        self.requests.append(request)
+        return self.decision
+
+
+class OutageGate:
+    """Simulate the consent service being unreachable."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def evaluate(self, request: ConsentGateRequest) -> ConsentGateDecision:
+        self.calls += 1
+        raise RuntimeError("synthetic consent transport detail must stay masked")
+
+
 class TogglePublisher:
     def __init__(self, *, fail: bool) -> None:
         self.fail = fail
@@ -179,6 +217,7 @@ def test_event_store_migration_idempotency_quarantine_outbox_and_minimization() 
         repository = PostgresEventIngestionRepository(
             engine,
             scopes=StaticScopes(),
+            consent_gate=StaticGate(),
             retention_days=30,
             now=lambda: NOW,
         )
@@ -214,7 +253,24 @@ def test_event_store_migration_idempotency_quarantine_outbox_and_minimization() 
         serialized_payload = json.dumps(stored_payload, sort_keys=True).casefold()
         assert stored_payload["schema_version"] == "normalized_outbox_v1"
         assert stored_payload["metadata"]["schema_version"] == "event_metadata_v1"
+        assert stored_payload["consent_gate_status"] == "allowed"
+        assert stored_payload["consent_policy_version"] == "consent_policy_v1"
         assert all(marker not in serialized_payload for marker in FORBIDDEN_PAYLOAD_MARKERS)
+        with engine.connect() as connection:
+            stored_event = (
+                connection.execute(
+                    sa.text(
+                        "SELECT consent_gate_status, consent_policy_version"
+                        " FROM events.normalized_events"
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        assert dict(stored_event) == {
+            "consent_gate_status": "allowed",
+            "consent_policy_version": "consent_policy_v1",
+        }
 
         conflict_event = replace(
             event,
@@ -297,6 +353,7 @@ def test_event_store_migration_idempotency_quarantine_outbox_and_minimization() 
         denied_repository = PostgresEventIngestionRepository(
             engine,
             scopes=FailingScopes(),
+            consent_gate=StaticGate(),
             retention_days=30,
             now=lambda: NOW,
         )
@@ -386,6 +443,7 @@ def test_outbox_batch_claim_lease_isolation_and_batch_acknowledgement() -> None:
         repository = PostgresEventIngestionRepository(
             engine,
             scopes=StaticScopes(),
+            consent_gate=StaticGate(),
             retention_days=30,
             now=clock,
         )
@@ -475,6 +533,368 @@ def test_outbox_batch_claim_lease_isolation_and_batch_acknowledgement() -> None:
         assert result.retry_scheduled == 0
         assert len(publisher.published) == 12
         assert drain.execute().empty is True
+    finally:
+        if upgraded:
+            command.downgrade(config, "base")
+        engine.dispose()
+
+
+def _consent_audit_rows(engine: Engine) -> list[dict[str, object]]:
+    with engine.connect() as connection:
+        rows = (
+            connection.execute(
+                sa.text(
+                    "SELECT source_service, payload FROM events.audit_outbox"
+                    " ORDER BY recorded_at, audit_outbox_id"
+                )
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
+def test_consent_gate_matrix_blocked_deferred_resume_and_fanout_guard() -> None:
+    """Issue #139 acceptance matrix against a real database.
+
+    Covers: blocked minimized persistence with one audit intent, service-down
+    deferral with a durable receipt and idempotent resume, not_required
+    non-biometric flow, the at-rest CHECK, the outbox fan-out guard, and the
+    impossibility of replaying a refused message.
+    """
+
+    database_uri = _test_database_uri()
+    engine = sa.create_engine(database_uri, poolclass=sa.pool.NullPool)
+    config = _alembic_config()
+    upgraded = False
+    deriver = ContractIdempotencyDeriver(fallback_keys=PrimaryOnlyKeys())
+    try:
+        command.downgrade(config, "base")
+        command.upgrade(config, "head")
+        upgraded = True
+
+        # --- blocked: minimized rejected link, no detections, no fan-out, one audit.
+        blocked_gate = StaticGate(
+            ConsentGateDecision(
+                status=ConsentGateStatus.BLOCKED,
+                reason_code="CONSENT_WITHDRAWN",
+                policy_version="consent_policy_v1",
+            )
+        )
+        blocked_repository = PostgresEventIngestionRepository(
+            engine,
+            scopes=StaticScopes(),
+            consent_gate=blocked_gate,
+            retention_days=30,
+            now=lambda: NOW,
+        )
+        blocked_event = parse_and_normalize_event(
+            _event_payload(
+                source_event_id="event_test_consent_blocked",
+                correlation_id="corr_test_consent_blocked",
+            )
+        )
+        blocked_descriptor = deriver.derive(blocked_event, SOURCE)
+        first = blocked_repository.record(blocked_event, SOURCE, blocked_descriptor)
+        assert first.outcome is ReceiptOutcome.ACCEPTED
+        retried = blocked_repository.record(blocked_event, SOURCE, blocked_descriptor)
+        assert retried.outcome is ReceiptOutcome.DUPLICATE
+        assert blocked_gate.requests[0].subject_ref == "synthetic_subject_reference"
+        assert blocked_gate.requests[0].purpose_code == "attendance"
+        assert blocked_gate.requests[0].policy_version == CONSENT_GATE_POLICY_VERSION
+
+        with engine.connect() as connection:
+            blocked_row = (
+                connection.execute(
+                    sa.text(
+                        "SELECT consent_gate_status, consent_policy_version, confidence,"
+                        " sanitized_metadata FROM events.normalized_events"
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            blocked_counts = (
+                connection.execute(
+                    sa.text(
+                        "SELECT "
+                        "(SELECT count(*) FROM events.event_detections) AS detections, "
+                        "(SELECT count(*) FROM events.outbox_messages) AS outbox, "
+                        "(SELECT count(*) FROM events.audit_outbox) AS audit"
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        assert blocked_row["consent_gate_status"] == "blocked"
+        assert blocked_row["consent_policy_version"] == "consent_policy_v1"
+        assert blocked_row["confidence"] is None
+        assert blocked_row["sanitized_metadata"] == {"schema_version": "event_metadata_v1"}
+        assert dict(blocked_counts) == {"detections": 0, "outbox": 0, "audit": 1}
+
+        audit_rows = _consent_audit_rows(engine)
+        blocked_audit = cast(dict[str, object], audit_rows[0]["payload"])
+        blocked_changes = cast(dict[str, object], blocked_audit["changes"])
+        assert audit_rows[0]["source_service"] == "event-ingestion-service"
+        assert blocked_audit["action"] == "EVENT_CONSENT_DENIED"
+        assert blocked_audit["result"] == "denied"
+        assert blocked_audit["reason_code"] == "CONSENT_WITHDRAWN"
+        assert blocked_changes["policy_versions"] == {"consent_policy": "consent_policy_v1"}
+        serialized_audit = json.dumps(audit_rows, default=str, sort_keys=True).casefold()
+        assert "synthetic_subject_reference" not in serialized_audit
+        assert all(marker not in serialized_audit for marker in FORBIDDEN_PAYLOAD_MARKERS)
+
+        # --- at-rest CHECK: not_evaluated can never be stored for face/emotion.
+        with pytest.raises(DBAPIError), engine.begin() as connection:
+            connection.execute(
+                sa.text(
+                    "INSERT INTO events.normalized_events ("
+                    "normalized_event_id, ingestion_receipt_id, school_id, source_id,"
+                    " camera_id, task_id, event_type, event_time, source_timezone,"
+                    " model_version, config_version, correlation_id, consent_gate_status,"
+                    " consent_policy_version, retention_until, occurred_at, recorded_at"
+                    ") SELECT gen_random_uuid(), ingestion_receipt_id, school_id, source_id,"
+                    " :camera_id, :task_id, 'attendance.face.observed', occurred_at, 'UTC',"
+                    " 'model_v1', 'config_v1', 'corr_test_check_violation', 'not_evaluated',"
+                    " 'consent_gate_v1', occurred_at + interval '30 days', occurred_at, now()"
+                    " FROM events.ingestion_receipts LIMIT 1"
+                ),
+                {"camera_id": str(CAMERA_ID), "task_id": str(TASK_ID)},
+            )
+
+        # --- service-down: durable deferred receipt, no projection, idempotent retry.
+        outage_gate = OutageGate()
+        deferred_repository = PostgresEventIngestionRepository(
+            engine,
+            scopes=StaticScopes(),
+            consent_gate=outage_gate,
+            retention_days=30,
+            now=lambda: NOW,
+        )
+        deferred_event = parse_and_normalize_event(
+            _event_payload(
+                source_event_id="event_test_consent_deferred",
+                correlation_id="corr_test_consent_deferred",
+            )
+        )
+        deferred_descriptor = deriver.derive(deferred_event, SOURCE)
+        for _ in range(2):
+            with pytest.raises(AnsvisAdapterError) as deferred_error:
+                deferred_repository.record(deferred_event, SOURCE, deferred_descriptor)
+            assert deferred_error.value.code == "EVENT_CONSENT_UNAVAILABLE"
+        assert outage_gate.calls == 2
+        with engine.connect() as connection:
+            deferred_receipt = (
+                connection.execute(
+                    sa.text(
+                        "SELECT result, error_code FROM events.ingestion_receipts"
+                        " WHERE idempotency_key = :key"
+                    ),
+                    {"key": deferred_descriptor.idempotency_key},
+                )
+                .mappings()
+                .one()
+            )
+            deferred_counts = (
+                connection.execute(
+                    sa.text(
+                        "SELECT "
+                        "(SELECT count(*) FROM events.normalized_events) AS normalized, "
+                        "(SELECT count(*) FROM events.audit_outbox) AS audit"
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        assert dict(deferred_receipt) == {
+            "result": "deferred",
+            "error_code": "EVENT_CONSENT_UNAVAILABLE",
+        }
+        # Still only the blocked event exists; the deferral added audit evidence once.
+        assert dict(deferred_counts) == {"normalized": 1, "audit": 2}
+
+        # The same unavailable-consent behaviour applies to the default gate wiring.
+        unwired_repository = PostgresEventIngestionRepository(
+            engine,
+            scopes=StaticScopes(),
+            consent_gate=UnavailableConsentGate(),
+            retention_days=30,
+            now=lambda: NOW,
+        )
+        with pytest.raises(AnsvisAdapterError) as unwired_error:
+            unwired_repository.record(deferred_event, SOURCE, deferred_descriptor)
+        assert unwired_error.value.code == "EVENT_CONSENT_UNAVAILABLE"
+
+        # --- resume: the consent service recovers and the same retry materializes.
+        resume_repository = PostgresEventIngestionRepository(
+            engine,
+            scopes=StaticScopes(),
+            consent_gate=StaticGate(),
+            retention_days=30,
+            now=lambda: NOW,
+        )
+        resumed = resume_repository.record(deferred_event, SOURCE, deferred_descriptor)
+        assert resumed.outcome is ReceiptOutcome.ACCEPTED
+        again = resume_repository.record(deferred_event, SOURCE, deferred_descriptor)
+        assert again.outcome is ReceiptOutcome.DUPLICATE
+        with engine.connect() as connection:
+            resumed_row = (
+                connection.execute(
+                    sa.text(
+                        "SELECT consent_gate_status, consent_policy_version"
+                        " FROM events.normalized_events WHERE correlation_id = :corr"
+                    ),
+                    {"corr": "corr_test_consent_deferred"},
+                )
+                .mappings()
+                .one()
+            )
+            resumed_receipt = (
+                connection.execute(
+                    sa.text(
+                        "SELECT result FROM events.ingestion_receipts WHERE idempotency_key = :key"
+                    ),
+                    {"key": deferred_descriptor.idempotency_key},
+                )
+                .mappings()
+                .one()
+            )
+        assert dict(resumed_row) == {
+            "consent_gate_status": "allowed",
+            "consent_policy_version": "consent_policy_v1",
+        }
+        # Receipts are append-only: the deferred outcome remains as history.
+        assert resumed_receipt["result"] == "deferred"
+
+        # --- non-biometric types map to not_required explicitly, without a gate call.
+        health_gate = OutageGate()
+        health_repository = PostgresEventIngestionRepository(
+            engine,
+            scopes=StaticScopes(),
+            consent_gate=health_gate,
+            retention_days=30,
+            now=lambda: NOW,
+        )
+        health_event = parse_and_normalize_event(
+            {
+                "schema_version": "ansvis_http_trigger_v1",
+                "source_namespace": "ansvis.test.source",
+                "source_event_id": "event_test_consent_health",
+                "event_type": "camera.health.changed",
+                "tenant_ref": "tenant_test_0001",
+                "school_ref": "school_test_0001",
+                "camera_external_id": "camera_test_0001",
+                "task_external_id": "task_test_0001",
+                "event_time": "2026-07-21T10:00:00Z",
+                "correlation_id": "corr_test_consent_health",
+                "attributes": {"status": "online"},
+            }
+        )
+        health_receipt = health_repository.record(
+            health_event, SOURCE, deriver.derive(health_event, SOURCE)
+        )
+        assert health_receipt.outcome is ReceiptOutcome.ACCEPTED
+        assert health_gate.calls == 0
+        with engine.connect() as connection:
+            health_row = (
+                connection.execute(
+                    sa.text(
+                        "SELECT consent_gate_status, consent_policy_version"
+                        " FROM events.normalized_events WHERE correlation_id = :corr"
+                    ),
+                    {"corr": "corr_test_consent_health"},
+                )
+                .mappings()
+                .one()
+            )
+        assert dict(health_row) == {
+            "consent_gate_status": "not_required",
+            "consent_policy_version": CONSENT_GATE_POLICY_VERSION,
+        }
+
+        # --- fan-out guard: a legacy face payload without an allow decision is
+        # refused terminally, audited, and cannot be replayed into a record.
+        with engine.begin() as connection:
+            legacy = (
+                connection.execute(
+                    sa.text(
+                        "UPDATE events.outbox_messages SET payload = jsonb_set("
+                        "payload, '{consent_gate_status}', '\"not_evaluated\"'::jsonb, true)"
+                        " WHERE payload->>'correlation_id' = :corr"
+                        " RETURNING outbox_message_id"
+                    ),
+                    {"corr": "corr_test_consent_deferred"},
+                )
+                .mappings()
+                .one()
+            )
+        refused_hook_calls: list[UUID] = []
+        guard_publisher = TogglePublisher(fail=False)
+        drain = DrainOutboxBatch(
+            resume_repository,
+            guard_publisher,
+            now=lambda: NOW + timedelta(seconds=120),
+            jitter=lambda _: 0,
+            on_consent_refused=lambda message: refused_hook_calls.append(message.outbox_message_id),
+        )
+        result = drain.execute()
+        assert result.claimed == 2
+        assert result.refused == 1
+        assert result.published == 1
+        assert refused_hook_calls == [legacy["outbox_message_id"]]
+        published_types = {
+            payload["event_type"]
+            for _, payload in guard_publisher.published
+            if isinstance(payload, dict)
+        }
+        assert published_types == {"camera.health.changed"}
+
+        with engine.connect() as connection:
+            refused_row = (
+                connection.execute(
+                    sa.text(
+                        "SELECT publish_status FROM events.outbox_messages"
+                        " WHERE outbox_message_id = :message_id"
+                    ),
+                    {"message_id": legacy["outbox_message_id"]},
+                )
+                .mappings()
+                .one()
+            )
+            guard_attempt = (
+                connection.execute(
+                    sa.text(
+                        "SELECT result, error_code FROM events.processing_attempts"
+                        " WHERE consumer = 'consent-guard'"
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        assert refused_row["publish_status"] == "refused"
+        assert dict(guard_attempt) == {
+            "result": "dead_lettered",
+            "error_code": "EVENT_CONSENT_BLOCKED",
+        }
+
+        with pytest.raises(AnsvisAdapterError) as replay_denied:
+            resume_repository.replay_failed(
+                legacy["outbox_message_id"],
+                actor_id=ACTOR_ID,
+                reason_code="OPERATOR_REVIEWED",
+                authorized_at=NOW + timedelta(seconds=180),
+            )
+        assert replay_denied.value.code == "EVENT_REPLAY_DENIED"
+        assert (
+            DrainOutboxBatch(
+                resume_repository,
+                guard_publisher,
+                now=lambda: NOW + timedelta(seconds=240),
+                jitter=lambda _: 0,
+            )
+            .execute()
+            .empty
+        )
     finally:
         if upgraded:
             command.downgrade(config, "base")

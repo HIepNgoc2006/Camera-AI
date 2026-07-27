@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from ansvis_adapter.application.ports import (
     AuthenticatedSource,
+    ConsentGate,
     DurableReceipt,
     DurableReceiptPort,
     IdempotencyDeriver,
     SourceAuthenticator,
     SourceAuthRequest,
+)
+from ansvis_adapter.domain.consent import (
+    CONSENT_UNAVAILABLE,
+    ConsentGateDecision,
+    ConsentGateRequest,
 )
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.idempotency import IdempotencyDescriptor
@@ -44,3 +50,16 @@ class UnavailableDurableReceiptPort(DurableReceiptPort):
     ) -> DurableReceipt:
         del event, source, idempotency
         raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
+
+
+class UnavailableConsentGate(ConsentGate):
+    """Defer every biometric event until an approved consent gate is explicitly wired.
+
+    This is the mandatory default: with no gate configured, face and emotion
+    events keep a durable deferred receipt and are never persisted with an
+    unevaluated or fabricated consent status.
+    """
+
+    def evaluate(self, request: ConsentGateRequest) -> ConsentGateDecision:
+        del request
+        raise AnsvisAdapterError(CONSENT_UNAVAILABLE)

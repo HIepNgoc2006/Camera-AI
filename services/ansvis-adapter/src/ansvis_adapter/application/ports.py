@@ -10,6 +10,7 @@ from typing import Protocol
 from uuid import UUID
 
 from ansvis_adapter.domain.auth import RegisteredSource
+from ansvis_adapter.domain.consent import ConsentGateDecision, ConsentGateRequest
 from ansvis_adapter.domain.idempotency import IdempotencyDescriptor
 from ansvis_adapter.domain.ingestion import (
     EventOperationalSnapshot,
@@ -103,6 +104,16 @@ class EventScopeResolver(Protocol):
         """Resolve approved source/camera/task IDs without querying another service schema."""
 
 
+class ConsentGate(Protocol):
+    def evaluate(self, request: ConsentGateRequest) -> ConsentGateDecision:
+        """Return the strict tri-state decision or raise EVENT_CONSENT_UNAVAILABLE.
+
+        Implementations must never return an unevaluated result: transport,
+        configuration or contract failures raise so the caller can defer with a
+        durable receipt instead of persisting an unevaluated biometric event.
+        """
+
+
 class OutboxRepository(Protocol):
     def claim_next(self, *, now: datetime) -> PendingOutboxMessage | None:
         """Lease one due message without allowing another worker to claim it."""
@@ -142,6 +153,18 @@ class OutboxRepository(Protocol):
         authorized_at: datetime,
     ) -> None:
         """Move one failed message back to pending after explicit authorization."""
+
+    def refuse_consent_blocked(
+        self,
+        message: PendingOutboxMessage,
+        *,
+        refused_at: datetime,
+    ) -> None:
+        """Terminally refuse one leased message that failed the consent fan-out guard.
+
+        Refused messages are neither publishable nor replayable; replaying a
+        blocked biometric event into a business record must stay impossible.
+        """
 
 
 class OperationalStatusRepository(Protocol):

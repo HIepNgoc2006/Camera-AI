@@ -5,21 +5,35 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import cast
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import sqlalchemy as sa
+from camera_ai_audit import AuditIntent, IntentResult
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from ansvis_adapter.application.ports import (
     AuthenticatedSource,
+    ConsentGate,
     DurableReceipt,
     DurableReceiptPort,
     EventScopeResolver,
+    MetricsSink,
     OperationalStatusRepository,
     OutboxRepository,
     ReceiptOutcome,
+)
+from ansvis_adapter.application.telemetry import NullMetricsSink
+from ansvis_adapter.domain.consent import (
+    CONSENT_BLOCKED,
+    CONSENT_GATE_POLICY_VERSION,
+    CONSENT_UNAVAILABLE,
+    NOT_REQUIRED_DECISION,
+    ConsentGateDecision,
+    ConsentGateRequest,
+    ConsentGateStatus,
+    consent_purpose_for,
 )
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.idempotency import IdempotencyDescriptor
@@ -29,11 +43,8 @@ from ansvis_adapter.domain.ingestion import (
     ReplayAuthorization,
     ResolvedEventScope,
 )
-from ansvis_adapter.domain.models import (
-    EmotionInsightEvent,
-    FaceObservationEvent,
-    NormalizedAnsvisEvent,
-)
+from ansvis_adapter.domain.models import NormalizedAnsvisEvent
+from ansvis_adapter.infrastructure.audit_outbox import enqueue_audit_intent
 from ansvis_adapter.infrastructure.tables import (
     event_detections,
     ingestion_receipts,
@@ -47,6 +58,10 @@ OUTBOX_CONTRACT_VERSION = "normalized_outbox_v1"
 CONSUMER_PUBLISHER = "outbox-publisher"
 CONSUMER_CONFLICT = "ingestion-conflict"
 CONSUMER_REPLAY = "outbox-replay"
+CONSUMER_CONSENT_GUARD = "consent-guard"
+AUDIT_SOURCE_SERVICE = "event-ingestion-service"
+CONSENT_AUDIT_ACTION = "EVENT_CONSENT_DENIED"
+CONSENT_GATE_METRIC = "event_consent_gate_total"
 
 
 def _utc(value: datetime) -> datetime:
@@ -78,12 +93,6 @@ def _fingerprint(checksum: object) -> str:
 def _topic(event: NormalizedAnsvisEvent) -> str:
     suffix = event.event_type.value.replace(".", "_")
     return f"camera_ai.events.{suffix}.v1"
-
-
-def _consent_status(event: NormalizedAnsvisEvent) -> str:
-    if isinstance(event, (FaceObservationEvent, EmotionInsightEvent)):
-        return "not_evaluated"
-    return "not_required"
 
 
 def _versions(event: NormalizedAnsvisEvent) -> tuple[str, str]:
@@ -126,7 +135,7 @@ def _outbox_payload(
     source_id: UUID,
     camera_id: UUID,
     task_id: UUID,
-    consent_status: str,
+    decision: ConsentGateDecision,
 ) -> dict[str, object]:
     model_version, config_version = _versions(event)
     payload: dict[str, object] = {
@@ -141,7 +150,8 @@ def _outbox_payload(
         "correlation_id": event.correlation_id,
         "model_version": model_version,
         "config_version": config_version,
-        "consent_gate_status": consent_status,
+        "consent_gate_status": decision.status.value,
+        "consent_policy_version": decision.policy_version,
     }
     if event.attributes.confidence is not None:
         payload["confidence"] = event.attributes.confidence
@@ -175,9 +185,11 @@ class PostgresEventIngestionRepository(
         engine: Engine,
         *,
         scopes: EventScopeResolver,
+        consent_gate: ConsentGate,
         retention_days: int,
         claim_seconds: int = 30,
         now: Callable[[], datetime] = _system_utc_now,
+        metrics: MetricsSink | None = None,
     ) -> None:
         if not 1 <= retention_days <= 3_650:
             raise ValueError("retention_days must come from an approved bounded policy")
@@ -185,9 +197,11 @@ class PostgresEventIngestionRepository(
             raise ValueError("claim lease must match normalized_outbox_v1")
         self._engine = engine
         self._scopes = scopes
+        self._consent_gate = consent_gate
         self._retention_days = retention_days
         self._claim_seconds = claim_seconds
         self._now = now
+        self._metrics = metrics or NullMetricsSink()
 
     def record(
         self,
@@ -202,13 +216,15 @@ class PostgresEventIngestionRepository(
         except Exception:
             raise AnsvisAdapterError("EVENT_SOURCE_MAPPING_DENIED") from None
 
+        purpose_code = consent_purpose_for(event.event_type)
+        decision = self._evaluate_consent(event, source, scope, purpose_code)
         received_at = _utc(self._now())
         retention_until = received_at + timedelta(days=self._retention_days)
         receipt_uuid = uuid4()
-        receipt_ref = f"receipt_{receipt_uuid.hex}"
         event_id = uuid4()
         checksum = _checksum(idempotency.canonical_fingerprint)
         conflict = False
+        deferred = decision is None
         result: DurableReceipt | None = None
         try:
             with self._engine.begin() as connection:
@@ -223,8 +239,8 @@ class PostgresEventIngestionRepository(
                         payload_checksum=checksum,
                         request_id=event.correlation_id,
                         received_at=received_at,
-                        result="accepted",
-                        error_code=None,
+                        result="deferred" if deferred else "accepted",
+                        error_code=CONSENT_UNAVAILABLE if deferred else None,
                         occurred_at=event.occurred_at,
                         recorded_at=received_at,
                     )
@@ -237,75 +253,40 @@ class PostgresEventIngestionRepository(
                     .returning(ingestion_receipts.c.ingestion_receipt_id)
                 ).scalar_one_or_none()
                 if inserted is None:
-                    existing = (
-                        connection.execute(
-                            sa.select(
-                                ingestion_receipts.c.ingestion_receipt_id,
-                                ingestion_receipts.c.payload_checksum,
-                                normalized_events.c.normalized_event_id,
-                            )
-                            .join(
-                                normalized_events,
-                                normalized_events.c.ingestion_receipt_id
-                                == ingestion_receipts.c.ingestion_receipt_id,
-                            )
-                            .where(
-                                ingestion_receipts.c.source_id == scope.source_id,
-                                ingestion_receipts.c.idempotency_key == idempotency.idempotency_key,
-                            )
-                            .with_for_update()
-                        )
-                        .mappings()
-                        .one()
+                    result, conflict = self._continue_existing_receipt(
+                        connection,
+                        event=event,
+                        scope=scope,
+                        idempotency=idempotency,
+                        decision=decision,
+                        purpose_code=purpose_code,
+                        event_id=event_id,
+                        received_at=received_at,
+                        retention_until=retention_until,
                     )
-                    stored_fingerprint = _fingerprint(existing["payload_checksum"])
-                    if stored_fingerprint == idempotency.canonical_fingerprint:
-                        result = DurableReceipt(
-                            receipt_id=(
-                                f"receipt_{cast(UUID, existing['ingestion_receipt_id']).hex}"
-                            ),
-                            outcome=ReceiptOutcome.DUPLICATE,
-                            commit_confirmed=True,
-                            idempotency_key=idempotency.idempotency_key,
-                            canonical_fingerprint=stored_fingerprint,
-                        )
-                    else:
-                        existing_event_id = cast(UUID, existing["normalized_event_id"])
-                        connection.execute(
-                            sa.insert(processing_attempts).values(
-                                processing_attempt_id=uuid4(),
-                                normalized_event_id=existing_event_id,
-                                consumer=CONSUMER_CONFLICT,
-                                attempt_number=_next_attempt_number(
-                                    connection, existing_event_id, CONSUMER_CONFLICT
-                                ),
-                                result="dead_lettered",
-                                error_code="EVENT_IDEMPOTENCY_CONFLICT",
-                                next_retry_at=None,
-                                duration_ms=None,
-                                actor_id=None,
-                                reason_code=None,
-                                occurred_at=received_at,
-                                recorded_at=received_at,
-                            )
-                        )
-                        conflict = True
+                elif deferred:
+                    self._enqueue_consent_audit(
+                        connection,
+                        receipt_uuid=receipt_uuid,
+                        event_id=None,
+                        scope=scope,
+                        purpose_code=purpose_code,
+                        reason_code=CONSENT_UNAVAILABLE,
+                        policy_version=CONSENT_GATE_POLICY_VERSION,
+                        occurred_at=received_at,
+                    )
                 else:
-                    self._insert_accepted(
+                    result = self._materialize_event(
                         connection,
                         event=event,
                         scope=scope,
                         receipt_uuid=receipt_uuid,
                         event_id=event_id,
+                        decision=cast(ConsentGateDecision, decision),
+                        purpose_code=purpose_code,
+                        idempotency=idempotency,
                         recorded_at=received_at,
                         retention_until=retention_until,
-                    )
-                    result = DurableReceipt(
-                        receipt_id=receipt_ref,
-                        outcome=ReceiptOutcome.ACCEPTED,
-                        commit_confirmed=True,
-                        idempotency_key=idempotency.idempotency_key,
-                        canonical_fingerprint=idempotency.canonical_fingerprint,
                     )
         except AnsvisAdapterError:
             raise
@@ -314,10 +295,135 @@ class PostgresEventIngestionRepository(
         if conflict:
             raise AnsvisAdapterError("EVENT_IDEMPOTENCY_CONFLICT")
         if result is None:
-            raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
+            # The durable deferred receipt is committed; the source must retry
+            # idempotently until the consent gate can produce a real decision.
+            self._consent_metric("unavailable")
+            raise AnsvisAdapterError(CONSENT_UNAVAILABLE)
         return result
 
-    def _insert_accepted(
+    def _evaluate_consent(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        scope: ResolvedEventScope,
+        purpose_code: str | None,
+    ) -> ConsentGateDecision | None:
+        """Return the strict decision, or None when the gate is unavailable."""
+
+        if purpose_code is None:
+            return NOT_REQUIRED_DECISION
+        try:
+            decision = self._consent_gate.evaluate(
+                ConsentGateRequest(
+                    school_id=scope.school_id,
+                    tenant_ref=source.tenant_ref,
+                    school_ref=source.school_ref,
+                    subject_ref=event.attributes.subject_external_id,
+                    purpose_code=purpose_code,
+                    policy_version=CONSENT_GATE_POLICY_VERSION,
+                )
+            )
+        except Exception:
+            return None
+        if not isinstance(decision, ConsentGateDecision):
+            return None
+        return decision
+
+    def _continue_existing_receipt(
+        self,
+        connection: Connection,
+        *,
+        event: NormalizedAnsvisEvent,
+        scope: ResolvedEventScope,
+        idempotency: IdempotencyDescriptor,
+        decision: ConsentGateDecision | None,
+        purpose_code: str | None,
+        event_id: UUID,
+        received_at: datetime,
+        retention_until: datetime,
+    ) -> tuple[DurableReceipt | None, bool]:
+        """Resolve a receipt conflict: duplicate, fingerprint conflict, or a
+        deferred receipt resuming with a fresh consent decision."""
+
+        receipt_row = (
+            connection.execute(
+                sa.select(
+                    ingestion_receipts.c.ingestion_receipt_id,
+                    ingestion_receipts.c.payload_checksum,
+                    ingestion_receipts.c.result,
+                )
+                .where(
+                    ingestion_receipts.c.source_id == scope.source_id,
+                    ingestion_receipts.c.idempotency_key == idempotency.idempotency_key,
+                )
+                .with_for_update()
+            )
+            .mappings()
+            .one()
+        )
+        existing_receipt_id = cast(UUID, receipt_row["ingestion_receipt_id"])
+        existing_event_id = cast(
+            UUID | None,
+            connection.scalar(
+                sa.select(normalized_events.c.normalized_event_id).where(
+                    normalized_events.c.ingestion_receipt_id == existing_receipt_id
+                )
+            ),
+        )
+        stored_fingerprint = _fingerprint(receipt_row["payload_checksum"])
+        if stored_fingerprint != idempotency.canonical_fingerprint:
+            if existing_event_id is not None:
+                connection.execute(
+                    sa.insert(processing_attempts).values(
+                        processing_attempt_id=uuid4(),
+                        normalized_event_id=existing_event_id,
+                        consumer=CONSUMER_CONFLICT,
+                        attempt_number=_next_attempt_number(
+                            connection, existing_event_id, CONSUMER_CONFLICT
+                        ),
+                        result="dead_lettered",
+                        error_code="EVENT_IDEMPOTENCY_CONFLICT",
+                        next_retry_at=None,
+                        duration_ms=None,
+                        actor_id=None,
+                        reason_code=None,
+                        occurred_at=received_at,
+                        recorded_at=received_at,
+                    )
+                )
+            return None, True
+        if existing_event_id is not None:
+            return (
+                DurableReceipt(
+                    receipt_id=f"receipt_{existing_receipt_id.hex}",
+                    outcome=ReceiptOutcome.DUPLICATE,
+                    commit_confirmed=True,
+                    idempotency_key=idempotency.idempotency_key,
+                    canonical_fingerprint=stored_fingerprint,
+                ),
+                False,
+            )
+        if str(receipt_row["result"]) != "deferred":
+            raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
+        if decision is None:
+            return None, False
+        return (
+            self._materialize_event(
+                connection,
+                event=event,
+                scope=scope,
+                receipt_uuid=existing_receipt_id,
+                event_id=event_id,
+                decision=decision,
+                purpose_code=purpose_code,
+                idempotency=idempotency,
+                recorded_at=received_at,
+                retention_until=retention_until,
+            ),
+            False,
+        )
+
+    def _materialize_event(
         self,
         connection: Connection,
         *,
@@ -325,11 +431,14 @@ class PostgresEventIngestionRepository(
         scope: ResolvedEventScope,
         receipt_uuid: UUID,
         event_id: UUID,
+        decision: ConsentGateDecision,
+        purpose_code: str | None,
+        idempotency: IdempotencyDescriptor,
         recorded_at: datetime,
         retention_until: datetime,
-    ) -> None:
+    ) -> DurableReceipt:
+        blocked = decision.status is ConsentGateStatus.BLOCKED
         model_version, config_version = _versions(event)
-        consent_status = _consent_status(event)
         connection.execute(
             sa.insert(normalized_events).values(
                 normalized_event_id=event_id,
@@ -341,61 +450,135 @@ class PostgresEventIngestionRepository(
                 event_type=event.event_type.value,
                 event_time=event.occurred_at,
                 source_timezone="UTC",
-                confidence=event.attributes.confidence,
+                # A blocked event keeps only the minimized rejected link: scope,
+                # type, time and correlation. No confidence, no detection row,
+                # no outbox fan-out.
+                confidence=None if blocked else event.attributes.confidence,
                 zone_ref=scope.zone_id,
                 model_version=model_version,
                 config_version=config_version,
                 correlation_id=event.correlation_id,
-                sanitized_metadata=_safe_metadata(event),
-                consent_gate_status=consent_status,
+                sanitized_metadata=(
+                    {"schema_version": "event_metadata_v1"} if blocked else _safe_metadata(event)
+                ),
+                consent_gate_status=decision.status.value,
+                consent_policy_version=decision.policy_version,
                 retention_until=retention_until,
                 occurred_at=event.occurred_at,
                 recorded_at=recorded_at,
             )
         )
-        detection_attributes = _detection_attributes(event)
-        if len(detection_attributes) > 1:
+        if blocked:
+            self._enqueue_consent_audit(
+                connection,
+                receipt_uuid=receipt_uuid,
+                event_id=event_id,
+                scope=scope,
+                purpose_code=purpose_code,
+                reason_code=decision.reason_code,
+                policy_version=decision.policy_version,
+                occurred_at=recorded_at,
+            )
+        else:
+            detection_attributes = _detection_attributes(event)
+            if len(detection_attributes) > 1:
+                connection.execute(
+                    sa.insert(event_detections).values(
+                        event_detection_id=uuid4(),
+                        normalized_event_id=event_id,
+                        detection_index=0,
+                        subject_type=None,
+                        subject_ref=None,
+                        subject_match_confidence=None,
+                        emotion_label=None,
+                        emotion_confidence=None,
+                        attributes=detection_attributes,
+                        retention_until=retention_until,
+                        occurred_at=event.occurred_at,
+                        recorded_at=recorded_at,
+                    )
+                )
             connection.execute(
-                sa.insert(event_detections).values(
-                    event_detection_id=uuid4(),
+                sa.insert(outbox_messages).values(
+                    outbox_message_id=uuid4(),
                     normalized_event_id=event_id,
-                    detection_index=0,
-                    subject_type=None,
-                    subject_ref=None,
-                    subject_match_confidence=None,
-                    emotion_label=None,
-                    emotion_confidence=None,
-                    attributes=detection_attributes,
-                    retention_until=retention_until,
+                    topic=_topic(event),
+                    contract_version=OUTBOX_CONTRACT_VERSION,
+                    payload=_outbox_payload(
+                        event,
+                        event_id=event_id,
+                        school_id=scope.school_id,
+                        source_id=scope.source_id,
+                        camera_id=scope.camera_id,
+                        task_id=scope.task_id,
+                        decision=decision,
+                    ),
+                    publish_status="pending",
+                    published_at=None,
+                    attempt_count=0,
+                    next_attempt_at=recorded_at,
+                    claim_token=None,
+                    claim_expires_at=None,
                     occurred_at=event.occurred_at,
                     recorded_at=recorded_at,
                 )
             )
-        connection.execute(
-            sa.insert(outbox_messages).values(
-                outbox_message_id=uuid4(),
-                normalized_event_id=event_id,
-                topic=_topic(event),
-                contract_version=OUTBOX_CONTRACT_VERSION,
-                payload=_outbox_payload(
-                    event,
-                    event_id=event_id,
-                    school_id=scope.school_id,
-                    source_id=scope.source_id,
-                    camera_id=scope.camera_id,
-                    task_id=scope.task_id,
-                    consent_status=consent_status,
-                ),
-                publish_status="pending",
-                published_at=None,
-                attempt_count=0,
-                next_attempt_at=recorded_at,
-                claim_token=None,
-                claim_expires_at=None,
-                occurred_at=event.occurred_at,
-                recorded_at=recorded_at,
-            )
+        self._consent_metric(decision.status.value)
+        return DurableReceipt(
+            receipt_id=f"receipt_{receipt_uuid.hex}",
+            outcome=ReceiptOutcome.ACCEPTED,
+            commit_confirmed=True,
+            idempotency_key=idempotency.idempotency_key,
+            canonical_fingerprint=idempotency.canonical_fingerprint,
         )
+
+    def _enqueue_consent_audit(
+        self,
+        connection: Connection,
+        *,
+        receipt_uuid: UUID,
+        event_id: UUID | None,
+        scope: ResolvedEventScope,
+        purpose_code: str | None,
+        reason_code: str,
+        policy_version: str,
+        occurred_at: datetime,
+    ) -> None:
+        """Enqueue exactly one denial evidence intent inside the same transaction.
+
+        The intent identity derives from the immutable receipt identity, so a
+        retried ingestion can never produce duplicate evidence downstream.
+        """
+
+        marker = "consent-blocked" if event_id is not None else "consent-deferred"
+        references: tuple[tuple[str, UUID], ...] = (("receipt_id", receipt_uuid),)
+        if event_id is not None:
+            references = (("event_id", event_id),) + references
+        enqueue_audit_intent(
+            connection,
+            AuditIntent(
+                source_service=AUDIT_SOURCE_SERVICE,
+                source_event_id=uuid5(NAMESPACE_URL, f"camera-ai:{marker}:{receipt_uuid}"),
+                action=CONSENT_AUDIT_ACTION,
+                resource_type="event" if event_id is not None else "ingestion_receipt",
+                resource_id=event_id if event_id is not None else receipt_uuid,
+                request_id=f"req_receipt_{receipt_uuid.hex}",
+                result=IntentResult.DENIED,
+                reason_code=reason_code,
+                occurred_at=occurred_at,
+                school_id=scope.school_id,
+                purpose_code=purpose_code,
+                reference_ids=references,
+                policy_versions=(("consent_policy", policy_version),),
+            ),
+            now=occurred_at,
+        )
+
+    def _consent_metric(self, outcome: str) -> None:
+        try:
+            self._metrics.increment(CONSENT_GATE_METRIC, outcome=outcome)
+        except Exception:
+            return
 
     def claim_next(self, *, now: datetime) -> PendingOutboxMessage | None:
         messages = self.claim_batch(now=now, limit=1)
@@ -624,6 +807,63 @@ class PostgresEventIngestionRepository(
                         duration_ms=None,
                         actor_id=authorization.actor_id,
                         reason_code=authorization.reason_code,
+                        occurred_at=current,
+                        recorded_at=current,
+                    )
+                )
+        except AnsvisAdapterError:
+            raise
+        except SQLAlchemyError:
+            raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE") from None
+
+    def refuse_consent_blocked(
+        self,
+        message: PendingOutboxMessage,
+        *,
+        refused_at: datetime,
+    ) -> None:
+        current = _utc(refused_at)
+        try:
+            with self._engine.begin() as connection:
+                row = (
+                    connection.execute(
+                        sa.select(outbox_messages.c.outbox_message_id)
+                        .where(
+                            outbox_messages.c.outbox_message_id == message.outbox_message_id,
+                            outbox_messages.c.claim_token == message.claim_token,
+                            outbox_messages.c.publish_status == "pending",
+                        )
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if row is None:
+                    raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
+                connection.execute(
+                    sa.update(outbox_messages)
+                    .where(outbox_messages.c.outbox_message_id == message.outbox_message_id)
+                    .values(
+                        publish_status="refused",
+                        next_attempt_at=current,
+                        claim_token=None,
+                        claim_expires_at=None,
+                    )
+                )
+                connection.execute(
+                    sa.insert(processing_attempts).values(
+                        processing_attempt_id=uuid4(),
+                        normalized_event_id=message.normalized_event_id,
+                        consumer=CONSUMER_CONSENT_GUARD,
+                        attempt_number=_next_attempt_number(
+                            connection, message.normalized_event_id, CONSUMER_CONSENT_GUARD
+                        ),
+                        result="dead_lettered",
+                        error_code=CONSENT_BLOCKED,
+                        next_retry_at=None,
+                        duration_ms=None,
+                        actor_id=None,
+                        reason_code=None,
                         occurred_at=current,
                         recorded_at=current,
                     )

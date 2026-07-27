@@ -29,12 +29,15 @@ from consent_service.domain.models import (
     transition_consent,
 )
 from consent_service.domain.policies import AUDIT_ACTIONS
+from consent_service.domain.processing import ProcessingLookup
 from consent_service.infrastructure.tables import (
     consent_audit_outbox,
     consent_events,
     consents,
     purposes,
 )
+
+_PROCESSING_LOOKUP_CAP = 8
 
 
 def _uuid(value: object) -> UUID:
@@ -470,6 +473,66 @@ class SqlAlchemyConsentRepository:
             raise
         except IntegrityError:
             raise ConsentError("CONSENT_DUPLICATE_CONFLICT") from None
+        except SQLAlchemyError:
+            raise ConsentError("CONSENT_UNAVAILABLE") from None
+
+    def find_for_processing(
+        self,
+        *,
+        school_id: UUID,
+        subject_type: SubjectType,
+        subject_id: UUID | None,
+        purpose_code: str,
+    ) -> ProcessingLookup:
+        """Bounded tenant-filtered snapshot for one Issue #139 gate evaluation.
+
+        The cap only bounds transport; the pure decision layer treats more than
+        one active purpose or matching consent as ambiguity and denies.
+        """
+
+        try:
+            with self._engine.connect() as connection:
+                purpose_rows = (
+                    connection.execute(
+                        sa.select(purposes)
+                        .where(
+                            purposes.c.code == purpose_code,
+                            sa.or_(
+                                purposes.c.school_id == school_id,
+                                purposes.c.school_id.is_(None),
+                            ),
+                        )
+                        .order_by(purposes.c.version, purposes.c.purpose_id)
+                        .limit(_PROCESSING_LOOKUP_CAP)
+                    )
+                    .mappings()
+                    .all()
+                )
+                consent_rows = []
+                if subject_id is not None and purpose_rows:
+                    consent_rows = list(
+                        connection.execute(
+                            sa.select(consents)
+                            .where(
+                                consents.c.school_id == school_id,
+                                consents.c.subject_type == subject_type.value,
+                                consents.c.subject_id == subject_id,
+                                consents.c.purpose_id.in_(
+                                    [row["purpose_id"] for row in purpose_rows]
+                                ),
+                            )
+                            .order_by(consents.c.consent_id)
+                            .limit(_PROCESSING_LOOKUP_CAP)
+                        )
+                        .mappings()
+                        .all()
+                    )
+            return ProcessingLookup(
+                purposes=tuple(_purpose(row) for row in purpose_rows),
+                consents=tuple(_consent(row) for row in consent_rows),
+            )
+        except ConsentError:
+            raise
         except SQLAlchemyError:
             raise ConsentError("CONSENT_UNAVAILABLE") from None
 

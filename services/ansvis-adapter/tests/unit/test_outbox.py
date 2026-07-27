@@ -28,7 +28,10 @@ def pending_message(attempt_count: int = 0) -> PendingOutboxMessage:
         claim_token=CLAIM_TOKEN,
         topic="camera_ai.events.camera_health_changed.v1",
         contract_version="normalized_outbox_v1",
-        payload={"schema_version": "normalized_outbox_v1"},
+        payload={
+            "schema_version": "normalized_outbox_v1",
+            "event_type": "camera.health.changed",
+        },
         attempt_count=attempt_count,
         recorded_at=NOW - timedelta(seconds=30),
     )
@@ -89,6 +92,14 @@ class FakeRepository:
     ) -> None:
         self.replays.append((message_id, actor_id, reason_code, authorized_at))
 
+    def refuse_consent_blocked(
+        self,
+        message: PendingOutboxMessage,
+        *,
+        refused_at: datetime,
+    ) -> None:
+        raise AssertionError("consent guard must not fire for permitted payloads")
+
 
 class FakePublisher:
     def __init__(self, *, fail: bool = False) -> None:
@@ -141,7 +152,13 @@ def test_empty_and_successful_dispatch_use_bounded_metrics() -> None:
 
     assert outcome is DispatchOutcome.PUBLISHED
     assert publisher.published == [
-        ("camera_ai.events.camera_health_changed.v1", {"schema_version": "normalized_outbox_v1"})
+        (
+            "camera_ai.events.camera_health_changed.v1",
+            {
+                "schema_version": "normalized_outbox_v1",
+                "event_type": "camera.health.changed",
+            },
+        )
     ]
     assert repository.published == [(MESSAGE_ID, CLAIM_TOKEN, NOW)]
     assert repository.failures == []

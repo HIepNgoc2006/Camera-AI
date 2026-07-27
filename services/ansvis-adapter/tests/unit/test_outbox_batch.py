@@ -22,7 +22,11 @@ def message(index: int, *, attempt_count: int = 0) -> PendingOutboxMessage:
         claim_token=TOKEN,
         topic="camera_ai.events.camera_health_changed.v1",
         contract_version="normalized_outbox_v1",
-        payload={"schema_version": "normalized_outbox_v1", "index": index},
+        payload={
+            "schema_version": "normalized_outbox_v1",
+            "event_type": "camera.health.changed",
+            "index": index,
+        },
         attempt_count=attempt_count,
         recorded_at=NOW - timedelta(seconds=45),
     )
@@ -78,6 +82,14 @@ class FakeBatchRepository:
         authorized_at: datetime,
     ) -> None:
         raise AssertionError("replay is not part of batch drain")
+
+    def refuse_consent_blocked(
+        self,
+        message: PendingOutboxMessage,
+        *,
+        refused_at: datetime,
+    ) -> None:
+        raise AssertionError("consent guard must not fire for permitted payloads")
 
 
 class SelectivePublisher:

@@ -10,6 +10,7 @@ from uuid import UUID
 
 from ansvis_adapter.application.ports import EventPublisher, MetricsSink, OutboxRepository
 from ansvis_adapter.application.telemetry import NullMetricsSink
+from ansvis_adapter.domain.consent import fanout_permitted
 from ansvis_adapter.domain.errors import AnsvisAdapterError
 from ansvis_adapter.domain.ingestion import (
     DispatchOutcome,
@@ -65,6 +66,7 @@ class DispatchOutboxMessage:
         max_attempts: int = 5,
         base_backoff_seconds: int = 5,
         on_dead_letter: Callable[[PendingOutboxMessage], None] | None = None,
+        on_consent_refused: Callable[[PendingOutboxMessage], None] | None = None,
     ) -> None:
         if max_attempts != 5 or base_backoff_seconds != 5:
             raise ValueError("outbox retry policy must match normalized_outbox_v1")
@@ -76,6 +78,7 @@ class DispatchOutboxMessage:
         self._max_attempts = max_attempts
         self._base_backoff_seconds = base_backoff_seconds
         self._on_dead_letter = on_dead_letter
+        self._on_consent_refused = on_consent_refused
 
     def execute(self) -> DispatchOutcome:
         now = self._aware_now()
@@ -83,6 +86,14 @@ class DispatchOutboxMessage:
         if message is None:
             self._metric("empty")
             return DispatchOutcome.EMPTY
+        if not fanout_permitted(message.payload):
+            # Consent guard: a face/emotion payload without a real allow decision
+            # never reaches the broker; the refusal is terminal and audited first.
+            if self._on_consent_refused is not None:
+                self._on_consent_refused(message)
+            self._repository.refuse_consent_blocked(message, refused_at=now)
+            self._metric("refused")
+            return DispatchOutcome.REFUSED
         try:
             self._publisher.publish(topic=message.topic, payload=message.payload)
         except Exception:
@@ -161,11 +172,20 @@ class BatchDrainResult:
     published: int
     retry_scheduled: int
     dead_lettered: int
+    refused: int = 0
 
     def __post_init__(self) -> None:
+        counters = (
+            self.claimed,
+            self.published,
+            self.retry_scheduled,
+            self.dead_lettered,
+            self.refused,
+        )
         if (
-            min(self.claimed, self.published, self.retry_scheduled, self.dead_lettered) < 0
-            or self.published + self.retry_scheduled + self.dead_lettered != self.claimed
+            min(counters) < 0
+            or self.published + self.retry_scheduled + self.dead_lettered + self.refused
+            != self.claimed
         ):
             raise ValueError("batch drain counters must reconcile")
 
@@ -193,6 +213,7 @@ class DrainOutboxBatch:
         max_attempts: int = 5,
         base_backoff_seconds: int = 5,
         on_dead_letter: Callable[[PendingOutboxMessage], None] | None = None,
+        on_consent_refused: Callable[[PendingOutboxMessage], None] | None = None,
     ) -> None:
         if max_attempts != 5 or base_backoff_seconds != 5:
             raise ValueError("outbox retry policy must match normalized_outbox_v1")
@@ -207,6 +228,7 @@ class DrainOutboxBatch:
         self._max_attempts = max_attempts
         self._base_backoff_seconds = base_backoff_seconds
         self._on_dead_letter = on_dead_letter
+        self._on_consent_refused = on_consent_refused
 
     def execute(self) -> BatchDrainResult:
         now = self._aware_now()
@@ -218,7 +240,17 @@ class DrainOutboxBatch:
         published: list[tuple[UUID, UUID]] = []
         retry_scheduled = 0
         dead_lettered = 0
+        refused = 0
         for message in messages:
+            if not fanout_permitted(message.payload):
+                # Consent guard: audit-before-persist, then terminal refusal; one
+                # refused message never blocks the rest of its batch.
+                if self._on_consent_refused is not None:
+                    self._on_consent_refused(message)
+                self._repository.refuse_consent_blocked(message, refused_at=now)
+                refused += 1
+                self._metric("refused")
+                continue
             try:
                 self._publisher.publish(topic=message.topic, payload=message.payload)
             except Exception:
@@ -263,6 +295,7 @@ class DrainOutboxBatch:
             published=len(published),
             retry_scheduled=retry_scheduled,
             dead_lettered=dead_lettered,
+            refused=refused,
         )
 
     def _metric(self, outcome: str) -> None:

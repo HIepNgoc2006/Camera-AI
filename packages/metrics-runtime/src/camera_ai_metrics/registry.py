@@ -81,7 +81,13 @@ _SPECS: tuple[MetricSpec, ...] = (
         name="event_outbox_dispatch_total",
         kind=MetricKind.COUNTER,
         help_text="Outbox dispatch attempts by bounded outcome.",
-        outcomes=("dead_lettered", "empty", "published", "retry_scheduled"),
+        outcomes=("dead_lettered", "empty", "published", "refused", "retry_scheduled"),
+    ),
+    MetricSpec(
+        name="event_consent_gate_total",
+        kind=MetricKind.COUNTER,
+        help_text="Consent gate decisions on biometric event ingestion by bounded outcome.",
+        outcomes=("allowed", "blocked", "not_required", "unavailable"),
     ),
     MetricSpec(
         name="event_outbox_replay_total",

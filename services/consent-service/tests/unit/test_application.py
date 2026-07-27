@@ -18,6 +18,7 @@ from consent_service.domain.models import (
     TrustedConsentContext,
     TrustedPurposeContext,
 )
+from consent_service.domain.processing import ProcessingLookup
 
 NOW = datetime(2026, 7, 19, 8, 0, tzinfo=UTC)
 SCHOOL_ID = UUID("00000000-0000-4000-8000-000000000001")
@@ -64,6 +65,16 @@ class CapturingRepository:
         if self.created is None:
             return None, None
         return self.created.consent, self.purpose
+
+    def find_for_processing(
+        self,
+        *,
+        school_id: UUID,
+        subject_type: SubjectType,
+        subject_id: UUID | None,
+        purpose_code: str,
+    ) -> ProcessingLookup:
+        raise AssertionError("not used")
 
 
 def _purpose_payload() -> dict[str, object]:

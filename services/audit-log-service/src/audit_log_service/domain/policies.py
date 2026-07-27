@@ -262,6 +262,15 @@ ACTION_POLICIES.update(
         versions=("event_contract",),
     )
 )
+ACTION_POLICIES.update(
+    _policies(
+        ("EVENT_CONSENT_DENIED",),
+        publishers=("event-ingestion-service",),
+        resources=("event", "ingestion_receipt"),
+        references=("event_id", "receipt_id", "outbox_id"),
+        versions=("consent_policy",),
+    )
+)
 
 for prefix, publisher, resource in (
     ("ATTENDANCE", "attendance-service", "attendance_record"),

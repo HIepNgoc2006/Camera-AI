@@ -40,6 +40,20 @@ def test_consent_change_actions_keep_business_result_semantics() -> None:
         assert ACTION_POLICIES[action].results == frozenset({AuditResult.SUCCESS})
 
 
+def test_event_consent_denial_policy_binds_the_ingestion_publisher_and_versions() -> None:
+    policy = ACTION_POLICIES["EVENT_CONSENT_DENIED"]
+
+    assert policy.publishers == frozenset({"event-ingestion-service"})
+    assert policy.resource_types == frozenset({"event", "ingestion_receipt"})
+    assert policy.results == frozenset({AuditResult.DENIED})
+    assert policy.purpose_required is False
+    assert policy.school_scope_required is True
+    assert policy.resource_identity_required is True
+    assert policy.reference_types == frozenset({"event_id", "receipt_id", "outbox_id"})
+    assert policy.policy_types == frozenset({"consent_policy"})
+    assert policy.changed_fields == frozenset()
+
+
 def test_camera_registry_policy_accepts_minimized_zone_and_camera_changes() -> None:
     policy = ACTION_POLICIES["CAMERA_MAPPING_CHANGED"]
 
