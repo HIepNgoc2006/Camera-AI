@@ -118,3 +118,15 @@ def test_consent_migration_enforces_the_gate_at_rest_without_cross_schema_reads(
         assert re.search(rf"(?<![a-z_]){re.escape(cross_schema)}", source) is None
     for forbidden in ("raw_payload", "face_image", "base64", "subject_external_id"):
         assert forbidden not in source.casefold()
+
+
+def test_consent_migration_downgrade_removes_strict_payload_check_before_rewrite() -> None:
+    source = CONSENT_MIGRATION.read_text(encoding="utf-8")
+    downgrade = source[source.index("def downgrade() -> None:") :]
+    drop_allowlist = downgrade.index('op.drop_constraint("ck_events_outbox_payload_allowlist"')
+    strip_policy_version = downgrade.index("\"SET payload = payload - 'consent_policy_version' \"")
+    recreate_allowlist = downgrade.index(
+        'op.create_check_constraint(\n        "ck_events_outbox_payload_allowlist"'
+    )
+
+    assert drop_allowlist < strip_policy_version < recreate_allowlist

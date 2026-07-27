@@ -199,6 +199,9 @@ def downgrade() -> None:
         f"publish_status IN ({_quoted(LEGACY_PUBLISH_STATES)})",
         schema=SCHEMA,
     )
+    # Drop the strict allowlist BEFORE stripping the key it requires; the
+    # legacy allowlist is recreated only after every payload is legacy-shaped.
+    op.drop_constraint("ck_events_outbox_payload_allowlist", "outbox_messages", schema=SCHEMA)
     op.execute(
         sa.text(
             "UPDATE events.outbox_messages "
@@ -206,7 +209,6 @@ def downgrade() -> None:
             "WHERE payload ? 'consent_policy_version'"
         )
     )
-    op.drop_constraint("ck_events_outbox_payload_allowlist", "outbox_messages", schema=SCHEMA)
     op.create_check_constraint(
         "ck_events_outbox_payload_allowlist",
         "outbox_messages",

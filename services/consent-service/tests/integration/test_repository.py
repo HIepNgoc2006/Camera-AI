@@ -431,7 +431,10 @@ def test_processing_gate_lookup_and_decisions_against_real_schema() -> None:
         ambiguous_payload["version"] = 2
         service.register_purpose(
             ambiguous_payload,
-            TrustedPurposeContext(SCHOOL_ID, ACTOR_ID, can_manage_purposes=True),
+            # A school-specific and a global active purpose can both match the
+            # same request. Two active versions within one school are rejected
+            # by uq_purposes_active_code before the gate is evaluated.
+            TrustedPurposeContext(None, ACTOR_ID, can_manage_purposes=True),
         )
         ambiguous = service.evaluate_processing(gate_payload(), gate_context())
         assert ambiguous.status is ProcessingConsentStatus.BLOCKED
