@@ -134,6 +134,38 @@ _SPECS: tuple[MetricSpec, ...] = (
         kind=MetricKind.GAUGE,
         help_text="Age of the oldest undelivered audit intent at the latest snapshot.",
     ),
+    MetricSpec(
+        name="notification_dispatch_total",
+        kind=MetricKind.COUNTER,
+        help_text="Notification dispatch decisions by bounded outcome.",
+        outcomes=(
+            "cancelled",
+            "dead_lettered",
+            "delivered",
+            "denied",
+            "duplicate",
+            "queued",
+            "retry_scheduled",
+            "unavailable",
+        ),
+    ),
+    MetricSpec(
+        name="notification_dlq_arrivals_total",
+        kind=MetricKind.COUNTER,
+        help_text="Minimized notification delivery jobs entering dead letter state.",
+        outcomes=("arrived",),
+    ),
+    MetricSpec(
+        name="notification_reauthorization_seconds",
+        kind=MetricKind.HISTOGRAM,
+        help_text="Current-recipient batch reauthorization latency.",
+        buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5),
+    ),
+    MetricSpec(
+        name="notification_retry_backlog_messages",
+        kind=MetricKind.GAUGE,
+        help_text="Notification deliveries waiting for a bounded retry.",
+    ),
 )
 
 REGISTRY: MappingProxyType[str, MetricSpec] = MappingProxyType({spec.name: spec for spec in _SPECS})

@@ -61,3 +61,31 @@ def test_camera_registry_policy_accepts_minimized_zone_and_camera_changes() -> N
     assert policy.resource_types == frozenset({"camera", "camera_zone"})
     assert policy.purpose_required is True
     assert {"metadata", "purpose", "schedule", "status", "task", "zone"} <= (policy.changed_fields)
+
+
+def test_notification_policy_accepts_only_minimized_service_actions() -> None:
+    delivery_actions = {
+        "NOTIFICATION_DISPATCH_GRANTED",
+        "NOTIFICATION_DISPATCH_DENIED",
+        "NOTIFICATION_DELIVERED",
+        "NOTIFICATION_RETRY_SCHEDULED",
+        "NOTIFICATION_DEAD_LETTERED",
+        "NOTIFICATION_OPEN_GRANTED",
+        "NOTIFICATION_OPEN_DENIED",
+        "NOTIFICATION_CANCELLED",
+    }
+    assert delivery_actions <= APPROVED_ACTIONS
+    for action in delivery_actions:
+        policy = ACTION_POLICIES[action]
+        assert policy.publishers == frozenset({"notification-service"})
+        assert policy.purpose_required
+        assert policy.reference_types == frozenset(
+            {"delivery_id", "notification_id", "recipient_id", "resource_id"}
+        )
+        assert policy.policy_types == frozenset({"notification_policy", "rbac_policy"})
+
+    for action in ("DEVICE_ENDPOINT_CHANGED", "DEVICE_ENDPOINT_REVOKED"):
+        policy = ACTION_POLICIES[action]
+        assert policy.publishers == frozenset({"notification-service"})
+        assert policy.resource_types == frozenset({"device_endpoint"})
+        assert policy.reference_types == frozenset({"endpoint_id"})

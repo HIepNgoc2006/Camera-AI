@@ -353,17 +353,30 @@ ACTION_POLICIES.update(
 
 ACTION_POLICIES.update(
     _policies(
-        ("NOTIFICATION_RECIPIENT_DENIED",),
+        (
+            "NOTIFICATION_RECIPIENT_DENIED",
+            "NOTIFICATION_DISPATCH_GRANTED",
+            "NOTIFICATION_DISPATCH_DENIED",
+            "NOTIFICATION_DELIVERED",
+            "NOTIFICATION_DELIVERY_FAILED",
+            "NOTIFICATION_RETRY_SCHEDULED",
+            "NOTIFICATION_DEAD_LETTERED",
+            "NOTIFICATION_OPEN_GRANTED",
+            "NOTIFICATION_OPEN_DENIED",
+            "NOTIFICATION_CANCELLED",
+            "NOTIFICATION_EXPIRED",
+        ),
         publishers=("notification-service",),
-        resources=("notification_recipient",),
+        resources=("notification", "notification_delivery", "notification_recipient"),
         purpose=True,
-        references=("notification_id", "recipient_id"),
+        references=("delivery_id", "notification_id", "recipient_id", "resource_id"),
+        counts=("attempt_count",),
         versions=("notification_policy", "rbac_policy"),
     )
 )
 ACTION_POLICIES.update(
     _policies(
-        ("DEVICE_ENDPOINT_CHANGED",),
+        ("DEVICE_ENDPOINT_CHANGED", "DEVICE_ENDPOINT_REVOKED"),
         publishers=("notification-service",),
         resources=("device_endpoint",),
         fields=("provider", "status"),
