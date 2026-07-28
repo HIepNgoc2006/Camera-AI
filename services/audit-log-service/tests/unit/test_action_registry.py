@@ -7,6 +7,7 @@ from audit_log_service.domain.policies import ACTION_POLICIES, APPROVED_ACTIONS
 def test_registry_contains_the_approved_cross_domain_audit_taxonomy() -> None:
     required = {
         "AUTH_LOGIN_SUCCEEDED",
+        "AUTHORIZATION_DECISION_DENIED",
         "CONSENT_REQUESTED",
         "CONSENT_RESTRICTED",
         "CONSENT_WITHDRAWN",
@@ -26,6 +27,27 @@ def test_registry_contains_the_approved_cross_domain_audit_taxonomy() -> None:
     assert required <= APPROVED_ACTIONS
     assert len(APPROVED_ACTIONS) >= 82
     assert len(APPROVED_ACTIONS) == len(ACTION_POLICIES)
+
+
+def test_authorization_denial_policy_accepts_only_minimized_references() -> None:
+    policy = ACTION_POLICIES["AUTHORIZATION_DECISION_DENIED"]
+
+    assert policy.publishers
+    assert policy.resource_types == frozenset({"authorization_decision"})
+    assert policy.results == frozenset({AuditResult.DENIED})
+    assert policy.purpose_required
+    assert policy.reference_types == frozenset({"actor_id", "protected_resource_id"})
+    assert policy.policy_types == frozenset({"rbac_policy"})
+    assert policy.changed_fields == frozenset()
+
+
+def test_permission_change_policy_records_the_actor_and_permission_only() -> None:
+    policy = ACTION_POLICIES["PERMISSION_CHANGED"]
+
+    assert policy.publishers == frozenset({"identity-service"})
+    assert policy.resource_types == frozenset({"permission"})
+    assert policy.reference_types == frozenset({"actor_id", "permission_id"})
+    assert policy.policy_types == frozenset({"rbac_policy"})
 
 
 def test_consent_change_actions_keep_business_result_semantics() -> None:

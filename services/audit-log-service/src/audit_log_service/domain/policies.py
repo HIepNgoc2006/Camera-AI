@@ -101,6 +101,17 @@ ACTION_POLICIES: dict[str, ActionPolicy] = {}
 
 ACTION_POLICIES.update(
     _policies(
+        ("AUTHORIZATION_DECISION_DENIED",),
+        publishers=tuple(APPROVED_PUBLISHERS),
+        resources=("authorization_decision",),
+        purpose=True,
+        references=("actor_id", "protected_resource_id"),
+        versions=("rbac_policy",),
+    )
+)
+
+ACTION_POLICIES.update(
+    _policies(
         ("AUTH_LOGIN_SUCCEEDED", "AUTH_LOGIN_FAILED"),
         publishers=("api-gateway", "identity-service"),
         resources=("user", "session"),
@@ -143,7 +154,7 @@ ACTION_POLICIES.update(
         publishers=("identity-service",),
         resources=("permission",),
         fields=("action", "requires_audit", "requires_object_scope", "resource", "status"),
-        references=("permission_id",),
+        references=("actor_id", "permission_id"),
         versions=("rbac_policy",),
     )
 )
