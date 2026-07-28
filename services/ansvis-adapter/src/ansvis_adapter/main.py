@@ -22,6 +22,7 @@ from ansvis_adapter.application.ports import (
     IdempotencyDeriver,
     MetricsSink,
     SourceAuthenticator,
+    SourceRateLimiter,
 )
 from ansvis_adapter.application.service import IngestAnsvisEvent, system_utc_now
 from ansvis_adapter.config import Settings, load_settings
@@ -29,6 +30,7 @@ from ansvis_adapter.infrastructure.unavailable import (
     UnavailableDurableReceiptPort,
     UnavailableIdempotencyDeriver,
     UnavailableSourceAuthenticator,
+    UnavailableSourceRateLimiter,
 )
 from ansvis_adapter.logging import configure_logging
 
@@ -39,6 +41,7 @@ def create_app(
     authenticator: SourceAuthenticator | None = None,
     idempotency_deriver: IdempotencyDeriver | None = None,
     receipt_port: DurableReceiptPort | None = None,
+    rate_limiter: SourceRateLimiter | None = None,
     metrics: MetricsSink | None = None,
     audit_recorder: AuditIntentRecorder | None = None,
     request_logger: logging.Logger | None = None,
@@ -91,7 +94,12 @@ def create_app(
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.include_router(health_router)
     application.include_router(
-        create_event_router(service, metrics=runtime_metrics, audit=audit_recorder)
+        create_event_router(
+            service,
+            rate_limiter or UnavailableSourceRateLimiter(),
+            metrics=runtime_metrics,
+            audit=audit_recorder,
+        )
     )
     return application
 

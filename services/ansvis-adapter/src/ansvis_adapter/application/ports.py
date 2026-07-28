@@ -59,6 +59,19 @@ class SourceAuthenticator(Protocol):
         """Verify the source or raise a stable fail-closed adapter error."""
 
 
+@dataclass(frozen=True, slots=True)
+class RateLimitDecision:
+    """Bounded limiter result; retry delay is meaningful only for a rejection."""
+
+    allowed: bool
+    retry_after_seconds: int = 0
+
+
+class SourceRateLimiter(Protocol):
+    def check(self, source_namespace: str) -> RateLimitDecision:
+        """Consume one source-scoped token or fail closed when state is unavailable."""
+
+
 class FallbackIdempotencyKeyProvider(Protocol):
     def key_for(self, version: str) -> bytes | None:
         """Return secret-managed fallback HMAC key bytes for one exact policy version."""

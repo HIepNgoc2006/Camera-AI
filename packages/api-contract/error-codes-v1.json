@@ -50,6 +50,8 @@
     {"code":"EVENT_DURABLE_RECEIPT_UNAVAILABLE","http_status":503,"retryable":true,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"Durable event receipt is unavailable."},
     {"code":"EVENT_FALLBACK_IDENTITY_INSUFFICIENT","http_status":422,"retryable":false,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"Event identity is insufficient."},
     {"code":"EVENT_IDEMPOTENCY_CONFLICT","http_status":409,"retryable":false,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"The event identity conflicts with an earlier request."},
+    {"code":"EVENT_RATE_LIMITED","http_status":429,"retryable":true,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"Too many event requests."},
+    {"code":"EVENT_RATE_LIMIT_UNAVAILABLE","http_status":503,"retryable":true,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"Event rate limiting is temporarily unavailable."},
     {"code":"EVENT_SCHEMA_INVALID","http_status":422,"retryable":false,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"The event payload is invalid."},
     {"code":"EVENT_SOURCE_MAPPING_DENIED","http_status":401,"retryable":false,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"Event source authentication failed."},
     {"code":"EVENT_SOURCE_UNAUTHORIZED","http_status":401,"retryable":false,"exposure":"public","redaction_rule":"fixed_message_no_reflection","safe_message":"Event source authentication failed."},

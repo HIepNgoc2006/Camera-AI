@@ -12,6 +12,7 @@ import sys
 
 BASELINE_METRICS = (
     "event_ingestion_total",
+    "event_ingestion_rejections_total",
     "event_outbox_dispatch_total",
     "event_outbox_replay_total",
     "event_operational_alerts_total",

@@ -58,7 +58,7 @@ def test_committed_contract_and_client_smoke_pass() -> None:
     generated, operation_count, digest = generate_typescript_client_smoke(document)
 
     assert summary.operation_count == 34
-    assert summary.error_code_count == 59
+    assert summary.error_code_count == 61
     assert summary.client_operation_count == 34
     assert operation_count == 34
     assert len(digest) == 64

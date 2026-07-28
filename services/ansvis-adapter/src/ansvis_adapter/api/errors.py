@@ -18,6 +18,8 @@ ERROR_STATUS = {
     "EVENT_DURABLE_RECEIPT_UNAVAILABLE": 503,
     "EVENT_FALLBACK_IDENTITY_INSUFFICIENT": 422,
     "EVENT_IDEMPOTENCY_CONFLICT": 409,
+    "EVENT_RATE_LIMITED": 429,
+    "EVENT_RATE_LIMIT_UNAVAILABLE": 503,
     "EVENT_SCHEMA_INVALID": 422,
     "EVENT_SOURCE_UNAUTHORIZED": 401,
     "EVENT_SOURCE_MAPPING_DENIED": 401,
@@ -36,16 +38,24 @@ def request_id_from(request: Request) -> str:
     return value if isinstance(value, str) else generated_request_id()
 
 
-def error_response(*, status_code: int, error_code: str, request_id: str) -> JSONResponse:
+def error_response(
+    *,
+    status_code: int,
+    error_code: str,
+    request_id: str,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
     body = ErrorResponse(
         error_code=error_code,
         message="Request rejected.",
         request_id=request_id,
     )
-    return JSONResponse(status_code=status_code, content=body.model_dump())
+    return JSONResponse(status_code=status_code, content=body.model_dump(), headers=headers)
 
 
-def adapter_error_response(request: Request, error_code: str) -> JSONResponse:
+def adapter_error_response(
+    request: Request, error_code: str, *, headers: dict[str, str] | None = None
+) -> JSONResponse:
     status_code = ERROR_STATUS.get(error_code, 500)
     public_code = error_code if error_code in ERROR_STATUS else "INTERNAL_SERVER_ERROR"
     request.state.error_code = public_code
@@ -53,6 +63,7 @@ def adapter_error_response(request: Request, error_code: str) -> JSONResponse:
         status_code=status_code,
         error_code=public_code,
         request_id=request_id_from(request),
+        headers=headers,
     )
 
 

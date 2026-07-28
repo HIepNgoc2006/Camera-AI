@@ -20,7 +20,7 @@ def test_openapi_exposes_only_liveness_and_ansvis_ingestion() -> None:
     assert operation["responses"]["202"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/IngestionAck"
     }
-    for status in ("200", "401", "409", "413", "415", "422", "503"):
+    for status in ("200", "401", "409", "413", "415", "422", "429", "503"):
         assert status in operation["responses"]
 
 

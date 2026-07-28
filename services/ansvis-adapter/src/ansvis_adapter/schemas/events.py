@@ -24,6 +24,8 @@ from ansvis_adapter.domain.models import (
 
 CONTRACT_VERSION = "ansvis_http_trigger_v1"
 SAFE_INTEGER_MAX = 9_007_199_254_740_991
+MAX_JSON_NESTING_DEPTH = 16
+MAX_JSON_ARRAY_ITEMS = 256
 STABLE_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_.:-]{0,63}$")
 STABLE_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$")
 EXTERNAL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -70,11 +72,133 @@ def load_json_object(data: bytes) -> dict[str, object]:
             object_pairs_hook=_unique_object,
             parse_constant=_reject_constant,
         )
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError):
         raise AnsvisAdapterError("EVENT_SCHEMA_INVALID") from None
     if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
         raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
     return value
+
+
+def inspect_json_envelope(data: bytes) -> str:
+    """Lexically cap JSON complexity and read one top-level source namespace.
+
+    This deliberately does not construct the JSON object. Full JSON parsing remains
+    after rate limiting and source authentication.
+    """
+
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise AnsvisAdapterError("EVENT_SCHEMA_INVALID") from None
+    stack: list[str] = []
+    array_items: list[int] = []
+    array_expects_value: list[bool] = []
+    source_namespace: str | None = None
+    pending_top_level_key: str | None = None
+    last_token: str | None = None
+    index = 0
+
+    def mark_array_value() -> None:
+        if stack and stack[-1] == "[" and array_expects_value[-1]:
+            array_items[-1] += 1
+            if array_items[-1] > MAX_JSON_ARRAY_ITEMS:
+                raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+            array_expects_value[-1] = False
+
+    while index < len(text):
+        character = text[index]
+        if character.isspace():
+            index += 1
+            continue
+        if character == '"':
+            start = index
+            index += 1
+            escaped = False
+            while index < len(text):
+                current = text[index]
+                if current == '"' and not escaped:
+                    index += 1
+                    break
+                escaped = current == "\\" and not escaped
+                index += 1
+            else:
+                raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+            lexeme = text[start:index]
+            is_top_level_key = stack == ["{"] and last_token in ("{", ",")
+            if is_top_level_key:
+                try:
+                    decoded_key = json.loads(lexeme)
+                except (json.JSONDecodeError, RecursionError, ValueError):
+                    raise AnsvisAdapterError("EVENT_SCHEMA_INVALID") from None
+                pending_top_level_key = decoded_key if isinstance(decoded_key, str) else None
+            else:
+                mark_array_value()
+                if (
+                    stack == ["{"]
+                    and last_token == ":"
+                    and pending_top_level_key == "source_namespace"
+                ):
+                    if source_namespace is not None:
+                        raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+                    try:
+                        decoded_source = json.loads(lexeme)
+                        source_namespace = _stable_code(decoded_source)
+                    except (
+                        json.JSONDecodeError,
+                        RecursionError,
+                        TypeError,
+                        ValueError,
+                    ):
+                        raise AnsvisAdapterError("EVENT_SCHEMA_INVALID") from None
+            last_token = "string"
+            continue
+        if character in "{[":
+            mark_array_value()
+            stack.append(character)
+            if len(stack) > MAX_JSON_NESTING_DEPTH:
+                raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+            if character == "[":
+                array_items.append(0)
+                array_expects_value.append(True)
+            last_token = character
+            index += 1
+            continue
+        if character in "}]":
+            expected = "{" if character == "}" else "["
+            if not stack or stack[-1] != expected:
+                raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+            stack.pop()
+            if character == "]":
+                array_items.pop()
+                array_expects_value.pop()
+            last_token = character
+            index += 1
+            continue
+        if character == ",":
+            if stack and stack[-1] == "[":
+                array_expects_value[-1] = True
+            pending_top_level_key = None
+            last_token = character
+            index += 1
+            continue
+        if character == ":":
+            last_token = character
+            index += 1
+            continue
+
+        mark_array_value()
+        start = index
+        while index < len(text) and text[index] not in " \t\r\n,]}":
+            index += 1
+        if index == start:
+            raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+        if stack == ["{"] and last_token == ":" and pending_top_level_key == "source_namespace":
+            raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+        last_token = "atom"
+
+    if stack or source_namespace is None:
+        raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+    return source_namespace
 
 
 def _normalize_external_id(value: object) -> str:
@@ -217,6 +341,15 @@ def declared_source_namespace(payload: Mapping[str, object]) -> str:
         return _stable_code(payload.get("source_namespace"))
     except ValueError:
         raise AnsvisAdapterError("EVENT_SCHEMA_INVALID") from None
+
+
+def declared_event_time(payload: Mapping[str, object]) -> datetime:
+    """Validate only the replay timestamp before full schema normalization."""
+
+    value = payload.get("event_time")
+    if not isinstance(value, str):
+        raise AnsvisAdapterError("EVENT_SCHEMA_INVALID")
+    return _event_time(value)
 
 
 def parse_and_normalize_event(payload: Mapping[str, object]) -> NormalizedAnsvisEvent:

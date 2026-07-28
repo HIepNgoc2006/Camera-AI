@@ -12,7 +12,13 @@ from ansvis_adapter.domain.models import (
     HealthStatusEvent,
     SuspectedViolationEvent,
 )
-from ansvis_adapter.schemas.events import load_json_object, parse_and_normalize_event
+from ansvis_adapter.schemas.events import (
+    MAX_JSON_ARRAY_ITEMS,
+    MAX_JSON_NESTING_DEPTH,
+    inspect_json_envelope,
+    load_json_object,
+    parse_and_normalize_event,
+)
 
 
 def event_payload(event_type: str = "camera.health.changed") -> dict[str, object]:
@@ -144,3 +150,48 @@ def test_json_loader_rejects_ambiguous_or_non_object_json(raw: bytes) -> None:
 def test_json_loader_accepts_only_the_decoded_object() -> None:
     raw = json.dumps(event_payload(), separators=(",", ":")).encode("utf-8")
     assert load_json_object(raw) == event_payload()
+
+
+def test_envelope_preflight_extracts_source_without_building_object() -> None:
+    raw = (
+        b'{"schema_version":"ansvis_http_trigger_v1",'
+        b'"source_namespace":"ansvis.test.source","attributes":{"status":"online"}}'
+    )
+
+    assert inspect_json_envelope(raw) == "ansvis.test.source"
+
+
+def test_envelope_preflight_caps_nesting_and_array_length() -> None:
+    nested = (
+        b'{"source_namespace":"ansvis.test.source","attributes":'
+        + b"[" * MAX_JSON_NESTING_DEPTH
+        + b"0"
+        + b"]" * MAX_JSON_NESTING_DEPTH
+        + b"}"
+    )
+    oversized_array = (
+        b'{"source_namespace":"ansvis.test.source","attributes":['
+        + b",".join(b"0" for _ in range(MAX_JSON_ARRAY_ITEMS + 1))
+        + b"]}"
+    )
+
+    for raw in (nested, oversized_array):
+        with pytest.raises(AnsvisAdapterError) as raised:
+            inspect_json_envelope(raw)
+        assert raised.value.code == "EVENT_SCHEMA_INVALID"
+
+
+def test_json_loader_masks_recursion_and_value_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_with(error: Exception) -> object:
+        raise error
+
+    for error in (RecursionError(), ValueError("synthetic parser failure")):
+        monkeypatch.setattr(
+            "ansvis_adapter.schemas.events.json.loads",
+            lambda *args, _error=error, **kwargs: fail_with(_error),
+        )
+        with pytest.raises(AnsvisAdapterError) as raised:
+            load_json_object(b"{}")
+        assert raised.value.code == "EVENT_SCHEMA_INVALID"

@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from ansvis_adapter.application.ports import (
     AuthenticatedSource,
     DurableReceipt,
+    RateLimitDecision,
     ReceiptOutcome,
 )
 from ansvis_adapter.config import Settings
@@ -116,6 +117,33 @@ class CommittedReceiptPort:
         )
 
 
+class DuplicateReceiptPort(CommittedReceiptPort):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def record(
+        self,
+        event: NormalizedAnsvisEvent,
+        source: AuthenticatedSource,
+        idempotency: IdempotencyDescriptor,
+    ) -> DurableReceipt:
+        receipt = super().record(event, source, idempotency)
+        self.calls += 1
+        return DurableReceipt(
+            receipt_id=receipt.receipt_id,
+            outcome=(ReceiptOutcome.ACCEPTED if self.calls == 1 else ReceiptOutcome.DUPLICATE),
+            commit_confirmed=True,
+            idempotency_key=receipt.idempotency_key,
+            canonical_fingerprint=receipt.canonical_fingerprint,
+        )
+
+
+class PermittingRateLimiter:
+    def check(self, source_namespace: str) -> RateLimitDecision:
+        assert source_namespace == "ansvis.test.source"
+        return RateLimitDecision(allowed=True)
+
+
 def app_authenticator() -> HmacBearerSourceAuthenticator:
     return HmacBearerSourceAuthenticator(
         policy=BearerAuthPolicy(trusted_issuer="issuer_test_ansvis_0001"),
@@ -136,6 +164,7 @@ def test_valid_bearer_reaches_only_the_committed_test_receipt() -> None:
         authenticator=app_authenticator(),
         idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=lambda: NOW,
     )
     with TestClient(application, base_url="https://testserver") as client:
@@ -161,6 +190,7 @@ def test_invalid_signature_is_masked_in_response_and_logs() -> None:
         authenticator=app_authenticator(),
         idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         request_logger=request_logger,
         now=lambda: NOW,
     )
@@ -206,6 +236,7 @@ def test_expired_missing_and_insecure_bearer_requests_are_rejected() -> None:
         authenticator=app_authenticator(),
         idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=lambda: NOW,
     )
     with TestClient(application, base_url="https://testserver") as client:
@@ -236,6 +267,7 @@ def test_duplicate_and_combined_authorization_values_are_rejected() -> None:
         authenticator=app_authenticator(),
         idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=lambda: NOW,
     )
     bearer = f"Bearer {token()}"
@@ -265,6 +297,7 @@ def test_verified_source_cannot_cross_tenant_boundary() -> None:
         authenticator=app_authenticator(),
         idempotency_deriver=app_idempotency(),
         receipt_port=CommittedReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=lambda: NOW,
     )
     payload = event_payload()
@@ -279,3 +312,33 @@ def test_verified_source_cannot_cross_tenant_boundary() -> None:
     assert response.status_code == 401
     assert response.json()["error_code"] == "EVENT_SOURCE_MAPPING_DENIED"
     assert "receipt_id" not in response.text
+
+
+def test_reused_jti_and_source_event_id_follow_existing_duplicate_semantics() -> None:
+    receipts = DuplicateReceiptPort()
+    application = create_app(
+        Settings(environment="test", log_level="CRITICAL"),
+        authenticator=app_authenticator(),
+        idempotency_deriver=app_idempotency(),
+        receipt_port=receipts,
+        rate_limiter=PermittingRateLimiter(),
+        now=lambda: NOW,
+    )
+    bearer = f"Bearer {token()}"
+
+    with TestClient(application, base_url="https://testserver") as client:
+        accepted = client.post(
+            "/integration/ansvis/events",
+            json=event_payload(),
+            headers={"Authorization": bearer},
+        )
+        duplicate = client.post(
+            "/integration/ansvis/events",
+            json=event_payload(),
+            headers={"Authorization": bearer},
+        )
+
+    assert accepted.status_code == 202
+    assert duplicate.status_code == 200
+    assert duplicate.json()["outcome"] == "duplicate"
+    assert accepted.json()["receipt_id"] == duplicate.json()["receipt_id"]

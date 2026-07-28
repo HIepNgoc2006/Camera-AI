@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from ansvis_adapter.application.ports import (
     AuthenticatedSource,
     DurableReceipt,
+    RateLimitDecision,
     ReceiptOutcome,
     SourceAuthRequest,
 )
@@ -46,6 +47,12 @@ class FakeAuthenticator:
             tenant_ref="tenant_test_0001",
             school_ref="school_test_0001",
         )
+
+
+class PermittingRateLimiter:
+    def check(self, source_namespace: str) -> RateLimitDecision:
+        assert source_namespace == "ansvis.test.source"
+        return RateLimitDecision(allowed=True)
 
 
 class FakeFallbackKeys:
@@ -100,6 +107,7 @@ def app_with(ledger: SyntheticReceiptLedger, *, logger: logging.Logger | None = 
         authenticator=FakeAuthenticator(),
         idempotency_deriver=ContractIdempotencyDeriver(fallback_keys=FakeFallbackKeys()),
         receipt_port=ledger,
+        rate_limiter=PermittingRateLimiter(),
         request_logger=logger,
         now=lambda: datetime(2030, 1, 1, tzinfo=UTC),
     )
@@ -192,6 +200,7 @@ def test_fallback_retry_is_deterministic_and_missing_deriver_fails_closed() -> N
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
         receipt_port=unavailable_ledger,
+        rate_limiter=PermittingRateLimiter(),
         now=lambda: datetime(2030, 1, 1, tzinfo=UTC),
     )
     with TestClient(unavailable_app, base_url="https://testserver") as client:
