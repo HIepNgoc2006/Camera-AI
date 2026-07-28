@@ -20,6 +20,9 @@ Service hiện có:
 - `ansvis-adapter/`: HTTP Trigger JSON boundary, strict normalization, PostgreSQL durable receipt,
   minimized `events` schema và transactional outbox; runtime mặc định vẫn từ chối cho tới khi auth,
   authoritative scope resolver, retention policy, database và publisher được nối rõ ràng.
+- `notification-service/`: internal, inactive-by-default boundary cho generic in-app/push/email
+  intents, fresh recipient authorization, encrypted endpoint references, bounded retry/cancellation
+  và transactional audit outbox; chưa có provider adapter hoặc public route.
 
 API Gateway và Identity Service hiện chưa có business route, auth flow, proxy, database hay ANSVIS
 integration. School Service mới chỉ có schema/migration, chưa có API/repository/decryption. Audit Log

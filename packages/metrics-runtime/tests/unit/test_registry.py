@@ -23,6 +23,10 @@ BASELINE_NAMES = {
     "event_outbox_enqueue_to_publish_seconds",
     "event_outbox_backlog_messages",
     "event_outbox_oldest_pending_seconds",
+    "notification_dispatch_total",
+    "notification_dlq_arrivals_total",
+    "notification_reauthorization_seconds",
+    "notification_retry_backlog_messages",
 }
 
 
