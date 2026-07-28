@@ -1,0 +1,78 @@
+{
+  "policy_schema_version": 1,
+  "policy_version": "api_contract_policy_v1",
+  "status": "implementation_baseline_inactive",
+  "openapi_version": "1.0.0",
+  "authorization_policy_version": "rbac_policy_v1",
+  "error_registry_version": "error_registry_v1",
+  "base_path": "/api/v1",
+  "required_operation_controls": [
+    "x-auth-scheme",
+    "x-required-permission",
+    "x-object-scope",
+    "x-audit-action",
+    "x-rate-limit-bucket"
+  ],
+  "versioning": {
+    "strategy": "major_path",
+    "breaking_change_requires_new_major_path": true,
+    "additive_change_requires_compatibility_review": true
+  },
+  "route_naming": {
+    "resource_names": "lowercase_plural_kebab_case",
+    "operation_id": "authorization_catalog_operation_id",
+    "verbs_allowed_only_for_commands": true
+  },
+  "pagination": {
+    "strategy": "opaque_cursor",
+    "cursor_parameter": "cursor",
+    "limit_parameter": "limit",
+    "default_limit": 50,
+    "maximum_limit": 200,
+    "total_count_default": "omitted"
+  },
+  "filtering": {
+    "allowlisted_only": true,
+    "unknown_filter": "reject_400",
+    "scope_filters_never_expand_authorization": true
+  },
+  "idempotency": {
+    "mutation_header": "Idempotency-Key",
+    "required_for_post": true,
+    "minimum_length": 16,
+    "maximum_length": 128,
+    "conflict_error_code": "IDEMPOTENCY_CONFLICT"
+  },
+  "request_id": {
+    "request_header": "X-Request-ID",
+    "response_header": "X-Request-ID",
+    "generated_when_missing_or_invalid": true,
+    "never_echo_unvalidated_input": true
+  },
+  "deprecation": {
+    "openapi_deprecated_flag_required": true,
+    "sunset_header_required_when_deprecated": true,
+    "minimum_notice_days": 90,
+    "removal_requires_breaking_change_review": true
+  },
+  "compatibility": {
+    "published_v1_immutable": true,
+    "breaking_review_roles": ["security", "backend", "web", "mobile"],
+    "client_smoke_required": true,
+    "sanitized_examples_required": true
+  },
+  "rate_limit_buckets": {
+    "ansvis_ingestion": {"sustained_rps": 50, "burst": 200, "retry_after_required": true},
+    "login": {"sustained_rps": 5, "burst": 10, "retry_after_required": true},
+    "standard_read": {"sustained_rps": 20, "burst": 60, "retry_after_required": true},
+    "sensitive_write": {"sustained_rps": 5, "burst": 15, "retry_after_required": true},
+    "signed_access": {"sustained_rps": 10, "burst": 30, "retry_after_required": true},
+    "export": {"sustained_rps": 1, "burst": 3, "retry_after_required": true},
+    "destructive_request": {"sustained_rps": 1, "burst": 3, "retry_after_required": true},
+    "admin_read": {"sustained_rps": 10, "burst": 20, "retry_after_required": true},
+    "admin_write": {"sustained_rps": 2, "burst": 5, "retry_after_required": true},
+    "report_read": {"sustained_rps": 5, "burst": 15, "retry_after_required": true},
+    "audit_read": {"sustained_rps": 5, "burst": 10, "retry_after_required": true},
+    "operations_read": {"sustained_rps": 10, "burst": 30, "retry_after_required": true}
+  }
+}

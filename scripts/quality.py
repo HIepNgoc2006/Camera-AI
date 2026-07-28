@@ -27,6 +27,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "notification-privacy-policy": ((python, "scripts/check_notification_privacy_policy.py"),),
         "consent-withdrawal-policy": ((python, "scripts/check_consent_withdrawal_policy.py"),),
         "authorization-catalog": ((python, "scripts/check_authorization_catalog.py"),),
+        "api-contract": ((python, "scripts/check_api_contract.py"),),
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "metrics-registry": ((python, "scripts/check_metrics_registry.py"),),
         "lint": (
@@ -205,6 +206,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "notification-privacy-policy",
                 "consent-withdrawal-policy",
                 "authorization-catalog",
+                "api-contract",
                 "ansvis-contract",
                 "metrics-registry",
                 "lint",
@@ -231,6 +233,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "notification-privacy-policy",
             "consent-withdrawal-policy",
             "authorization-catalog",
+            "api-contract",
             "ansvis-contract",
             "lint",
             "typecheck",

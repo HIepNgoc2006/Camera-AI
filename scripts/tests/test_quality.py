@@ -21,6 +21,7 @@ def test_all_expands_each_supported_gate_in_order() -> None:
         *commands["notification-privacy-policy"],
         *commands["consent-withdrawal-policy"],
         *commands["authorization-catalog"],
+        *commands["api-contract"],
         *commands["ansvis-contract"],
         *commands["metrics-registry"],
         *commands["lint"],
