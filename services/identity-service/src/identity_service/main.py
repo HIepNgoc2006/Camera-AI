@@ -10,11 +10,16 @@ from identity_service.api.errors import http_exception_handler, validation_excep
 from identity_service.api.health import router as health_router
 from identity_service.api.middleware import RequestContextMiddleware
 from identity_service.api.v1.router import router as api_v1_router
+from identity_service.application.authentication import AuthenticationService
 from identity_service.config import Settings, load_settings
 from identity_service.logging import configure_logging
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    authentication_service: AuthenticationService | None = None,
+) -> FastAPI:
     runtime_settings = load_settings() if settings is None else settings
     production = runtime_settings.environment == "production"
     application = FastAPI(
@@ -25,6 +30,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if production else "/openapi.json",
     )
     application.state.settings = runtime_settings
+    application.state.authentication_service = authentication_service
     application.add_middleware(
         RequestContextMiddleware,
         settings=runtime_settings,

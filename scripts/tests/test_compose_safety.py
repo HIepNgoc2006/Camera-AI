@@ -5,7 +5,12 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from scripts.check_compose_safety import EXPECTED_SERVICES, validate_compose
+from scripts.check_compose_safety import (
+    EXPECTED_SERVICES,
+    INTERNAL_NETWORK,
+    POSTGRES_TEST_LOOPBACK_NETWORK,
+    validate_compose,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -15,9 +20,12 @@ def safe_config() -> dict[str, Any]:
     for service_name in EXPECTED_SERVICES:
         published = 55432 if service_name == "postgres-test" else 10000
         target = 5432 if service_name == "postgres-test" else 1
+        network = (
+            POSTGRES_TEST_LOOPBACK_NETWORK if service_name == "postgres-test" else INTERNAL_NETWORK
+        )
         services[service_name] = {
             "image": f"example.invalid/{service_name}:test@sha256:{'a' * 64}",
-            "networks": {"local-backend": None},
+            "networks": {network: None},
             "ports": [{"host_ip": "127.0.0.1", "published": published, "target": target}],
             "security_opt": ["no-new-privileges:true"],
             "healthcheck": {"test": ["CMD", "true"]},
@@ -29,7 +37,16 @@ def safe_config() -> dict[str, Any]:
                 }
             ],
         }
-    return {"services": services, "networks": {"local-backend": {"internal": True}}}
+    return {
+        "services": services,
+        "networks": {
+            INTERNAL_NETWORK: {"internal": True},
+            POSTGRES_TEST_LOOPBACK_NETWORK: {
+                "driver": "bridge",
+                "driver_opts": {"com.docker.network.bridge.host_binding_ipv4": "127.0.0.1"},
+            },
+        },
+    }
 
 
 class ComposeSafetyTests(unittest.TestCase):
@@ -58,10 +75,26 @@ class ComposeSafetyTests(unittest.TestCase):
 
     def test_rejects_non_internal_network(self) -> None:
         config = safe_config()
-        config["networks"]["local-backend"]["internal"] = False
+        config["networks"][INTERNAL_NETWORK]["internal"] = False
 
         violations = validate_compose(config, REPO_ROOT)
         self.assertIn("missing-internal-network", violations)
+
+    def test_rejects_unsafe_postgres_test_loopback_network(self) -> None:
+        config = safe_config()
+        config["networks"][POSTGRES_TEST_LOOPBACK_NETWORK]["driver_opts"][
+            "com.docker.network.bridge.host_binding_ipv4"
+        ] = "0.0.0.0"
+
+        violations = validate_compose(config, REPO_ROOT)
+        self.assertIn("unsafe-postgres-test-loopback-network", violations)
+
+    def test_rejects_non_database_service_on_test_loopback_network(self) -> None:
+        config = safe_config()
+        config["services"]["redis"]["networks"] = {POSTGRES_TEST_LOOPBACK_NETWORK: None}
+
+        violations = validate_compose(config, REPO_ROOT)
+        self.assertIn("unsafe-network:redis", violations)
 
     def test_rejects_missing_healthcheck(self) -> None:
         config = safe_config()

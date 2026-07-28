@@ -1,17 +1,17 @@
 # Identity Service
 
-Internal Identity boundary for users, roles, permissions, role assignments, session metadata, and
-future MFA work. Issue #12 provides a process and domain skeleton only. It does not authenticate a
-user, issue a token, persist identity data, or expose a business API.
+Internal Identity boundary for users, roles, credentials, MFA factors, sessions, refresh-token
+families, and minimized authentication audit intents. Issue #137 adds the authentication runtime on
+top of the policy/domain baseline from Issue #12.
 
-Web and Mobile clients must never call this service directly. Future external identity routes must
-enter through API Gateway and require separately reviewed authentication, authorization, audit,
-rate-limit, and object-boundary controls.
+Web and Mobile clients must never call this service directly. External identity requests enter
+through API Gateway. The service expects an opaque gateway-derived `X-Client-Source` for login
+throttling; direct public exposure or trusting a client-supplied value is forbidden.
 
 ## API
 
-`GET /healthz` is the only route. It returns process status and the request correlation ID without
-dependency, build, host, account, or configuration details:
+`GET /healthz` returns process status and the request correlation ID without dependency, build,
+host, account, or configuration details:
 
 ```json
 {
@@ -24,6 +24,22 @@ The service accepts exactly one safe `X-Request-ID` using the same 1-64 ASCII-ch
 API Gateway. Missing, duplicate, malformed, or oversized values are replaced. Public errors use
 only `error_code`, `message`, and `request_id`; exception messages and stack traces are not returned.
 
+Authentication routes:
+
+| Route | Authentication/permission | Audit intent |
+|---|---|---|
+| `POST /api/v1/auth/login` | Gateway context; password; TOTP for `admin`/`bgh` | `AUTH_LOGIN_SUCCEEDED` or `AUTH_LOGIN_FAILED` |
+| `POST /api/v1/auth/refresh` | Active, unrotated refresh token | `SESSION_REVOKED` on replay |
+| `POST /api/v1/auth/logout` | Active bearer session | `SESSION_REVOKED` |
+| `POST /api/v1/auth/logout-all` | Active bearer session; own user only | `SESSION_REVOKED` |
+| `POST /api/v1/auth/mfa/enroll` | Active bearer; current TOTP proof | `MFA_CHANGED` |
+| `POST /api/v1/auth/sessions/{session_id}/revoke` | MFA-verified `admin` | `SESSION_REVOKED` |
+
+MFA enrollment accepts a secret only over the protected request channel and returns an opaque factor
+ID, never the secret or provisioning URI. Initial MFA provisioning for an account that cannot yet
+obtain a session must use an approved trusted administrative workflow; production provisioning is
+outside Issue #137.
+
 ## Domain and safe read schemas
 
 The framework-free domain package models only the approved identity metadata:
@@ -33,22 +49,29 @@ The framework-free domain package models only the approved identity metadata:
 - scoped role assignment, grant actor, validity interval, and revocation time;
 - session ID, owner, expiry, last-seen, and revocation metadata.
 
-Credential material is deliberately absent. Read DTOs must not contain password, password hash,
+Credential material remains absent from general read DTOs. Read DTOs must not contain password,
+password hash,
 refresh/access token, token hash, ciphertext, MFA secret/reference, recovery code, device
 fingerprint, IP address, raw user agent, or provider credential fields. Adding any of these requires
 a dedicated storage/transport threat review and must never make them client-facing.
 
 ## Database and events
 
-This scaffold owns no physical database schema, migration, repository, cache, queue, or event. The
-approved future schema boundary is `identity`; other services must not read it directly. Physical
-tables and migrations require their own issue and must implement encryption, retention, audit, and
-tenant/object authorization before use.
+The first Alembic migration owns only schema `identity` and creates `users`, `credentials`, `roles`,
+`user_role_assignments`, `sessions`, `refresh_tokens`, `mfa_factors`, and `audit_outbox`. Other
+services must not query this schema. Passwords use Argon2id hashes, refresh tokens use one-way
+SHA-256 hashes over purpose-bound high-entropy values, login lookup uses a dedicated HMAC key, and
+TOTP secrets use ENCV1 with record/tenant/field AAD. No plaintext credential or token is persisted.
 
-## Password rules for future implementation
+Session and refresh mutation plus its audit intent are committed in one PostgreSQL transaction.
+Rotated refresh records are retained until credential-retention expiry so replay can revoke the
+entire family.
 
-No password is currently accepted or processed. A future credential issue must implement all of the
-following as one reviewed control set:
+## Password rules
+
+Login verification uses Argon2id and an Argon2id dummy hash for unknown accounts so unknown-user and
+wrong-password requests follow the same comparison and public response path. The runtime also
+enforces the following control set:
 
 - Never store plaintext or reversible password encryption. Use a unique salt and an approved modern
   password hash; the current baseline is Argon2id with parameters benchmarked for the deployment and
@@ -69,12 +92,14 @@ References:
 - [NIST SP 800-63B password verifier requirements](https://pages.nist.gov/800-63-4/sp800-63b.html)
 - [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
 
-## Token and session rules for future implementation
+## Token and session rules
 
-No token is currently issued or stored. Future implementation must use cryptographically random,
-purpose-bound tokens; short access-token lifetime; strict issuer/audience/expiry validation; and
-refresh-token rotation or approved sender constraint. Only refresh-token hashes may be stored.
-Replay of a rotated token revokes the affected token family and produces an audit/security event.
+The runtime uses five-minute, purpose-bound JWT access tokens with an exact algorithm/key ID,
+issuer, audience, issued/not-before/expiry checks, bounded clock skew, opaque session/family/token
+IDs, tenant binding, and live session-state verification. Signing material is injected from an
+approved secret provider; it has no default or value in Git. Refresh tokens are cryptographically
+random, only their hashes are stored, and every use rotates the token. Replay of a rotated token
+revokes the affected token family and writes a `SESSION_REVOKED` audit intent.
 
 Logout, account disablement, password change, role-risk change, suspected compromise, and retention
 expiry must revoke applicable sessions. Tokens must never appear in URLs, query strings, logs,
@@ -85,7 +110,7 @@ Reference: [OWASP OAuth 2.0 Cheat Sheet](https://cheatsheetseries.owasp.org/chea
 
 ## Audit, logging, and retention
 
-Future credential, role, permission, MFA, and session changes require stable audit actions with
+Credential, MFA, and session changes produce stable audit actions with
 opaque IDs and minimized metadata. Audit events never contain passwords, hashes, token values,
 ciphertext, secrets, full request metadata, or free-text reasons. Session/credential expiry follows
 `RET-CREDENTIAL`; account deactivation and minimized profile disposal follow `RET-PROFILE`.
@@ -97,18 +122,31 @@ not serialized.
 
 ## Environment and local run
 
-The process reads only `APP_ENV` and `LOG_LEVEL`; invalid values fail startup. It does not auto-load
-dotenv files. From the repository root:
+The process reads `APP_ENV` and `LOG_LEVEL`. Alembic additionally requires
+`IDENTITY_DATABASE_URI=postgresql+psycopg://...`; its representation is redacted and no dotenv file
+is auto-loaded. Runtime database, signing key, login lookup HMAC, ENCV1 provider, and Redis client
+are deliberately composed by the trusted local/deployment profile. Missing composition fails
+authentication with a stable 503 instead of weakening a control.
+
+From the repository root:
 
 ```powershell
 $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'
-.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "services/identity-service[test]"
+.\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e "packages/audit-producer" -e "packages/crypto-runtime" -e "services/identity-service[test]"
+.\.venv\Scripts\python.exe -m alembic -c services/identity-service/alembic.ini upgrade head
 .\.venv\Scripts\python.exe -m uvicorn identity_service.main:app --app-dir services/identity-service/src --host 127.0.0.1 --port 8001 --no-access-log
 ```
 
-Loopback and disabled Uvicorn access logs are deliberate local defaults. Production network policy,
-TLS/mTLS, service authentication, trusted proxy handling, rate limiting, and observability require
-deployment issues; this scaffold claims none of them.
+Loopback and disabled Uvicorn access logs are deliberate local defaults. `main:app` is fail-closed
+until a trusted profile injects the runtime. Production activation, keys, Redis/PostgreSQL
+credentials, TLS/mTLS, and deployment policy remain separate work.
+
+The guarded migration integration test accepts only `postgresql+psycopg` on loopback port `55432`
+with the exact database name `Camera_AI_test`; every other target fails before Alembic runs. The
+Compose `postgres-test` profile uses a dedicated bridge whose host binding is fixed to `127.0.0.1`.
+Redis, RabbitMQ, and MinIO remain on the separate internal-only network. Start and stop the test
+database through the guarded project Docker MCP, and never inject the native development,
+staging, or production database URI into this test.
 
 ## Tests
 
@@ -117,6 +155,8 @@ deployment issues; this scaffold claims none of them.
 .\.venv\Scripts\python.exe scripts/quality.py all
 ```
 
-Tests use fixed synthetic UUIDs and generic labels only. They cover domain invariants, forbidden
-credential fields, dependency boundaries, request correlation, sanitized errors, health-only
-OpenAPI exposure, production documentation defaults, and log allowlisting.
+Tests use fixed synthetic UUIDs and generic labels only. They cover domain invariants, migration
+ownership/rollback, non-enumerating failures, Argon2id, refresh rotation/replay, logout and
+administrative revocation, TOTP/ENCV1 handling, account/source throttle boundaries, limiter
+dependency failure, cross-tenant/expired/revoked/clock-skew tokens, forbidden credential fields,
+request correlation, sanitized errors, OpenAPI exposure, and log allowlisting.
