@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -44,6 +45,30 @@ def test_contract_is_strict_versioned_and_accepts_no_message_body() -> None:
         invalid[forbidden] = "synthetic-private-value"
         with pytest.raises(NotificationError, match="NOTIFICATION_REQUEST_INVALID"):
             parse_notification_intent(invalid)
+
+
+def test_contract_accepts_canonical_decoded_json_values() -> None:
+    decoded_json = json.loads(json.dumps(payload(), default=str))
+
+    command = parse_notification_intent(decoded_json)
+
+    assert command.source_event_id == _uuid(1)
+    assert command.recipient_refs == (_uuid(6),)
+    assert command.notification_expires_at == NOW + timedelta(hours=1)
+    assert command.channels == ("in_app", "push", "email")
+
+
+@pytest.mark.parametrize("field", ["schema_version", "template_version"])
+@pytest.mark.parametrize("invalid_version", ["1", 1.0, True])
+def test_decoded_json_does_not_coerce_version(
+    field: str,
+    invalid_version: object,
+) -> None:
+    decoded_json = json.loads(json.dumps(payload(), default=str))
+    decoded_json[field] = invalid_version
+
+    with pytest.raises(NotificationError, match="NOTIFICATION_REQUEST_INVALID"):
+        parse_notification_intent(decoded_json)
 
 
 def test_notification_cannot_outlive_its_source() -> None:

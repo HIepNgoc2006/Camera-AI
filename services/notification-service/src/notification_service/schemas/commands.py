@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated, Literal
@@ -44,7 +45,25 @@ class NotificationIntentV1(BaseModel):
 
 def parse_notification_intent(payload: Mapping[str, object]) -> NotificationCommand:
     try:
-        command = NotificationIntentV1.model_validate(dict(payload))
+        raw_payload = dict(payload)
+        if any(
+            type(raw_payload.get(field)) is not int
+            for field in ("schema_version", "template_version")
+        ):
+            raise NotificationError("NOTIFICATION_REQUEST_INVALID")
+        try:
+            command = NotificationIntentV1.model_validate(raw_payload)
+        except ValidationError:
+            # Strict Python validation deliberately accepts only already-typed
+            # values. Retry through Pydantic's strict JSON path so canonical
+            # UUID/datetime strings and arrays from a decoded JSON boundary are
+            # accepted without enabling broad Python coercion.
+            encoded_payload = json.dumps(
+                raw_payload,
+                allow_nan=False,
+                separators=(",", ":"),
+            )
+            command = NotificationIntentV1.model_validate_json(encoded_payload)
         return NotificationCommand(
             source_event_id=command.source_event_id,
             idempotency_key=command.idempotency_key,
@@ -63,5 +82,5 @@ def parse_notification_intent(payload: Mapping[str, object]) -> NotificationComm
             request_id=command.request_id,
             correlation_id=command.correlation_id,
         )
-    except (ValidationError, NotificationError):
+    except (TypeError, ValueError, ValidationError, NotificationError):
         raise NotificationError("NOTIFICATION_REQUEST_INVALID") from None
