@@ -181,6 +181,38 @@ _SPECS: tuple[MetricSpec, ...] = (
         kind=MetricKind.GAUGE,
         help_text="Notification deliveries waiting for a bounded retry.",
     ),
+    MetricSpec(
+        name="evidence_lifecycle_total",
+        kind=MetricKind.COUNTER,
+        help_text="Private evidence object lifecycle transitions by bounded outcome.",
+        outcomes=(
+            "available",
+            "delete_failed",
+            "delete_requested",
+            "deleted",
+            "quarantined",
+            "rejected",
+            "upload_requested",
+        ),
+    ),
+    MetricSpec(
+        name="evidence_access_total",
+        kind=MetricKind.COUNTER,
+        help_text="Evidence authorization and short-lived access outcomes.",
+        outcomes=("denied", "granted", "unavailable", "url_issue_failed"),
+    ),
+    MetricSpec(
+        name="evidence_reconciliation_total",
+        kind=MetricKind.COUNTER,
+        help_text="Evidence metadata and object-store reconciliation outcomes.",
+        outcomes=("matched", "mismatch", "missing", "unavailable"),
+    ),
+    MetricSpec(
+        name="evidence_attachment_ratio_events_total",
+        kind=MetricKind.COUNTER,
+        help_text="Events contributing to the evidence attachment-ratio denominator.",
+        outcomes=("attached", "unattached"),
+    ),
 )
 
 REGISTRY: MappingProxyType[str, MetricSpec] = MappingProxyType({spec.name: spec for spec in _SPECS})

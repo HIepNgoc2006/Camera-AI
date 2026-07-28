@@ -23,6 +23,7 @@ jobs:
       ATTENDANCE_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
       TIMEKEEPING_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
       NOTIFICATION_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
+      EVIDENCE_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
     services:
       postgres-school-test:
         image: postgres:17.10-bookworm@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
@@ -51,6 +52,7 @@ jobs:
           cache-dependency-path: |
             requirements-quality.txt
             packages/audit-producer/pyproject.toml
+            packages/authorization-runtime/pyproject.toml
             packages/crypto-runtime/pyproject.toml
             packages/metrics-runtime/pyproject.toml
             services/api-gateway/pyproject.toml
@@ -62,6 +64,8 @@ jobs:
             services/ansvis-adapter/pyproject.toml
             services/attendance-service/pyproject.toml
             services/timekeeping-service/pyproject.toml
+            services/notification-service/pyproject.toml
+            services/evidence-service/pyproject.toml
             workers/event-outbox-worker/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
@@ -69,6 +73,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           -r requirements-quality.txt
           -e "packages/audit-producer[test]"
+          -e "packages/authorization-runtime[test]"
           -e "packages/crypto-runtime[test]"
           -e "packages/metrics-runtime[test]"
           -e "services/api-gateway[test]"
@@ -80,6 +85,8 @@ jobs:
           -e "services/ansvis-adapter[test]"
           -e "services/attendance-service[test]"
           -e "services/timekeeping-service[test]"
+          -e "services/notification-service[test]"
+          -e "services/evidence-service[test]"
           -e "workers/event-outbox-worker[test]"
 
       - name: Run repository quality gates

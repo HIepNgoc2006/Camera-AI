@@ -24,6 +24,7 @@ files = [
     "services/ansvis-adapter/src",
     "services/timekeeping-service/src",
     "services/notification-service/src",
+    "services/evidence-service/src",
     "workers/event-outbox-worker/src",
 ]
 pretty = true
@@ -42,11 +43,16 @@ mypy_path = [
     "services/ansvis-adapter/src",
     "services/timekeeping-service/src",
     "services/notification-service/src",
+    "services/evidence-service/src",
     "workers/event-outbox-worker/src",
 ]
 
 [[tool.mypy.overrides]]
 module = "pika.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "minio.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -65,6 +71,7 @@ testpaths = [
     "services/ansvis-adapter/tests",
     "services/timekeeping-service/tests",
     "services/notification-service/tests",
+    "services/evidence-service/tests",
     "workers/event-outbox-worker/tests",
 ]
 pythonpath = [
@@ -76,11 +83,13 @@ pythonpath = [
     "services/api-gateway/src",
     "services/identity-service/src",
     "services/school-service/src",
+    "services/audit-log-service/src",
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
     "services/timekeeping-service/src",
     "services/notification-service/src",
+    "services/evidence-service/src",
     "workers/event-outbox-worker/src",
 ]
 addopts = ["--strict-config", "--strict-markers", "--import-mode=importlib"]
