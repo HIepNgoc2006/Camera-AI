@@ -27,6 +27,10 @@ BASELINE_METRICS = (
     "notification_dlq_arrivals_total",
     "notification_reauthorization_seconds",
     "notification_retry_backlog_messages",
+    "evidence_lifecycle_total",
+    "evidence_access_total",
+    "evidence_reconciliation_total",
+    "evidence_attachment_ratio_events_total",
 )
 FORBIDDEN_LABEL_MARKERS = (
     "camera",

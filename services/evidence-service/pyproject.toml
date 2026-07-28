@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-evidence-storage-service"
+version = "0.1.0"
+description = "Private evidence object lifecycle and short-lived access boundary"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic==1.18.5",
+    "camera-ai-audit-producer==0.1.0",
+    "camera-ai-authorization-runtime==0.1.0",
+    "camera-ai-crypto-runtime==0.1.0",
+    "camera-ai-metrics-runtime==0.1.0",
+    "minio==7.2.20",
+    "psycopg[binary]==3.3.4",
+    "pydantic==2.13.4",
+    "SQLAlchemy==2.0.51",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+evidence_service = ["py.typed"]
