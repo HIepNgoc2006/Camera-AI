@@ -28,6 +28,9 @@ Các entry point hiện có:
   deny-before-dispose, owner disposition, legal hold/lawful basis, retry/reconciliation, restore và
   completion evidence bằng dữ liệu giả lập; không xóa/anonymize record, gọi provider hoặc đọc dữ liệu
   thật.
+- `check_api_contract.py`: kiểm OpenAPI v1, error registry, authorization catalog, năm control bảo
+  mật trên từng operation, rate-limit bucket và client-generation smoke; không khởi tạo route hoặc
+  gọi dịch vụ runtime.
 - `check_ansvis_event_contract.py`: kiểm JSON Schema, Bearer source auth/replay/idempotency/ACK policy
   và ma trận contract ANSVIS giả lập mà không in payload bị từ chối.
 - `check_metrics_registry.py`: kiểm registry `metrics_registry_v1` — baseline metric đầy đủ,
