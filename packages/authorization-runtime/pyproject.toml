@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-ai-authorization-runtime"
+version = "0.1.0"
+description = "Fail-closed RBAC/ABAC decision, SQL scope-filter and audit runtime"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "camera-ai-audit-producer==0.1.0",
+    "SQLAlchemy==2.0.51",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+camera_ai_authorization = ["py.typed"]
