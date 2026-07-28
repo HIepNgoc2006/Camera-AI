@@ -8,8 +8,14 @@ services:
       POSTGRES_DB: ${POSTGRES_TEST_DB:?Set POSTGRES_TEST_DB from .env.example}
       POSTGRES_USER: ${POSTGRES_TEST_USER:?Set POSTGRES_TEST_USER from .env.example}
       POSTGRES_PASSWORD: ${POSTGRES_TEST_PASSWORD:?Set POSTGRES_TEST_PASSWORD from .env.example}
+    labels:
+      com.camera-ai.local-data-policy: synthetic-test-data-only
     ports:
-      - "127.0.0.1:${POSTGRES_TEST_PORT:-55432}:5432"
+      - name: postgres-test
+        host_ip: 127.0.0.1
+        published: "${POSTGRES_TEST_PORT:-55432}"
+        target: 5432
+        protocol: tcp
     volumes:
       - type: bind
         source: ./.local/docker-data/postgres-test
@@ -22,7 +28,7 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
-    networks: [local-backend]
+    networks: [postgres-test-loopback]
     security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
 
@@ -99,3 +105,7 @@ services:
 networks:
   local-backend:
     internal: true
+  postgres-test-loopback:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"

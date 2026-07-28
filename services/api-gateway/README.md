@@ -1,8 +1,8 @@
 # API Gateway
 
-FastAPI entry point for external Web/Mobile traffic. Issue #11 provides only the safe process
-skeleton: liveness, request correlation, structured allowlist logging, a stable error envelope, and
-an empty versioned router. It does not implement business APIs or process customer data.
+FastAPI entry point for external Web/Mobile traffic. Issue #11 provides the safe process baseline;
+Issue #137 adds the allowlisted authentication ingress that forwards only approved calls to the
+private Identity Service.
 
 ## API
 
@@ -29,13 +29,17 @@ Errors use this stable public shape and never include stack traces or exception 
 }
 ```
 
-`/api/v1` is reserved as the versioned business-router boundary. This scaffold deliberately adds no
-route below it.
+The gateway exposes the Identity Service authentication surface under `/api/v1/auth`: login,
+refresh, logout, logout-all, MFA enrollment, and administrative session revoke. It derives a
+pseudonymous source key from the transport client address and overwrites any caller-supplied
+`X-Client-Source`. Only request ID, that source key, optional Authorization, JSON body, and three safe
+upstream response headers cross the service boundary. Bodies are capped at 8 KiB and never logged.
 
 ## Events and database
 
-This service currently consumes and publishes no events and owns no database schema. It does not
-connect to PostgreSQL, RabbitMQ, object storage, cameras, ANSVIS, or another service.
+This service consumes and publishes no events and owns no database schema. Its only current service
+dependency is the private Identity Service HTTP boundary. Missing upstream composition, invalid
+upstream URLs, network failure, or non-loopback plaintext HTTP all fail closed.
 
 ## Environment
 
@@ -46,6 +50,8 @@ variables directly and does not auto-load `.env` files:
   documentation.
 - `LOG_LEVEL`: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`.
 
+The Identity upstream is injected by the trusted local/deployment profile; no credentialed URL or
+default endpoint is stored in config. Plain HTTP is accepted only for loopback local profiles.
 Invalid values fail startup. Do not add secrets, tokens, credentials, RTSP URLs, or customer data.
 
 ## Local run
@@ -58,8 +64,9 @@ $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'
 .\.venv\Scripts\python.exe -m uvicorn api_gateway.main:app --app-dir services/api-gateway/src --host 127.0.0.1 --port 8000
 ```
 
-The service binds to loopback in this example. Deployment exposure, TLS, trusted proxy handling,
-CORS, authentication, rate limiting, and upstream routing require separate approved work.
+The service binds to loopback in this example. `main:app` leaves Identity unwired and returns a
+stable 503 for authentication until the trusted profile injects the upstream. Deployment exposure,
+TLS, trusted proxy handling, CORS, and production service authentication require separate work.
 
 ## Tests
 
@@ -69,8 +76,9 @@ CORS, authentication, rate limiting, and upstream routing require separate appro
 ```
 
 Tests use synthetic identifiers only. They cover liveness minimization, request-ID validation,
-correlated error envelopes, production documentation defaults, log allowlisting, and the OpenAPI
-contract.
+correlated error envelopes, production documentation defaults, log allowlisting, the OpenAPI
+contract, fail-closed upstream behavior, enumeration-safe forwarding, and an in-process local
+login/refresh/logout flow through Gateway and Identity Service.
 
 ## Logs and security
 
@@ -79,6 +87,6 @@ stable event name, request ID, status code, stable error code, and exception cla
 unexpected failure occurs. Request/response bodies, headers, query strings, tokens, credentials,
 biometric data, raw ANSVIS payloads, and exception messages are never serialized.
 
-The process-level health response proves only that the API process is responsive. Authentication,
-authorization, audit persistence, consent enforcement, and object-level policy remain mandatory for
-future sensitive routes and are not claimed by this scaffold.
+The process-level health response proves only that the API process is responsive. Identity runtime
+health, authorization, audit delivery, consent enforcement, and object-level policy are separate
+checks and are never inferred from `/healthz`.

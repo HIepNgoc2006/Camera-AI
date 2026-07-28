@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 EXPECTED_SERVICES = frozenset({"minio", "postgres-test", "rabbitmq", "redis"})
+INTERNAL_NETWORK = "local-backend"
+POSTGRES_TEST_LOOPBACK_NETWORK = "postgres-test-loopback"
 SHA256_IMAGE_PATTERN = re.compile(r"@sha256:[0-9a-f]{64}$")
 
 
@@ -21,9 +23,18 @@ def validate_compose(config: dict[str, Any], repo_root: Path) -> list[str]:
     if set(services) != EXPECTED_SERVICES:
         violations.append("unexpected-compose-service-set")
 
-    internal_networks = {name for name, value in networks.items() if value.get("internal") is True}
-    if not internal_networks:
+    internal_network = networks.get(INTERNAL_NETWORK, {})
+    if internal_network.get("internal") is not True:
         violations.append("missing-internal-network")
+    loopback_network = networks.get(POSTGRES_TEST_LOOPBACK_NETWORK, {})
+    loopback_driver_options = loopback_network.get("driver_opts", {})
+    if (
+        loopback_network.get("driver") != "bridge"
+        or loopback_network.get("internal") is True
+        or str(loopback_driver_options.get("com.docker.network.bridge.host_binding_ipv4"))
+        != "127.0.0.1"
+    ):
+        violations.append("unsafe-postgres-test-loopback-network")
 
     data_root = (repo_root / ".local" / "docker-data").resolve()
     for service_name, service in services.items():
@@ -39,7 +50,12 @@ def validate_compose(config: dict[str, Any], repo_root: Path) -> list[str]:
             violations.append(f"missing-healthcheck:{service_name}")
 
         attached_networks = set(service.get("networks", {}))
-        if not attached_networks or not attached_networks.issubset(internal_networks):
+        expected_networks = (
+            {POSTGRES_TEST_LOOPBACK_NETWORK}
+            if service_name == "postgres-test"
+            else {INTERNAL_NETWORK}
+        )
+        if attached_networks != expected_networks:
             violations.append(f"unsafe-network:{service_name}")
 
         for port in service.get("ports", []):

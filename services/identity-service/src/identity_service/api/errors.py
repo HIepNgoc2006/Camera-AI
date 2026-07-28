@@ -9,6 +9,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from identity_service.api.request_id import generated_request_id
 from identity_service.schemas import ErrorResponse
 
+ERRORS: dict[str, tuple[int, str]] = {
+    "AUTH_CREDENTIAL_INVALID": (401, "Authentication failed."),
+    "AUTH_MFA_REQUIRED": (401, "Additional authentication is required."),
+    "AUTH_MFA_VERIFICATION_FAILED": (401, "Additional authentication failed."),
+    "AUTH_REFRESH_REUSE_DETECTED": (401, "Authentication is required."),
+    "AUTHENTICATION_REQUIRED": (401, "Authentication is required."),
+    "AUTH_SOURCE_CONTEXT_REQUIRED": (400, "Trusted request context is required."),
+    "AUTH_RATE_LIMITED": (429, "Too many authentication attempts."),
+    "AUTH_RATE_LIMIT_UNAVAILABLE": (503, "Authentication is temporarily unavailable."),
+    "AUTH_DEPENDENCY_UNAVAILABLE": (503, "Authentication is temporarily unavailable."),
+    "AUTHZ_DENIED": (404, "The requested resource is unavailable."),
+}
+
 
 def request_id_from(request: Request) -> str:
     request_id: object = getattr(request.state, "request_id", None)
@@ -16,10 +29,29 @@ def request_id_from(request: Request) -> str:
 
 
 def error_response(
-    *, status_code: int, error_code: str, message: str, request_id: str
+    *,
+    status_code: int,
+    error_code: str,
+    message: str,
+    request_id: str,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = ErrorResponse(error_code=error_code, message=message, request_id=request_id)
-    return JSONResponse(status_code=status_code, content=body.model_dump())
+    return JSONResponse(status_code=status_code, content=body.model_dump(), headers=headers)
+
+
+def authentication_error_response(
+    *, code: str, request_id: str, retry_after: int | None = None
+) -> JSONResponse:
+    status_code, message = ERRORS.get(code, (503, "Authentication is temporarily unavailable."))
+    headers = None if retry_after is None else {"Retry-After": str(max(1, retry_after))}
+    return error_response(
+        status_code=status_code,
+        error_code=code,
+        message=message,
+        request_id=request_id,
+        headers=headers,
+    )
 
 
 async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:

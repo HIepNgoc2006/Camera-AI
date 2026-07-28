@@ -66,3 +66,25 @@ def test_production_disables_interactive_documentation() -> None:
     assert application.docs_url is None
     assert application.redoc_url is None
     assert application.openapi_url is None
+
+
+def test_authentication_runtime_is_fail_closed_when_not_composed() -> None:
+    with TestClient(create_app(Settings(environment="test", log_level="CRITICAL"))) as client:
+        response = client.post(
+            "/api/v1/auth/login",
+            headers={
+                "X-Request-ID": "req-identity-unavailable",
+                "X-Client-Source": "source.synthetic.0001",
+            },
+            json={
+                "tenant_id": "00000000-0000-4000-8000-000000000101",
+                "identifier": "synthetic.user@example.invalid",
+                "password": "SYNTHETIC-FAKE-PASSWORD-ONLY",
+            },
+        )
+    assert response.status_code == 503
+    assert response.json() == {
+        "error_code": "AUTH_DEPENDENCY_UNAVAILABLE",
+        "message": "Authentication is temporarily unavailable.",
+        "request_id": "req-identity-unavailable",
+    }
