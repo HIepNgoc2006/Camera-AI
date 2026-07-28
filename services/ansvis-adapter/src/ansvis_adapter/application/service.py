@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 
 from ansvis_adapter.application.ports import (
+    AuthenticatedSource,
     DurableReceipt,
     DurableReceiptPort,
     IdempotencyDeriver,
@@ -17,7 +18,12 @@ from ansvis_adapter.application.ports import (
 )
 from ansvis_adapter.application.telemetry import NullMetricsSink
 from ansvis_adapter.domain.errors import AnsvisAdapterError
-from ansvis_adapter.schemas.events import declared_source_namespace, parse_and_normalize_event
+from ansvis_adapter.domain.models import NormalizedAnsvisEvent
+from ansvis_adapter.schemas.events import (
+    declared_event_time,
+    declared_source_namespace,
+    parse_and_normalize_event,
+)
 
 RECEIPT_ID_PATTERN = re.compile(r"^receipt_[A-Za-z0-9_-]{8,120}$")
 FUTURE_TOLERANCE = timedelta(seconds=30)
@@ -54,11 +60,14 @@ class IngestAnsvisEvent:
         transport_secure: bool,
     ) -> DurableReceipt:
         try:
-            receipt = self._execute(
-                payload,
+            received_at = self.capture_trusted_receipt_time()
+            source_namespace = declared_source_namespace(payload)
+            source = self.authenticate_source(
+                source_namespace,
                 authorization_values=authorization_values,
                 transport_secure=transport_secure,
             )
+            receipt = self._execute_authenticated(payload, source, received_at=received_at)
         except AnsvisAdapterError as exc:
             outcome = "conflict" if exc.code == "EVENT_IDEMPOTENCY_CONFLICT" else "rejected"
             self._metric(outcome)
@@ -66,14 +75,21 @@ class IngestAnsvisEvent:
         self._metric(receipt.outcome.value)
         return receipt
 
-    def _execute(
+    def capture_trusted_receipt_time(self) -> datetime:
+        """Capture and validate the receiver clock once for the entire request."""
+
+        now = self._now()
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise AnsvisAdapterError("TIME_SOURCE_UNHEALTHY")
+        return now.astimezone(UTC)
+
+    def authenticate_source(
         self,
-        payload: Mapping[str, object],
+        source_namespace: str,
         *,
         authorization_values: tuple[str, ...],
         transport_secure: bool,
-    ) -> DurableReceipt:
-        source_namespace = declared_source_namespace(payload)
+    ) -> AuthenticatedSource:
         source = self._authenticator.authenticate(
             SourceAuthRequest(
                 declared_source_namespace=source_namespace,
@@ -83,11 +99,34 @@ class IngestAnsvisEvent:
         )
         if source.source_namespace != source_namespace:
             raise AnsvisAdapterError("EVENT_SOURCE_UNAUTHORIZED")
+        return source
 
+    def execute_authenticated(
+        self,
+        payload: Mapping[str, object],
+        source: AuthenticatedSource,
+        *,
+        received_at: datetime,
+    ) -> DurableReceipt:
+        try:
+            receipt = self._execute_authenticated(payload, source, received_at=received_at)
+        except AnsvisAdapterError as exc:
+            outcome = "conflict" if exc.code == "EVENT_IDEMPOTENCY_CONFLICT" else "rejected"
+            self._metric(outcome)
+            raise
+        self._metric(receipt.outcome.value)
+        return receipt
+
+    def _execute_authenticated(
+        self,
+        payload: Mapping[str, object],
+        source: AuthenticatedSource,
+        *,
+        received_at: datetime,
+    ) -> DurableReceipt:
+        self._validate_replay_window(declared_event_time(payload), received_at=received_at)
         event = parse_and_normalize_event(payload)
-        if event.tenant_ref != source.tenant_ref or event.school_ref != source.school_ref:
-            raise AnsvisAdapterError("EVENT_SOURCE_MAPPING_DENIED")
-        self._validate_replay_window(event.occurred_at)
+        self._validate_source_mapping(event, source)
         try:
             idempotency = self._idempotency_deriver.derive(event, source)
         except AnsvisAdapterError:
@@ -110,17 +149,23 @@ class IngestAnsvisEvent:
             raise AnsvisAdapterError("EVENT_DURABLE_RECEIPT_UNAVAILABLE")
         return receipt
 
+    @staticmethod
+    def _validate_source_mapping(event: NormalizedAnsvisEvent, source: AuthenticatedSource) -> None:
+        if event.source_namespace != source.source_namespace:
+            raise AnsvisAdapterError("EVENT_SOURCE_UNAUTHORIZED")
+        if event.tenant_ref != source.tenant_ref or event.school_ref != source.school_ref:
+            raise AnsvisAdapterError("EVENT_SOURCE_MAPPING_DENIED")
+
     def _metric(self, outcome: str) -> None:
         try:
             self._metrics.increment("event_ingestion_total", outcome=outcome)
         except Exception:
             return
 
-    def _validate_replay_window(self, occurred_at: datetime) -> None:
-        now = self._now()
-        if now.tzinfo is None or now.utcoffset() is None:
+    def _validate_replay_window(self, occurred_at: datetime, *, received_at: datetime) -> None:
+        if received_at.tzinfo is None or received_at.utcoffset() is None:
             raise AnsvisAdapterError("TIME_SOURCE_UNHEALTHY")
-        current = now.astimezone(UTC)
+        current = received_at.astimezone(UTC)
         if occurred_at > current + FUTURE_TOLERANCE:
             raise AnsvisAdapterError("TIME_EVENT_FUTURE")
         if occurred_at < current - REPLAY_WINDOW:

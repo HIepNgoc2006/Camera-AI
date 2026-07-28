@@ -85,6 +85,8 @@ def test_null_metrics_sink_accepts_only_the_named_metric_vocabulary() -> None:
         ("event_ingestion_total", "duplicate"),
         ("event_ingestion_total", "rejected"),
         ("event_ingestion_total", "conflict"),
+        ("event_ingestion_rejections_total", "rate_limited"),
+        ("event_ingestion_rejections_total", "rate_limit_unavailable"),
         ("event_outbox_dispatch_total", "retry_scheduled"),
         ("event_outbox_dispatch_total", "dead_lettered"),
         ("event_outbox_replay_total", "replayed"),

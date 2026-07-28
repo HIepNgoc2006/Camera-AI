@@ -78,6 +78,21 @@ _SPECS: tuple[MetricSpec, ...] = (
         outcomes=("accepted", "conflict", "duplicate", "rejected"),
     ),
     MetricSpec(
+        name="event_ingestion_rejections_total",
+        kind=MetricKind.COUNTER,
+        help_text="ANSVIS ingestion rejections by bounded security reason.",
+        outcomes=(
+            "authentication",
+            "body_size",
+            "content_type",
+            "malformed",
+            "rate_limit_unavailable",
+            "rate_limited",
+            "replay",
+            "source_mapping",
+        ),
+    ),
+    MetricSpec(
         name="event_outbox_dispatch_total",
         kind=MetricKind.COUNTER,
         help_text="Outbox dispatch attempts by bounded outcome.",

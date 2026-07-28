@@ -40,6 +40,20 @@ NumericDate values and a maximum five-minute token lifetime. It binds the verifi
 active source namespace, tenant and school. Missing, duplicate, combined, malformed, expired, revoked,
 unknown or dependency-unavailable inputs fail closed with stable masked errors.
 
+Ingress hardening follows `http-trigger-policy-v1.json` in order: capture trusted receipt time/request
+ID, verify the receiver clock, require HTTPS and JSON, enforce both declared and streamed 65,536-byte
+limits, lexically cap JSON at 16 nested containers and 256 items per array, consume a source-scoped
+rate token, authenticate, parse/validate replay time and schema, bind source scope, derive idempotency,
+then commit before ACK. The lexical preflight does not build the JSON object; over-complex bodies are
+stable `422` rejections before Bearer verification or full parsing.
+
+The concrete `RedisSourceRateLimiter` is an atomic token bucket at 50 requests/second sustained and
+200 burst. It uses Redis server time, hashes source namespaces in keys, expires state after 300 seconds
+and returns `429 EVENT_RATE_LIMITED` with integer `Retry-After`. Redis errors or invalid script replies
+return `503 EVENT_RATE_LIMIT_UNAVAILABLE`; there is no process-local or permissive fallback. The
+runnable default deliberately uses `UnavailableSourceRateLimiter`, so deployment assembly must inject
+an approved Redis client before ingestion can succeed.
+
 ## Idempotency contract
 
 Derivation occurs only after authentication, normalized schema validation, authoritative tenant/school
@@ -154,6 +168,8 @@ Telemetry vocabulary comes from the shared `metrics_registry_v1` (`packages/metr
 low-cardinality only:
 
 - `event_ingestion_total{outcome=accepted|duplicate|rejected|conflict}`;
+- `event_ingestion_rejections_total{outcome=authentication|body_size|content_type|malformed|`
+  `rate_limit_unavailable|rate_limited|replay|source_mapping}`;
 - `event_outbox_dispatch_total{outcome=empty|published|retry_scheduled|dead_lettered|refused}`;
 - `event_consent_gate_total{outcome=allowed|blocked|not_required|unavailable}`;
 - `event_outbox_replay_total{outcome=replayed}`;
@@ -193,8 +209,9 @@ $env:PIP_CACHE_DIR = 'D:\WORKSAPCE\Camera AI\.local\cache\pip'
 .\.venv\Scripts\python.exe -m uvicorn ansvis_adapter.main:app --app-dir services/ansvis-adapter/src --host 127.0.0.1 --port 8010
 ```
 
-The example binds only to loopback. Runtime secret/source adapter wiring, TLS termination, trusted
-proxy handling, rate limiting and production exposure require their approved implementation issues.
+The example binds only to loopback. Runtime secret/source/Redis-client wiring, TLS termination,
+trusted proxy handling and production exposure require approved deployment assembly. Never place
+Redis credentials in command lines, source, `.env` files, logs or limiter keys.
 
 ## Tests
 
@@ -209,6 +226,9 @@ provider failures, duplicate/combined headers, registered-source and tenant/scho
 replay limits, body/content-type limits, primary/fallback idempotency vectors, ten-retry duplicate
 behavior, changed-content conflict, cross-scope separation, provider/receipt failure, default denial,
 commit-before-ACK behavior, masked errors and logs, logging allowlisting and OpenAPI route exposure.
+Hardening coverage additionally asserts the exact processing order, JSON depth/array caps, sustained
+and burst rates, source isolation, Redis fail-closed behavior, `Retry-After`, a simulated 200-rps
+60-second flood, duplicate replay semantics and declared/streamed oversize p95.
 Event-ingestion coverage adds migration ownership/constraints, JSONB minimization, ten identical
 retries, conflicting-content quarantine, concurrent first-write behavior, outbox leasing and bounded
 retry/dead-letter/replay state. The PostgreSQL integration test skips unless `EVENT_DATABASE_URI` is
@@ -229,6 +249,11 @@ Before rollback, stop ingestion and the outbox dispatcher, verify no accepted re
 message must be preserved, and follow the approved backup/restore process. The downgrade drops the
 owned `events` schema and is destructive; it is not an operational reset procedure. Never replay by
 editing rows manually, and never delete/quarantine records to make a queue appear healthy.
+
+Limiter rollback is configuration-only: keep the Redis-backed enforcement wired, change the positive
+sustained/burst values only through reviewed deployment configuration, then repeat burst/flood
+evidence. Never use zero, remove the limiter, or switch to a local fallback to restore availability.
+If Redis is unavailable, ingestion remains fail closed while operators restore the dependency.
 
 ## Logs and security
 

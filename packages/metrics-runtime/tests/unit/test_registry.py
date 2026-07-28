@@ -15,6 +15,7 @@ from camera_ai_metrics import (
 )
 
 BASELINE_NAMES = {
+    "event_ingestion_rejections_total",
     "event_ingestion_total",
     "event_outbox_dispatch_total",
     "event_outbox_replay_total",

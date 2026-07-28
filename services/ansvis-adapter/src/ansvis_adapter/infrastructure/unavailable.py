@@ -8,8 +8,10 @@ from ansvis_adapter.application.ports import (
     DurableReceipt,
     DurableReceiptPort,
     IdempotencyDeriver,
+    RateLimitDecision,
     SourceAuthenticator,
     SourceAuthRequest,
+    SourceRateLimiter,
 )
 from ansvis_adapter.domain.consent import (
     CONSENT_UNAVAILABLE,
@@ -27,6 +29,14 @@ class UnavailableSourceAuthenticator(SourceAuthenticator):
     def authenticate(self, request: SourceAuthRequest) -> AuthenticatedSource:
         del request
         raise AnsvisAdapterError("EVENT_SOURCE_UNAUTHORIZED")
+
+
+class UnavailableSourceRateLimiter(SourceRateLimiter):
+    """Reject ingestion until a shared Redis-backed limiter is explicitly wired."""
+
+    def check(self, source_namespace: str) -> RateLimitDecision:
+        del source_namespace
+        raise AnsvisAdapterError("EVENT_RATE_LIMIT_UNAVAILABLE")
 
 
 class UnavailableIdempotencyDeriver(IdempotencyDeriver):

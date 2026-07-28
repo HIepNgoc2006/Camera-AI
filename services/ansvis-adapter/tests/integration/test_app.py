@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from ansvis_adapter.application.ports import (
     AuthenticatedSource,
     DurableReceipt,
+    RateLimitDecision,
     ReceiptOutcome,
     SourceAuthRequest,
 )
@@ -92,12 +93,22 @@ class FakeMetrics:
         self.gauges.append((metric, value))
 
 
+class PermittingRateLimiter:
+    def check(self, source_namespace: str) -> RateLimitDecision:
+        assert source_namespace == "ansvis.test.source"
+        return RateLimitDecision(allowed=True)
+
+
 def fixed_now() -> datetime:
     return datetime(2030, 1, 1, tzinfo=UTC)
 
 
 def test_runtime_default_denies_unverified_source() -> None:
-    with TestClient(create_app(Settings(environment="test", log_level="CRITICAL"))) as client:
+    application = create_app(
+        Settings(environment="test", log_level="CRITICAL"),
+        rate_limiter=PermittingRateLimiter(),
+    )
+    with TestClient(application, base_url="https://testserver") as client:
         response = client.post(
             "/integration/ansvis/events",
             json=event_payload(),
@@ -118,6 +129,7 @@ def test_committed_receipt_returns_minimal_accepted_ack() -> None:
         authenticator=FakeAuthenticator(),
         idempotency_deriver=idempotency_deriver(),
         receipt_port=FakeReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=fixed_now,
     )
     with TestClient(app, base_url="https://testserver") as client:
@@ -144,6 +156,7 @@ def test_committed_duplicate_returns_200() -> None:
         authenticator=FakeAuthenticator(),
         idempotency_deriver=idempotency_deriver(),
         receipt_port=FakeReceiptPort(ReceiptOutcome.DUPLICATE),
+        rate_limiter=PermittingRateLimiter(),
         now=fixed_now,
     )
     with TestClient(app, base_url="https://testserver") as client:
@@ -159,6 +172,7 @@ def test_unavailable_durable_receipt_returns_503_without_ack() -> None:
         authenticator=FakeAuthenticator(),
         idempotency_deriver=idempotency_deriver(),
         receipt_port=UnavailableDurableReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=fixed_now,
     )
     with TestClient(app, base_url="https://testserver") as client:
@@ -183,10 +197,11 @@ def test_content_type_and_body_limits_fail_before_business_processing() -> None:
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
         receipt_port=FakeReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         metrics=metrics,
         now=fixed_now,
     )
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         wrong_type = client.post(
             "/integration/ansvis/events",
             content=b"{}",
@@ -204,7 +219,9 @@ def test_content_type_and_body_limits_fail_before_business_processing() -> None:
     assert oversized.json()["error_code"] == "EVENT_BODY_TOO_LARGE"
     assert metrics.values == [
         ("event_ingestion_total", "rejected"),
+        ("event_ingestion_rejections_total", "content_type"),
         ("event_ingestion_total", "rejected"),
+        ("event_ingestion_rejections_total", "body_size"),
     ]
 
 
@@ -213,11 +230,12 @@ def test_invalid_json_and_unknown_fields_use_sanitized_error() -> None:
         Settings(environment="test", log_level="CRITICAL"),
         authenticator=FakeAuthenticator(),
         receipt_port=FakeReceiptPort(),
+        rate_limiter=PermittingRateLimiter(),
         now=fixed_now,
     )
     payload = event_payload()
     payload["raw_payload"] = "blocked_test_value"
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         invalid_json = client.post(
             "/integration/ansvis/events",
             content=b"not-json",
@@ -257,6 +275,7 @@ def test_source_auth_denial_records_audit_intent_when_recorder_is_wired() -> Non
     app = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         audit_recorder=recorder,
+        rate_limiter=PermittingRateLimiter(),
     )
     with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
@@ -286,6 +305,7 @@ def test_source_auth_denial_with_broken_recorder_still_returns_401() -> None:
     app = create_app(
         Settings(environment="test", log_level="CRITICAL"),
         audit_recorder=BrokenRecorder(),
+        rate_limiter=PermittingRateLimiter(),
     )
     with TestClient(app, base_url="https://testserver") as client:
         response = client.post("/integration/ansvis/events", json=event_payload())
