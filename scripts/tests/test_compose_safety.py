@@ -25,9 +25,18 @@ def safe_config() -> dict[str, Any]:
         )
         services[service_name] = {
             "image": f"example.invalid/{service_name}:test@sha256:{'a' * 64}",
+            "user": "65532:65532",
             "networks": {network: None},
             "ports": [{"host_ip": "127.0.0.1", "published": published, "target": target}],
             "security_opt": ["no-new-privileges:true"],
+            "deploy": {
+                "resources": {
+                    "limits": {
+                        "cpus": 0.5,
+                        "memory": 128 * 1024 * 1024,
+                    }
+                }
+            },
             "healthcheck": {"test": ["CMD", "true"]},
             "volumes": [
                 {
@@ -102,6 +111,35 @@ class ComposeSafetyTests(unittest.TestCase):
 
         violations = validate_compose(config, REPO_ROOT)
         self.assertIn("missing-healthcheck:minio", violations)
+
+    def test_rejects_missing_resource_limits(self) -> None:
+        config = safe_config()
+        limits = config["services"]["rabbitmq"]["deploy"]["resources"]["limits"]
+        del limits["cpus"]
+        del limits["memory"]
+
+        violations = validate_compose(config, REPO_ROOT)
+        self.assertIn("missing-cpu-limit:rabbitmq", violations)
+        self.assertIn("missing-memory-limit:rabbitmq", violations)
+
+    def test_rejects_invalid_resource_limits(self) -> None:
+        config = safe_config()
+        limits = config["services"]["redis"]["deploy"]["resources"]["limits"]
+        limits["cpus"] = 0
+        limits["memory"] = 32 * 1024 * 1024
+
+        violations = validate_compose(config, REPO_ROOT)
+        self.assertIn("missing-cpu-limit:redis", violations)
+        self.assertIn("missing-memory-limit:redis", violations)
+
+    def test_rejects_missing_or_root_user(self) -> None:
+        config = safe_config()
+        del config["services"]["postgres-test"]["user"]
+        config["services"]["minio"]["user"] = "root:root"
+
+        violations = validate_compose(config, REPO_ROOT)
+        self.assertIn("missing-non-root-user:postgres-test", violations)
+        self.assertIn("missing-non-root-user:minio", violations)
 
 
 if __name__ == "__main__":

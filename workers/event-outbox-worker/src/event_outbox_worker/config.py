@@ -16,6 +16,7 @@ ALLOWED_ENVIRONMENTS = frozenset({"development", "test", "staging", "production"
 PLACEHOLDER_MARKERS = ("replace_with", "change_me", "changeme", "example")
 EXCHANGE_NAME = "camera-ai.events.v1"
 MAX_BATCH_SIZE = 50
+MAX_DATABASE_CONNECTIONS_PER_PROCESS = 4
 
 
 class WorkerConfigurationError(ValueError):
@@ -33,6 +34,11 @@ class WorkerSettings:
     broker_retry_seconds: float = 5.0
     metrics_port: int = 0
     snapshot_interval_seconds: float = 60.0
+    event_db_pool_size: int = 2
+    event_db_max_overflow: int = 1
+    audit_db_pool_size: int = 1
+    audit_db_max_overflow: int = 0
+    db_pool_timeout_seconds: float = 2.0
 
 
 def load_worker_settings(environ: Mapping[str, str] | None = None) -> WorkerSettings:
@@ -79,6 +85,20 @@ def load_worker_settings(environ: Mapping[str, str] | None = None) -> WorkerSett
     snapshot_interval = _bounded_float(
         source, "WORKER_SNAPSHOT_INTERVAL_SECONDS", default=60.0, low=5.0, high=3_600.0
     )
+    event_db_pool_size = _bounded_int(source, "EVENT_DB_POOL_SIZE", default=2, low=1, high=4)
+    event_db_max_overflow = _bounded_int(source, "EVENT_DB_MAX_OVERFLOW", default=1, low=0, high=3)
+    audit_db_pool_size = _bounded_int(source, "AUDIT_DB_POOL_SIZE", default=1, low=1, high=4)
+    audit_db_max_overflow = _bounded_int(source, "AUDIT_DB_MAX_OVERFLOW", default=0, low=0, high=3)
+    connection_budget = (
+        event_db_pool_size + event_db_max_overflow + audit_db_pool_size + audit_db_max_overflow
+    )
+    if connection_budget > MAX_DATABASE_CONNECTIONS_PER_PROCESS:
+        raise WorkerConfigurationError(
+            "combined worker database pools must not exceed 4 connections per process"
+        )
+    db_pool_timeout = _bounded_float(
+        source, "DB_POOL_TIMEOUT_SECONDS", default=2.0, low=0.1, high=30.0
+    )
     return WorkerSettings(
         environment=environment,
         broker_url=broker_url,
@@ -87,6 +107,11 @@ def load_worker_settings(environ: Mapping[str, str] | None = None) -> WorkerSett
         broker_retry_seconds=broker_retry,
         metrics_port=metrics_port,
         snapshot_interval_seconds=snapshot_interval,
+        event_db_pool_size=event_db_pool_size,
+        event_db_max_overflow=event_db_max_overflow,
+        audit_db_pool_size=audit_db_pool_size,
+        audit_db_max_overflow=audit_db_max_overflow,
+        db_pool_timeout_seconds=db_pool_timeout,
     )
 
 

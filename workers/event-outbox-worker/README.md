@@ -25,7 +25,15 @@ cả batch một lần; retry/dead-letter đúng policy `normalized_outbox_v1`.
 | `WORKER_BROKER_RETRY_SECONDS` | không | 1..300, mặc định 5 |
 | `WORKER_METRICS_PORT` | không | 0 = tắt; mặc định 9465 (0 khi `APP_ENV=test`); scrape chỉ bind 127.0.0.1 |
 | `WORKER_SNAPSHOT_INTERVAL_SECONDS` | không | 5..3600, mặc định 60 — chu kỳ cập nhật gauge backlog/oldest-age và đánh giá alert |
+| `EVENT_DB_POOL_SIZE` / `EVENT_DB_MAX_OVERFLOW` | không | mặc định `2 + 1`; event-store pool của mỗi worker process |
+| `AUDIT_DB_POOL_SIZE` / `AUDIT_DB_MAX_OVERFLOW` | không | mặc định `1 + 0`; audit-store pool của mỗi worker process |
+| `DB_POOL_TIMEOUT_SECONDS` | không | 0.1..30, mặc định 2; fail nhanh để backpressure thay vì chờ connection vô hạn |
 | `APP_ENV`, `LOG_LEVEL` | không | như các service khác |
+
+Tổng `pool_size + max_overflow` của hai database trong một worker process bị khóa ở tối đa 4.
+Baseline chạy hai replica do đó dùng tối đa 8 PostgreSQL connections; mọi thay đổi phải giữ tổng
+budget trong [deployment-capacity-baseline.md](../../docs/operations/deployment-capacity-baseline.md)
+và được kiểm chứng bằng burst profile #95.
 
 Metrics (registry `metrics_registry_v1`): counters dispatch/replay/alerts, histogram
 `event_outbox_enqueue_to_publish_seconds`, gauges `event_outbox_backlog_messages` và
