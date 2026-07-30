@@ -107,6 +107,7 @@ class OperationalAlert:
 
     def __post_init__(self) -> None:
         if self.code not in {
+            "EVENT_OUTBOX_BACKLOG",
             "EVENT_OUTBOX_DLQ_UNTRIAGED",
             "EVENT_OUTBOX_OLDEST_MESSAGE",
         }:

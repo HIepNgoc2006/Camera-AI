@@ -18,6 +18,9 @@ from ansvis_adapter.domain.ingestion import (
     ReplayAuthorization,
 )
 
+MAX_ATTEMPTS = 5
+BASE_BACKOFF_SECONDS = 5
+
 
 def system_utc_now() -> datetime:
     return datetime.now(UTC)
@@ -63,12 +66,12 @@ class DispatchOutboxMessage:
         metrics: MetricsSink | None = None,
         now: Callable[[], datetime] = system_utc_now,
         jitter: Callable[[int], int] = bounded_jitter,
-        max_attempts: int = 5,
-        base_backoff_seconds: int = 5,
+        max_attempts: int = MAX_ATTEMPTS,
+        base_backoff_seconds: int = BASE_BACKOFF_SECONDS,
         on_dead_letter: Callable[[PendingOutboxMessage], None] | None = None,
         on_consent_refused: Callable[[PendingOutboxMessage], None] | None = None,
     ) -> None:
-        if max_attempts != 5 or base_backoff_seconds != 5:
+        if max_attempts != MAX_ATTEMPTS or base_backoff_seconds != BASE_BACKOFF_SECONDS:
             raise ValueError("outbox retry policy must match normalized_outbox_v1")
         self._repository = repository
         self._publisher = publisher
@@ -210,12 +213,12 @@ class DrainOutboxBatch:
         now: Callable[[], datetime] = system_utc_now,
         jitter: Callable[[int], int] = bounded_jitter,
         batch_size: int = 50,
-        max_attempts: int = 5,
-        base_backoff_seconds: int = 5,
+        max_attempts: int = MAX_ATTEMPTS,
+        base_backoff_seconds: int = BASE_BACKOFF_SECONDS,
         on_dead_letter: Callable[[PendingOutboxMessage], None] | None = None,
         on_consent_refused: Callable[[PendingOutboxMessage], None] | None = None,
     ) -> None:
-        if max_attempts != 5 or base_backoff_seconds != 5:
+        if max_attempts != MAX_ATTEMPTS or base_backoff_seconds != BASE_BACKOFF_SECONDS:
             raise ValueError("outbox retry policy must match normalized_outbox_v1")
         if not 1 <= batch_size <= 50:
             raise ValueError("outbox drain batch size must stay within 1..50")

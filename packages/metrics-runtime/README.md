@@ -21,6 +21,13 @@ Registry metric `metrics_registry_v1` và Prometheus sink dùng chung cho mọi 
 2. Cập nhật `BASELINE_METRICS` trong `scripts/check_metrics_registry.py` (checker fail nếu lệch).
 3. Emit qua port `MetricsSink` (`increment`/`observe`/`set_gauge`).
 
+## Queue policy
+
+`src/camera_ai_metrics/queue_policy_v1.json` là bảng threshold duy nhất cho queue depth,
+drain ETA, DLQ, oldest-unpublished, circuit breaker và retry contract. `queue_policy.py` chỉ
+phát stable queue/alert codes cùng aggregate count/duration/ratio; không có payload, subject,
+endpoint hay identifier. Runbook: `../../docs/operations/queue-backpressure-dlq-policy.md`.
+
 ## Test
 
 ```powershell

@@ -1,0 +1,78 @@
+{
+  "policy_version": "queue_operational_policy_v1",
+  "thresholds": {
+    "warning_depth_messages": 5000,
+    "warning_depth_for_seconds": 300,
+    "critical_depth_messages": 20000,
+    "critical_drain_eta_seconds": 900,
+    "warning_dlq_arrivals": 1,
+    "critical_dlq_arrivals_over_10m": 30,
+    "sustained_profile_events_per_second": 50,
+    "dlq_rate_critical_ratio": 0.001,
+    "warning_oldest_unpublished_seconds": 60,
+    "critical_oldest_unpublished_seconds": 600,
+    "circuit_open_error_ratio": 0.1,
+    "circuit_window_seconds": 60,
+    "circuit_minimum_open_seconds": 60,
+    "half_open_successes_to_close": 3,
+    "target_max_attempts": 5,
+    "target_base_backoff_seconds": 2,
+    "jitter_required": true
+  },
+  "queues": {
+    "event_outbox": {
+      "depth_metric": "event_outbox_backlog_messages",
+      "drain_eta_metric": "event_outbox_drain_eta_seconds",
+      "oldest_metric": "event_outbox_oldest_pending_seconds",
+      "dlq_metric": "event_outbox_dispatch_total",
+      "dispatch_metric": "event_outbox_dispatch_total",
+      "audit_strict": false
+    },
+    "audit_outbox": {
+      "depth_metric": "event_audit_outbox_backlog_messages",
+      "drain_eta_metric": "event_audit_outbox_drain_eta_seconds",
+      "oldest_metric": "event_audit_outbox_oldest_pending_seconds",
+      "dlq_metric": "event_audit_delivery_total",
+      "dispatch_metric": "event_audit_delivery_total",
+      "audit_strict": true
+    },
+    "notification": {
+      "depth_metric": "notification_retry_backlog_messages",
+      "drain_eta_metric": "notification_drain_eta_seconds",
+      "oldest_metric": "notification_oldest_pending_seconds",
+      "dlq_metric": "notification_dlq_arrivals_total",
+      "dispatch_metric": "notification_dispatch_total",
+      "audit_strict": false
+    },
+    "report_export": {
+      "depth_metric": "report_export_queue_depth_messages",
+      "drain_eta_metric": "report_export_drain_eta_seconds",
+      "oldest_metric": "report_export_oldest_pending_seconds",
+      "dlq_metric": "report_export_dlq_arrivals_total",
+      "dispatch_metric": "report_export_total",
+      "audit_strict": false
+    }
+  },
+  "retry_contracts": {
+    "event_outbox": {
+      "observed_max_attempts": 5,
+      "observed_base_backoff_seconds": 5,
+      "status": "approved_versioned_exception"
+    },
+    "audit_outbox": {
+      "observed_max_attempts": 5,
+      "observed_base_backoff_seconds": 5,
+      "status": "approved_versioned_exception"
+    },
+    "notification": {
+      "observed_max_attempts": 5,
+      "observed_base_backoff_seconds": 2,
+      "status": "aligned"
+    },
+    "report_export": {
+      "observed_max_attempts": 5,
+      "observed_base_backoff_seconds": 2,
+      "status": "contract_only"
+    }
+  }
+}

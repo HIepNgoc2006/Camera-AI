@@ -23,14 +23,23 @@ BASELINE_NAMES = {
     "event_ingestion_ack_seconds",
     "event_outbox_enqueue_to_publish_seconds",
     "event_outbox_backlog_messages",
+    "event_outbox_drain_eta_seconds",
     "event_outbox_oldest_pending_seconds",
+    "event_audit_outbox_backlog_messages",
+    "event_audit_outbox_drain_eta_seconds",
+    "event_audit_outbox_oldest_pending_seconds",
     "notification_dispatch_total",
     "notification_dlq_arrivals_total",
     "notification_reauthorization_seconds",
     "notification_retry_backlog_messages",
+    "notification_drain_eta_seconds",
+    "notification_oldest_pending_seconds",
     "report_query_total",
     "report_export_total",
     "report_export_queue_depth_messages",
+    "report_export_drain_eta_seconds",
+    "report_export_oldest_pending_seconds",
+    "report_export_dlq_arrivals_total",
 }
 
 

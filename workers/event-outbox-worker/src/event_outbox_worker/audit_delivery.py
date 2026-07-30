@@ -15,6 +15,8 @@ from typing import Protocol
 from uuid import UUID
 
 from ansvis_adapter.application.outbox import (
+    BASE_BACKOFF_SECONDS,
+    MAX_ATTEMPTS,
     BatchDrainResult,
     _compute_retry_at,
     bounded_jitter,
@@ -90,8 +92,8 @@ class DeliverAuditIntents:
                     attempt_count=intent.attempt_count,
                     now=now,
                     jitter=self._jitter,
-                    max_attempts=5,
-                    base_backoff_seconds=5,
+                    max_attempts=MAX_ATTEMPTS,
+                    base_backoff_seconds=BASE_BACKOFF_SECONDS,
                 )
                 persisted_dead = self._outbox.record_failure(
                     intent,

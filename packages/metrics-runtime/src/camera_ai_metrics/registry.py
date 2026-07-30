@@ -114,7 +114,11 @@ _SPECS: tuple[MetricSpec, ...] = (
         name="event_operational_alerts_total",
         kind=MetricKind.COUNTER,
         help_text="Approved operational alert evaluations that fired.",
-        outcomes=("event_outbox_dlq_untriaged", "event_outbox_oldest_message"),
+        outcomes=(
+            "event_outbox_backlog",
+            "event_outbox_dlq_untriaged",
+            "event_outbox_oldest_message",
+        ),
     ),
     MetricSpec(
         name="event_audit_delivery_total",
@@ -140,9 +144,24 @@ _SPECS: tuple[MetricSpec, ...] = (
         help_text="Pending outbox messages at the latest housekeeping snapshot.",
     ),
     MetricSpec(
+        name="event_outbox_drain_eta_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Estimated seconds required to drain the event outbox backlog.",
+    ),
+    MetricSpec(
         name="event_outbox_oldest_pending_seconds",
         kind=MetricKind.GAUGE,
         help_text="Age of the oldest pending outbox message at the latest snapshot.",
+    ),
+    MetricSpec(
+        name="event_audit_outbox_backlog_messages",
+        kind=MetricKind.GAUGE,
+        help_text="Pending audit intents at the latest housekeeping snapshot.",
+    ),
+    MetricSpec(
+        name="event_audit_outbox_drain_eta_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Estimated seconds required to drain pending audit intents.",
     ),
     MetricSpec(
         name="event_audit_outbox_oldest_pending_seconds",
@@ -180,6 +199,16 @@ _SPECS: tuple[MetricSpec, ...] = (
         name="notification_retry_backlog_messages",
         kind=MetricKind.GAUGE,
         help_text="Notification deliveries waiting for a bounded retry.",
+    ),
+    MetricSpec(
+        name="notification_drain_eta_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Estimated seconds required to drain notification delivery work.",
+    ),
+    MetricSpec(
+        name="notification_oldest_pending_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Age of the oldest pending notification delivery.",
     ),
     MetricSpec(
         name="evidence_lifecycle_total",
@@ -229,6 +258,22 @@ _SPECS: tuple[MetricSpec, ...] = (
         name="report_export_queue_depth_messages",
         kind=MetricKind.GAUGE,
         help_text="Report export jobs waiting in the bounded queue.",
+    ),
+    MetricSpec(
+        name="report_export_drain_eta_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Estimated seconds required to drain report export jobs.",
+    ),
+    MetricSpec(
+        name="report_export_oldest_pending_seconds",
+        kind=MetricKind.GAUGE,
+        help_text="Age of the oldest pending report export job.",
+    ),
+    MetricSpec(
+        name="report_export_dlq_arrivals_total",
+        kind=MetricKind.COUNTER,
+        help_text="Minimized report export jobs entering dead letter state.",
+        outcomes=("arrived",),
     ),
 )
 

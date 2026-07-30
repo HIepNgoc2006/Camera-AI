@@ -19,4 +19,4 @@ test = ["pytest==9.1.1"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-camera_ai_metrics = ["py.typed"]
+camera_ai_metrics = ["py.typed", "queue_policy_v1.json"]

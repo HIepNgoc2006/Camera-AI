@@ -201,6 +201,34 @@ def test_failure_uses_fixed_exponential_backoff_and_dead_letters_at_five(
     assert metrics.values == [("event_outbox_dispatch_total", expected_outcome.value)]
 
 
+def test_poison_message_is_quarantined_then_replayed_only_with_authorization() -> None:
+    repository = FakeRepository(pending_message(attempt_count=4))
+    metrics = FakeMetrics()
+    dispatcher = DispatchOutboxMessage(
+        repository,
+        FakePublisher(fail=True),
+        metrics=metrics,
+        now=lambda: NOW,
+        jitter=lambda _: 0,
+    )
+
+    assert dispatcher.execute() is DispatchOutcome.DEAD_LETTERED
+    assert repository.failures[0][2] is None
+    authorization = ReplayAuthorization(
+        actor_id=ACTOR_ID,
+        reason_code="OPERATOR_REVIEWED",
+        approved=True,
+        authorized_at=NOW,
+    )
+    dispatcher.replay(MESSAGE_ID, authorization)
+
+    assert repository.replays == [(MESSAGE_ID, ACTOR_ID, "OPERATOR_REVIEWED", NOW)]
+    assert metrics.values == [
+        ("event_outbox_dispatch_total", "dead_lettered"),
+        ("event_outbox_replay_total", "replayed"),
+    ]
+
+
 def test_repository_state_mismatch_and_naive_clock_fail_closed() -> None:
     repository = FakeRepository(pending_message())
     repository.force_failure_state = True
