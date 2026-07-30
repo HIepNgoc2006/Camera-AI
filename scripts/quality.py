@@ -14,6 +14,8 @@ Command = tuple[str, ...]
 def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
     """Return commands for scopes that exist in the repository today."""
 
+    npm = "npm.cmd" if sys.platform == "win32" else "npm"
+
     return {
         "repository": ((python, "scripts/check_repository_safety.py"),),
         "foundation": ((python, "scripts/check_foundation_safety.py"),),
@@ -32,6 +34,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "metrics-registry": ((python, "scripts/check_metrics_registry.py"),),
         "queue-policy": ((python, "scripts/check_queue_policy.py"),),
+        "web": ((npm, "--prefix", "apps/web-portal", "run", "quality"),),
         "lint": (
             (python, "-m", "ruff", "check", "scripts", "services", "packages", "workers"),
             (
@@ -229,6 +232,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "ansvis-contract",
                 "metrics-registry",
                 "queue-policy",
+                "web",
                 "lint",
                 "typecheck",
                 "unit",
@@ -258,6 +262,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "ansvis-contract",
             "metrics-registry",
             "queue-policy",
+            "web",
             "lint",
             "typecheck",
             "unit",
