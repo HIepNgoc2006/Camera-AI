@@ -13,6 +13,29 @@ EXPECTED_SERVICES = frozenset({"minio", "postgres-test", "rabbitmq", "redis"})
 INTERNAL_NETWORK = "local-backend"
 POSTGRES_TEST_LOOPBACK_NETWORK = "postgres-test-loopback"
 SHA256_IMAGE_PATTERN = re.compile(r"@sha256:[0-9a-f]{64}$")
+MINIMUM_MEMORY_LIMIT_BYTES = 64 * 1024 * 1024
+
+
+def _is_non_root_user(value: Any) -> bool:
+    user = str(value or "").strip().casefold()
+    if not user:
+        return False
+    primary = user.split(":", maxsplit=1)[0]
+    return primary not in {"0", "root"}
+
+
+def _has_positive_cpu_limit(limits: dict[str, Any]) -> bool:
+    try:
+        return float(limits.get("cpus", 0)) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _has_safe_memory_limit(limits: dict[str, Any]) -> bool:
+    try:
+        return int(limits.get("memory", 0)) >= MINIMUM_MEMORY_LIMIT_BYTES
+    except (TypeError, ValueError):
+        return False
 
 
 def validate_compose(config: dict[str, Any], repo_root: Path) -> list[str]:
@@ -46,8 +69,16 @@ def validate_compose(config: dict[str, Any], repo_root: Path) -> list[str]:
             violations.append(f"privileged-service:{service_name}")
         if "no-new-privileges:true" not in service.get("security_opt", []):
             violations.append(f"missing-no-new-privileges:{service_name}")
+        if not _is_non_root_user(service.get("user")):
+            violations.append(f"missing-non-root-user:{service_name}")
         if not service.get("healthcheck"):
             violations.append(f"missing-healthcheck:{service_name}")
+
+        limits = service.get("deploy", {}).get("resources", {}).get("limits", {})
+        if not _has_positive_cpu_limit(limits):
+            violations.append(f"missing-cpu-limit:{service_name}")
+        if not _has_safe_memory_limit(limits):
+            violations.append(f"missing-memory-limit:{service_name}")
 
         attached_networks = set(service.get("networks", {}))
         expected_networks = (

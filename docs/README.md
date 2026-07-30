@@ -21,6 +21,8 @@ Runbook hiện có:
   Backend/ANSVIS/PostgreSQL.
 - `operations/queue-backpressure-dlq-policy.md`: threshold table, circuit
   closed/open/half-open, DLQ quarantine/replay và rollback an toàn.
+- `operations/deployment-capacity-baseline.md`: topology sanitized, resource/connection budget,
+  split/growth trigger và Compose enforcement cho #96.
 - `security/fixture-safety.md`: quy tắc fake fixture/seed, scanner và incident response.
 - `security/repository-protection.md`: branch protection và required-check baseline.
 - `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.

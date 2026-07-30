@@ -211,8 +211,20 @@ def main() -> int:
     logger = configure_logging(settings.log_level, settings.environment)
     database = load_event_database_settings()
     audit_database = load_audit_database_settings()
-    engine = sa.create_engine(database.database_url, pool_pre_ping=True)
-    audit_engine = sa.create_engine(audit_database.database_url, pool_pre_ping=True)
+    engine = sa.create_engine(
+        database.database_url,
+        pool_pre_ping=True,
+        pool_size=worker.event_db_pool_size,
+        max_overflow=worker.event_db_max_overflow,
+        pool_timeout=worker.db_pool_timeout_seconds,
+    )
+    audit_engine = sa.create_engine(
+        audit_database.database_url,
+        pool_pre_ping=True,
+        pool_size=worker.audit_db_pool_size,
+        max_overflow=worker.audit_db_max_overflow,
+        pool_timeout=worker.db_pool_timeout_seconds,
+    )
     store = PostgresEventIngestionRepository(
         engine,
         scopes=DrainOnlyScopeResolver(),
