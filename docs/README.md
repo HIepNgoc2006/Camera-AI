@@ -16,6 +16,8 @@ Runbook hiện có:
 - `project-progress.md`: báo cáo tiến độ live, execution-lane policy và lịch sử workflow hằng tuần.
 - `operations/time-synchronization-policy.md`: UTC/IANA, clock drift và replay-window contract cho
   Backend/ANSVIS/PostgreSQL.
+- `operations/queue-backpressure-dlq-policy.md`: threshold table, circuit
+  closed/open/half-open, DLQ quarantine/replay và rollback an toàn.
 - `security/fixture-safety.md`: quy tắc fake fixture/seed, scanner và incident response.
 - `security/repository-protection.md`: branch protection và required-check baseline.
 - `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.

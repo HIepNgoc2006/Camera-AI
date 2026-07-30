@@ -32,18 +32,30 @@ class NullMetricsSink:
 
 
 class EvaluateOperationalAlerts:
-    """Evaluate only thresholds approved by the non-functional requirements baseline."""
+    """Evaluate event-outbox signals available in the current aggregate snapshot.
 
-    WARNING_OLDEST_MESSAGE_SECONDS = 120
+    The shared queue policy owns cross-queue drain/DLQ-rate/circuit evaluation. This adapter
+    deliberately does not infer a five-minute breach or ten-minute rate from a point-in-time count.
+    """
+
+    WARNING_OLDEST_MESSAGE_SECONDS = 60
     CRITICAL_OLDEST_MESSAGE_SECONDS = 600
+    CRITICAL_BACKLOG_MESSAGES = 20_000
 
     def execute(self, snapshot: EventOperationalSnapshot) -> tuple[OperationalAlert, ...]:
         alerts: list[OperationalAlert] = []
+        if snapshot.pending_messages > self.CRITICAL_BACKLOG_MESSAGES:
+            alerts.append(
+                OperationalAlert(
+                    code="EVENT_OUTBOX_BACKLOG",
+                    severity=AlertSeverity.CRITICAL,
+                )
+            )
         if snapshot.failed_messages > 0:
             alerts.append(
                 OperationalAlert(
                     code="EVENT_OUTBOX_DLQ_UNTRIAGED",
-                    severity=AlertSeverity.CRITICAL,
+                    severity=AlertSeverity.WARNING,
                 )
             )
         if snapshot.oldest_pending_seconds > self.WARNING_OLDEST_MESSAGE_SECONDS:

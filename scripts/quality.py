@@ -30,6 +30,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "api-contract": ((python, "scripts/check_api_contract.py"),),
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "metrics-registry": ((python, "scripts/check_metrics_registry.py"),),
+        "queue-policy": ((python, "scripts/check_queue_policy.py"),),
         "lint": (
             (python, "-m", "ruff", "check", "scripts", "services", "packages", "workers"),
             (
@@ -225,6 +226,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "api-contract",
                 "ansvis-contract",
                 "metrics-registry",
+                "queue-policy",
                 "lint",
                 "typecheck",
                 "unit",
@@ -251,6 +253,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "authorization-catalog",
             "api-contract",
             "ansvis-contract",
+            "metrics-registry",
+            "queue-policy",
             "lint",
             "typecheck",
             "unit",

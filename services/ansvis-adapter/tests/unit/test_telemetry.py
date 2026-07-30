@@ -16,7 +16,7 @@ def snapshot(**overrides: int) -> EventOperationalSnapshot:
         "retryable_attempts": 2,
         "quarantined_conflicts": 1,
         "delayed_messages": 0,
-        "oldest_pending_seconds": 120,
+        "oldest_pending_seconds": 0,
     }
     values.update(overrides)
     return EventOperationalSnapshot(**values)
@@ -48,8 +48,8 @@ def test_operational_snapshot_has_only_bounded_aggregate_fields() -> None:
 @pytest.mark.parametrize(
     ("oldest_seconds", "expected_severity"),
     [
-        (120, None),
-        (121, AlertSeverity.WARNING),
+        (60, None),
+        (61, AlertSeverity.WARNING),
         (600, AlertSeverity.WARNING),
         (601, AlertSeverity.CRITICAL),
     ],
@@ -60,7 +60,7 @@ def test_oldest_message_alert_matches_the_approved_thresholds(
     alerts = EvaluateOperationalAlerts().execute(
         snapshot(
             oldest_pending_seconds=oldest_seconds,
-            delayed_messages=0 if oldest_seconds <= 120 else 1,
+            delayed_messages=0 if oldest_seconds <= 60 else 1,
         )
     )
     if expected_severity is None:
@@ -71,10 +71,19 @@ def test_oldest_message_alert_matches_the_approved_thresholds(
         assert alerts[0].severity is expected_severity
 
 
-def test_any_untriaged_dlq_message_is_a_critical_bounded_alert() -> None:
+def test_any_untriaged_event_dlq_message_is_an_immediate_warning() -> None:
     alerts = EvaluateOperationalAlerts().execute(snapshot(failed_messages=1))
     assert [(alert.code, alert.severity) for alert in alerts] == [
-        ("EVENT_OUTBOX_DLQ_UNTRIAGED", AlertSeverity.CRITICAL)
+        ("EVENT_OUTBOX_DLQ_UNTRIAGED", AlertSeverity.WARNING)
+    ]
+
+
+def test_point_in_time_backlog_only_fires_the_immediate_critical_boundary() -> None:
+    evaluator = EvaluateOperationalAlerts()
+    assert evaluator.execute(snapshot(pending_messages=20_000)) == ()
+    alerts = evaluator.execute(snapshot(pending_messages=20_001))
+    assert [(alert.code, alert.severity) for alert in alerts] == [
+        ("EVENT_OUTBOX_BACKLOG", AlertSeverity.CRITICAL)
     ]
 
 

@@ -24,6 +24,7 @@ def test_all_expands_each_supported_gate_in_order() -> None:
         *commands["api-contract"],
         *commands["ansvis-contract"],
         *commands["metrics-registry"],
+        *commands["queue-policy"],
         *commands["lint"],
         *commands["typecheck"],
         *commands["unit"],
