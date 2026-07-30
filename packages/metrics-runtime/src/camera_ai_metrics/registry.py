@@ -213,6 +213,23 @@ _SPECS: tuple[MetricSpec, ...] = (
         help_text="Events contributing to the evidence attachment-ratio denominator.",
         outcomes=("attached", "unattached"),
     ),
+    MetricSpec(
+        name="report_query_total",
+        kind=MetricKind.COUNTER,
+        help_text="Authorized report query decisions by bounded outcome.",
+        outcomes=("denied", "granted", "unavailable"),
+    ),
+    MetricSpec(
+        name="report_export_total",
+        kind=MetricKind.COUNTER,
+        help_text="Controlled report export lifecycle outcomes.",
+        outcomes=("denied", "downloaded", "expired", "failed", "generated", "queued"),
+    ),
+    MetricSpec(
+        name="report_export_queue_depth_messages",
+        kind=MetricKind.GAUGE,
+        help_text="Report export jobs waiting in the bounded queue.",
+    ),
 )
 
 REGISTRY: MappingProxyType[str, MetricSpec] = MappingProxyType({spec.name: spec for spec in _SPECS})
