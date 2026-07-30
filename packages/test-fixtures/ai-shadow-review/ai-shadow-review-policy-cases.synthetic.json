@@ -1,0 +1,150 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "policy_version": "ai_shadow_review_policy_v1",
+  "cases": [
+    {
+      "case_code": "disabled_policy_blocks_processing",
+      "pipeline_code": "facial_recognition",
+      "lifecycle_state": "disabled",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "none",
+      "consent_status": "granted",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "blocked",
+      "expected_reason_code": "AI_POLICY_DISABLED"
+    },
+    {
+      "case_code": "shadow_face_candidate_is_evaluation_only",
+      "pipeline_code": "facial_recognition",
+      "lifecycle_state": "shadow",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "none",
+      "consent_status": "granted",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "shadow_recorded",
+      "expected_reason_code": "AI_SHADOW_EVALUATION_ONLY"
+    },
+    {
+      "case_code": "face_candidate_without_consent_is_blocked",
+      "pipeline_code": "facial_recognition",
+      "lifecycle_state": "shadow",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "none",
+      "consent_status": "missing",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "blocked",
+      "expected_reason_code": "AI_CONSENT_REQUIRED"
+    },
+    {
+      "case_code": "littering_single_frame_requires_temporal_evidence",
+      "pipeline_code": "littering_detection",
+      "lifecycle_state": "shadow",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "single_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "review_required",
+      "expected_reason_code": "AI_TEMPORAL_EVIDENCE_REQUIRED"
+    },
+    {
+      "case_code": "littering_sequence_in_shadow_is_not_a_conclusion",
+      "pipeline_code": "littering_detection",
+      "lifecycle_state": "shadow",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "multi_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "shadow_recorded",
+      "expected_reason_code": "AI_SHADOW_EVALUATION_ONLY"
+    },
+    {
+      "case_code": "smoking_requires_human_review",
+      "pipeline_code": "smoking_detection",
+      "lifecycle_state": "production",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "multi_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "review_required",
+      "expected_reason_code": "AI_HUMAN_REVIEW_REQUIRED"
+    },
+    {
+      "case_code": "reviewed_smoking_remains_a_controlled_review_result",
+      "pipeline_code": "smoking_detection",
+      "lifecycle_state": "production",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "multi_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "confirmed",
+      "expected_decision": "review_confirmed",
+      "expected_reason_code": "AI_HUMAN_REVIEW_CONFIRMED"
+    },
+    {
+      "case_code": "uniform_partial_visibility_is_non_decision",
+      "pipeline_code": "student_uniform_detection",
+      "lifecycle_state": "production",
+      "confidence_band": "high",
+      "visibility": "partial_visibility",
+      "temporal_evidence": "single_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "non_decision",
+      "expected_reason_code": "AI_PARTIAL_VISIBILITY"
+    },
+    {
+      "case_code": "ppe_unknown_visibility_is_non_decision",
+      "pipeline_code": "kitchen_ppe_detection",
+      "lifecycle_state": "production",
+      "confidence_band": "high",
+      "visibility": "unknown",
+      "temporal_evidence": "single_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "non_decision",
+      "expected_reason_code": "AI_VISIBILITY_UNKNOWN"
+    },
+    {
+      "case_code": "low_confidence_requires_review",
+      "pipeline_code": "facial_recognition",
+      "lifecycle_state": "production",
+      "confidence_band": "low",
+      "visibility": "clear",
+      "temporal_evidence": "none",
+      "consent_status": "granted",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "review_required",
+      "expected_reason_code": "AI_LOW_CONFIDENCE"
+    },
+    {
+      "case_code": "face_candidate_requires_separate_business_rule",
+      "pipeline_code": "facial_recognition",
+      "lifecycle_state": "production",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "none",
+      "consent_status": "granted",
+      "human_review_outcome": "not_reviewed",
+      "expected_decision": "candidate_only",
+      "expected_reason_code": "AI_BUSINESS_RULE_REQUIRED"
+    },
+    {
+      "case_code": "review_rejection_is_preserved",
+      "pipeline_code": "kitchen_ppe_detection",
+      "lifecycle_state": "production",
+      "confidence_band": "high",
+      "visibility": "clear",
+      "temporal_evidence": "single_frame",
+      "consent_status": "not_applicable",
+      "human_review_outcome": "rejected",
+      "expected_decision": "review_rejected",
+      "expected_reason_code": "AI_HUMAN_REVIEW_REJECTED"
+    }
+  ]
+}

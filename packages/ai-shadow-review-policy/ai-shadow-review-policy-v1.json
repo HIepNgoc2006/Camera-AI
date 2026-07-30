@@ -1,0 +1,245 @@
+{
+  "policy_id": "ai_shadow_review_policy_v1",
+  "policy_version": "ai_shadow_review_policy_v1",
+  "schema_version": 1,
+  "status": "baseline_only",
+  "runtime_activation": "disabled",
+  "owner_code": "ai_governance",
+  "approver_code": "project_owner",
+  "purpose_code": "safe_ai_evaluation",
+  "data_class": "high",
+  "published_versions_immutable": true,
+  "lifecycle": {
+    "states": [
+      "disabled",
+      "shadow",
+      "review_required",
+      "accepted",
+      "production"
+    ],
+    "allowed_transitions": {
+      "disabled": [
+        "shadow"
+      ],
+      "shadow": [
+        "review_required",
+        "accepted",
+        "disabled"
+      ],
+      "review_required": [
+        "shadow",
+        "accepted",
+        "disabled"
+      ],
+      "accepted": [
+        "shadow",
+        "production",
+        "disabled"
+      ],
+      "production": [
+        "shadow",
+        "disabled"
+      ]
+    },
+    "transition_authorities": {
+      "disabled_to_shadow": "ai_governance_approver",
+      "shadow_to_review_required": "ai_reviewer",
+      "shadow_to_accepted": "ai_governance_approver",
+      "shadow_to_disabled": "ai_operator",
+      "review_required_to_shadow": "ai_operator",
+      "review_required_to_accepted": "ai_governance_approver",
+      "review_required_to_disabled": "ai_operator",
+      "accepted_to_shadow": "ai_operator",
+      "accepted_to_production": "project_owner",
+      "accepted_to_disabled": "ai_operator",
+      "production_to_shadow": "ai_operator",
+      "production_to_disabled": "incident_commander"
+    },
+    "production_requires_state": "accepted",
+    "direct_shadow_to_production_allowed": false
+  },
+  "common_controls": {
+    "automatic_disciplinary_conclusion_allowed": false,
+    "shadow_business_record_mutation_allowed": false,
+    "missing_policy_behavior": "deny",
+    "missing_or_ambiguous_input_outcome": "review_required",
+    "consent_missing_behavior": "deny",
+    "allowed_confidence_bands": [
+      "unknown",
+      "low",
+      "medium",
+      "high"
+    ],
+    "review_required_confidence_bands": [
+      "unknown",
+      "low"
+    ],
+    "allowed_visibility_states": [
+      "unknown",
+      "partial_visibility",
+      "clear"
+    ],
+    "allowed_temporal_evidence": [
+      "none",
+      "single_frame",
+      "multi_frame"
+    ],
+    "allowed_review_outcomes": [
+      "not_reviewed",
+      "confirmed",
+      "rejected",
+      "needs_more_evidence"
+    ],
+    "reviewer_requirements": [
+      "authenticated",
+      "authorized_for_object_scope",
+      "assigned_review_scope",
+      "approved_purpose_code",
+      "conflict_declared",
+      "decision_reason_code",
+      "audit_required"
+    ],
+    "audit_summary_fields": [
+      "policy_version",
+      "pipeline_code",
+      "model_version_ref",
+      "config_version_ref",
+      "task_version_ref",
+      "reviewer_ref",
+      "decision_code",
+      "reason_code",
+      "correlation_id"
+    ],
+    "forbidden_log_fields": [
+      "image",
+      "image_base64",
+      "video",
+      "face_embedding",
+      "raw_ansvis_payload",
+      "signed_url",
+      "credential",
+      "personal_name"
+    ]
+  },
+  "pipelines": {
+    "facial_recognition": {
+      "data_class": "critical",
+      "consent_requirement": "required",
+      "output_label": "face_match_candidate",
+      "human_review": "conditional",
+      "temporal_evidence_requirement": "none",
+      "business_record_requires_separate_rule": true,
+      "allowed_non_decision_outcomes": [
+        "unknown",
+        "review_required"
+      ]
+    },
+    "littering_detection": {
+      "data_class": "high",
+      "consent_requirement": "contextual",
+      "output_label": "suspected_littering",
+      "human_review": "always",
+      "temporal_evidence_requirement": "multi_frame",
+      "single_frame_confirmation_allowed": false,
+      "allowed_non_decision_outcomes": [
+        "unknown",
+        "review_required"
+      ]
+    },
+    "smoking_detection": {
+      "data_class": "high",
+      "consent_requirement": "contextual",
+      "output_label": "suspected_smoking",
+      "human_review": "always",
+      "temporal_evidence_requirement": "contextual_sequence",
+      "confirmed_wording_before_review_allowed": false,
+      "allowed_non_decision_outcomes": [
+        "unknown",
+        "review_required"
+      ]
+    },
+    "student_uniform_detection": {
+      "data_class": "high",
+      "consent_requirement": "contextual",
+      "output_label": "suspected_uniform_noncompliance",
+      "human_review": "always",
+      "temporal_evidence_requirement": "none",
+      "forced_classification_when_obscured_allowed": false,
+      "allowed_non_decision_outcomes": [
+        "unknown",
+        "partial_visibility",
+        "review_required"
+      ]
+    },
+    "kitchen_ppe_detection": {
+      "data_class": "high",
+      "consent_requirement": "contextual",
+      "output_label": "suspected_ppe_noncompliance",
+      "human_review": "always",
+      "temporal_evidence_requirement": "none",
+      "forced_classification_when_obscured_allowed": false,
+      "allowed_non_decision_outcomes": [
+        "unknown",
+        "partial_visibility",
+        "review_required"
+      ]
+    }
+  },
+  "production_enable": {
+    "all_required_gates": [
+      "dataset_provenance_approved",
+      "evaluation_sample_gate_met",
+      "false_positive_review_completed",
+      "false_negative_review_completed",
+      "latency_capacity_evidence_passed",
+      "owner_approval_recorded",
+      "model_version_recorded",
+      "config_version_recorded",
+      "task_version_recorded",
+      "rollback_trigger_recorded"
+    ],
+    "required_evidence_fields": [
+      "metric_profile_ref",
+      "evaluation_report_ref",
+      "dataset_manifest_hash",
+      "dataset_consent_review_ref",
+      "latency_capacity_report_ref",
+      "approval_record_ref",
+      "model_version_ref",
+      "config_version_ref",
+      "task_version_ref",
+      "rollback_record_ref"
+    ],
+    "per_pipeline_metric_profile_required": true,
+    "activation_change_record_required": true,
+    "unknown_or_missing_gate_behavior": "deny"
+  },
+  "rollback_disable": {
+    "target_scope": [
+      "pipeline_code",
+      "model_version_ref",
+      "config_version_ref",
+      "task_version_ref"
+    ],
+    "cross_pipeline_enable_allowed": false,
+    "audit_evidence_deletion_allowed": false,
+    "rollback_targets_last_approved_version": true,
+    "emergency_disable_requires_reason_and_audit": true
+  },
+  "stable_reason_codes": {
+    "policy_disabled": "AI_POLICY_DISABLED",
+    "pipeline_unknown": "AI_PIPELINE_UNKNOWN",
+    "input_invalid": "AI_INPUT_INVALID",
+    "consent_required": "AI_CONSENT_REQUIRED",
+    "visibility_unknown": "AI_VISIBILITY_UNKNOWN",
+    "partial_visibility": "AI_PARTIAL_VISIBILITY",
+    "temporal_evidence_required": "AI_TEMPORAL_EVIDENCE_REQUIRED",
+    "low_confidence": "AI_LOW_CONFIDENCE",
+    "human_review_required": "AI_HUMAN_REVIEW_REQUIRED",
+    "shadow_evaluation_only": "AI_SHADOW_EVALUATION_ONLY",
+    "business_rule_required": "AI_BUSINESS_RULE_REQUIRED",
+    "human_review_confirmed": "AI_HUMAN_REVIEW_CONFIRMED",
+    "human_review_rejected": "AI_HUMAN_REVIEW_REJECTED",
+    "more_evidence_required": "AI_MORE_EVIDENCE_REQUIRED"
+  }
+}

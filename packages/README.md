@@ -21,6 +21,9 @@ Thư viện runtime hiện có:
 
 Các contract hiện có:
 
+- `ai-shadow-review-policy/ai-shadow-review-policy-v1.json`: baseline machine-readable fail-closed
+  cho lifecycle shadow/review/production gate của Facial Recognition và bốn custom pipeline; runtime
+  vẫn disabled, không tự động tạo kết luận kỷ luật và không kích hoạt task/model/camera production.
 - `consent-withdrawal-policy/consent-withdrawal-policy-v1.json`: policy versioned cho authority,
   deny-before-dispose, owner disposition, legal hold/lawful basis, reconciliation/restore và
   completion evidence; runtime/destructive activation vẫn fail closed tới khi đủ named approval và
