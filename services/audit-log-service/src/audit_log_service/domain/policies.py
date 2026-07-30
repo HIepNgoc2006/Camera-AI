@@ -397,12 +397,30 @@ ACTION_POLICIES.update(
 )
 ACTION_POLICIES.update(
     _policies(
-        ("REPORT_EXPORT_REQUESTED", "REPORT_EXPORT_DOWNLOADED", "REPORT_EXPORT_EXPIRED"),
+        (
+            "REPORT_EXPORT_REQUESTED",
+            "REPORT_EXPORT_GENERATED",
+            "REPORT_EXPORT_DOWNLOADED",
+            "REPORT_EXPORT_DENIED",
+            "REPORT_EXPORT_EXPIRED",
+        ),
         publishers=("report-service",),
         resources=("report_export",),
         purpose=True,
         fields=("status",),
         references=("export_id", "report_job_id"),
+        counts=("record_count",),
+        versions=("rbac_policy", "report_policy", "retention_policy"),
+    )
+)
+ACTION_POLICIES.update(
+    _policies(
+        ("REPORT_VIEW_GRANTED", "REPORT_VIEW_DENIED"),
+        publishers=("report-service",),
+        resources=("report",),
+        purpose=True,
+        fields=("status",),
+        references=("report_id",),
         counts=("record_count",),
         versions=("rbac_policy", "report_policy", "retention_policy"),
     )

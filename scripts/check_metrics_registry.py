@@ -31,6 +31,9 @@ BASELINE_METRICS = (
     "evidence_access_total",
     "evidence_reconciliation_total",
     "evidence_attachment_ratio_events_total",
+    "report_query_total",
+    "report_export_total",
+    "report_export_queue_depth_messages",
 )
 FORBIDDEN_LABEL_MARKERS = (
     "camera",

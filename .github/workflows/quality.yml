@@ -24,6 +24,7 @@ jobs:
       TIMEKEEPING_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
       NOTIFICATION_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
       EVIDENCE_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
+      REPORT_DATABASE_URI: postgresql+psycopg://postgres@127.0.0.1:55432/Camera_AI_school_test
     services:
       postgres-school-test:
         image: postgres:17.10-bookworm@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
@@ -66,6 +67,7 @@ jobs:
             services/timekeeping-service/pyproject.toml
             services/notification-service/pyproject.toml
             services/evidence-service/pyproject.toml
+            services/report-service/pyproject.toml
             workers/event-outbox-worker/pyproject.toml
 
       - name: Install pinned quality and backend dependencies
@@ -87,6 +89,7 @@ jobs:
           -e "services/timekeeping-service[test]"
           -e "services/notification-service[test]"
           -e "services/evidence-service[test]"
+          -e "services/report-service[test]"
           -e "workers/event-outbox-worker[test]"
 
       - name: Run repository quality gates

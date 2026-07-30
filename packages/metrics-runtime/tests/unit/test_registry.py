@@ -28,6 +28,9 @@ BASELINE_NAMES = {
     "notification_dlq_arrivals_total",
     "notification_reauthorization_seconds",
     "notification_retry_backlog_messages",
+    "report_query_total",
+    "report_export_total",
+    "report_export_queue_depth_messages",
 }
 
 
