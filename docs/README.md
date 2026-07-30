@@ -10,6 +10,9 @@ Planning và tài liệu tham chiếu local tiếp tục được giữ ngoài i
 
 Runbook hiện có:
 
+- `nfr-baseline.md`: baseline NFR sanitized cho load/capacity, latency, availability và RPO/RTO.
+- `security-baseline.md`: baseline security sanitized cho data classification, authorization,
+  encryption/lookup, rate limit, retention và audit.
 - `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
 - `../packages/ansvis-event-contract/README.md`: contract HTTP Trigger JSON/ACK, auth, replay và
   idempotency versioned cho ANSVIS integration.
