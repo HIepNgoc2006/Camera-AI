@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { readSessionSnapshot } from "@/features/auth/application/session";
-import { resolveRouteAccess } from "@/features/auth/domain/route-access";
+import {
+  buildInternalRedirect,
+  resolveRouteAccess,
+} from "@/features/auth/domain/route-access";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +19,7 @@ export default async function ProtectedLayout({
   });
 
   if (decision.kind === "redirect") {
-    redirect(`${decision.destination}?reason=${decision.reason}`);
+    redirect(buildInternalRedirect(decision));
   }
 
   return children;

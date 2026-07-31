@@ -1,10 +1,69 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
-import { resolveRouteAccess } from "./route-access";
+import {
+  AUTHORIZATION_POLICY_VERSION,
+  buildInternalRedirect,
+  isUiActionVisible,
+  PERMISSION_CODES,
+  PROTECTED_ROUTE_POLICIES,
+  resolveRouteAccess,
+  type PermissionCode,
+  type SessionSnapshot,
+} from "./route-access";
+
+interface CatalogFile {
+  readonly policy_version: string;
+  readonly permissions: readonly {
+    readonly permission_code: string;
+  }[];
+}
+
+const FAKE_ACTOR_ID = "actor_fake_001";
+
+function fakeAuthenticatedSession(
+  permissions: readonly PermissionCode[],
+): SessionSnapshot {
+  return {
+    status: "authenticated",
+    actorId: FAKE_ACTOR_ID,
+    authorization: {
+      policyVersion: AUTHORIZATION_POLICY_VERSION,
+      permissions,
+    },
+  };
+}
+
+describe("authorization catalog alignment", () => {
+  it("uses only permission codes from the tracked authorization catalog", () => {
+    const catalogPath = fileURLToPath(
+      new URL(
+        "../../../../../../packages/authorization-policy/permission-catalog-v1.json",
+        import.meta.url,
+      ),
+    );
+    const catalog = JSON.parse(
+      readFileSync(catalogPath, "utf8"),
+    ) as CatalogFile;
+    const catalogPermissions = new Set(
+      catalog.permissions.map(({ permission_code }) => permission_code),
+    );
+
+    expect(catalog.policy_version).toBe(AUTHORIZATION_POLICY_VERSION);
+    expect(new Set(PERMISSION_CODES)).toEqual(catalogPermissions);
+    for (const policy of PROTECTED_ROUTE_POLICIES) {
+      for (const permission of policy.anyPermission) {
+        expect(catalogPermissions.has(permission)).toBe(true);
+      }
+    }
+  });
+});
 
 describe("resolveRouteAccess", () => {
   it.each(["/", "/login", "/not-authorized"])(
-    "allows public route %s without a session",
+    "allows explicitly public route %s without a session",
     (pathname) => {
       expect(resolveRouteAccess({ pathname, session: null })).toEqual({
         kind: "allow",
@@ -12,37 +71,216 @@ describe("resolveRouteAccess", () => {
     },
   );
 
-  it.each([null, undefined, { status: "unknown" as const }])(
-    "denies protected routes when session state is %j",
-    (session) => {
-      expect(resolveRouteAccess({ pathname: "/app", session })).toEqual({
-        kind: "redirect",
-        destination: "/login",
-        reason: "auth-required",
-      });
-    },
-  );
+  it.each([
+    null,
+    undefined,
+    { status: "unknown" },
+    { status: "unauthenticated" },
+  ])("redirects missing or unauthenticated state %j to login", (session) => {
+    expect(resolveRouteAccess({ pathname: "/app", session })).toEqual({
+      kind: "redirect",
+      destination: "/login",
+      reason: "auth-required",
+    });
+  });
 
-  it("allows an authenticated session through the guarded shell", () => {
+  it.each([
+    {},
+    { status: "authenticated" },
+    {
+      status: "authenticated",
+      actorId: "",
+      authorization: {
+        policyVersion: AUTHORIZATION_POLICY_VERSION,
+        permissions: ["report.view_metadata"],
+      },
+    },
+    {
+      status: "authenticated",
+      actorId: FAKE_ACTOR_ID,
+      authorization: {
+        policyVersion: "unknown_policy",
+        permissions: ["report.view_metadata"],
+      },
+    },
+    {
+      status: "authenticated",
+      actorId: FAKE_ACTOR_ID,
+      authorization: {
+        policyVersion: AUTHORIZATION_POLICY_VERSION,
+        permissions: ["unknown.permission"],
+      },
+    },
+    {
+      status: "authenticated",
+      actorId: FAKE_ACTOR_ID,
+      authorization: {
+        policyVersion: AUTHORIZATION_POLICY_VERSION,
+        permissions: ["report.view_metadata", "report.view_metadata"],
+      },
+    },
+  ])("fails malformed session state closed to login", (session) => {
+    expect(resolveRouteAccess({ pathname: "/app", session })).toEqual({
+      kind: "redirect",
+      destination: "/login",
+      reason: "auth-required",
+    });
+  });
+
+  it("allows an authenticated actor with the route permission", () => {
     expect(
       resolveRouteAccess({
-        pathname: "/app",
-        session: { status: "authenticated", actorId: "actor_fake_001" },
+        pathname: "/app/attendance/daily",
+        session: fakeAuthenticatedSession(["attendance.view_metadata"]),
       }),
     ).toEqual({ kind: "allow" });
   });
 
-  it("denies authenticated actors without a required role", () => {
+  it("allows the protected shell for any recognized Web view permission", () => {
     expect(
       resolveRouteAccess({
-        pathname: "/app/admin",
-        session: { status: "authenticated", roles: ["teacher"] },
-        requiredRoles: ["school_admin"],
+        pathname: "/app",
+        session: fakeAuthenticatedSession(["attendance.view_metadata"]),
+      }),
+    ).toEqual({ kind: "allow" });
+  });
+
+  it("denies an authenticated actor without the route permission", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/attendance",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
       }),
     ).toEqual({
       kind: "redirect",
       destination: "/not-authorized",
       reason: "forbidden",
     });
+  });
+
+  it.each([
+    "/app/unknown",
+    "/unclassified",
+    "/login/",
+    "https://attacker.example/path",
+    "//attacker.example/path",
+    "/app/%2e%2e/login",
+    "/app\\reports",
+  ])("denies unknown or unsafe route %s by default", (pathname) => {
+    expect(
+      resolveRouteAccess({
+        pathname,
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "route-not-allowed",
+    });
+  });
+
+  it("does not let a broad route group override a more specific group", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/audit",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+  });
+});
+
+describe("isUiActionVisible", () => {
+  it("shows an action only when the validated snapshot has its permission", () => {
+    const session = fakeAuthenticatedSession(["violation.review"]);
+
+    expect(
+      isUiActionVisible({
+        session,
+        requiredPermission: "violation.review",
+      }),
+    ).toBe(true);
+    expect(
+      isUiActionVisible({
+        session,
+        requiredPermission: "violation.export",
+      }),
+    ).toBe(false);
+  });
+
+  it.each([
+    null,
+    { status: "unknown" },
+    {
+      status: "authenticated",
+      actorId: FAKE_ACTOR_ID,
+      authorization: {
+        policyVersion: "unknown_policy",
+        permissions: ["violation.review"],
+      },
+    },
+  ])("hides actions for absent, unknown or malformed state", (session) => {
+    expect(
+      isUiActionVisible({
+        session,
+        requiredPermission: "violation.review",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("buildInternalRedirect", () => {
+  it.each([
+    {
+      kind: "redirect" as const,
+      destination: "/login" as const,
+      reason: "auth-required" as const,
+    },
+    {
+      kind: "redirect" as const,
+      destination: "/not-authorized" as const,
+      reason: "forbidden" as const,
+    },
+    {
+      kind: "redirect" as const,
+      destination: "/not-authorized" as const,
+      reason: "route-not-allowed" as const,
+    },
+  ])("builds only an allowlisted same-origin location", (decision) => {
+    const location = buildInternalRedirect(decision);
+    const resolved = new URL(location, "https://portal.example.invalid");
+
+    expect(location.startsWith("/")).toBe(true);
+    expect(location.startsWith("//")).toBe(false);
+    expect(resolved.origin).toBe("https://portal.example.invalid");
+    expect(resolved.searchParams.get("reason")).toBe(decision.reason);
+    expect(resolved.searchParams.has("returnTo")).toBe(false);
+  });
+
+  it("ignores a forged external destination at the runtime boundary", () => {
+    const forgedDecision = {
+      kind: "redirect",
+      destination: "https://attacker.example",
+      reason: "forbidden",
+    } as unknown as Parameters<typeof buildInternalRedirect>[0];
+
+    expect(buildInternalRedirect(forgedDecision)).toBe(
+      "/not-authorized?reason=forbidden",
+    );
+  });
+
+  it("fails a forged reason closed to the login redirect", () => {
+    const forgedDecision = {
+      kind: "redirect",
+      destination: "https://attacker.example",
+      reason: "__proto__",
+    } as unknown as Parameters<typeof buildInternalRedirect>[0];
+
+    expect(buildInternalRedirect(forgedDecision)).toBe(
+      "/login?reason=auth-required",
+    );
   });
 });
