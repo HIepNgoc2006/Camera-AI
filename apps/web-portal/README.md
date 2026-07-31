@@ -5,8 +5,11 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
 ## Scope
 
 - Public `/login` placeholder that does not collect credentials.
-- Server-side guarded `/app` shell that defaults to denied.
+- Server-side guarded `/app` shell with a versioned, permission-aware,
+  default-deny route policy.
 - Public `/not-authorized` fallback.
+- Reusable UI-action visibility checks that use the same validated permission
+  snapshot as route decisions.
 - One typed API Gateway client boundary under `src/shared/api/`.
 - Fake/session-neutral tests only.
 
@@ -62,7 +65,20 @@ npm run quality
 
 - `readSessionSnapshot` deliberately returns `null`, so protected routes remain
   closed until the approved Identity integration replaces that seam.
-- Route/UI guards do not replace backend object-level authorization.
+- Protected route groups are evaluated in server App Router layouts and remain
+  dynamic. Public routes are explicit; unknown routes, policy versions,
+  permissions and malformed snapshots fail closed.
+- The `/app` layout guards the shared shell with the catalogued Web view
+  permissions. Every future protected route group must also evaluate its exact
+  route policy in a server layout before rendering feature content.
+- Permission names come from
+  `packages/authorization-policy/permission-catalog-v1.json`. Role-name matching
+  is not an authorization mechanism.
+- Redirect destinations and reason codes are internal allowlists. The guard
+  never accepts or echoes a client-provided return URL.
+- UI actions use `isUiActionVisible` and default to hidden, but route/UI guards
+  do not replace backend object-level authorization, purpose/consent checks or
+  audit.
 - Feature code must use the typed API Gateway client; it must not call internal
   services, databases, queues or object storage directly.
 - Do not persist access tokens or sensitive records in browser storage.
