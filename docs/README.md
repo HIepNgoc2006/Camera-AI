@@ -13,6 +13,8 @@ Runbook hiện có:
 - `nfr-baseline.md`: baseline NFR sanitized cho load/capacity, latency, availability và RPO/RTO.
 - `security-baseline.md`: baseline security sanitized cho data classification, authorization,
   encryption/lookup, rate limit, retention và audit.
+- `security/ddos-replay-flood-abuse-threat-model.md`: threat model sanitized và responsibility/
+  degradation/activation baseline cho DDoS, replay, flood, login/API/export/evidence abuse.
 - `quality-gates.md`: lệnh lint, typecheck, unit test và repository policy dùng local/CI.
 - `../packages/ansvis-event-contract/README.md`: contract HTTP Trigger JSON/ACK, auth, replay và
   idempotency versioned cho ANSVIS integration.
