@@ -22,6 +22,8 @@ interface CatalogFile {
 }
 
 const FAKE_ACTOR_ID = "actor_fake_001";
+const SPARSE_PERMISSIONS = new Array<PermissionCode>(2);
+SPARSE_PERMISSIONS[1] = "report.view_metadata";
 
 function fakeAuthenticatedSession(
   permissions: readonly PermissionCode[],
@@ -119,6 +121,14 @@ describe("resolveRouteAccess", () => {
         permissions: ["report.view_metadata", "report.view_metadata"],
       },
     },
+    {
+      status: "authenticated",
+      actorId: FAKE_ACTOR_ID,
+      authorization: {
+        policyVersion: AUTHORIZATION_POLICY_VERSION,
+        permissions: SPARSE_PERMISSIONS,
+      },
+    },
   ])("fails malformed session state closed to login", (session) => {
     expect(resolveRouteAccess({ pathname: "/app", session })).toEqual({
       kind: "redirect",
@@ -191,6 +201,40 @@ describe("resolveRouteAccess", () => {
       reason: "forbidden",
     });
   });
+
+  it.each(PROTECTED_ROUTE_POLICIES)(
+    "allows only the mapped permission for $routeGroup",
+    (policy) => {
+      const pathname = policy.includeDescendants
+        ? `${policy.routeGroup}/fake-child`
+        : policy.routeGroup;
+      const allowedPermission = policy.anyPermission[0];
+      const unrelatedPermission = PERMISSION_CODES.find(
+        (permission) =>
+          !(policy.anyPermission as readonly PermissionCode[]).includes(
+            permission,
+          ),
+      );
+
+      expect(unrelatedPermission).toBeDefined();
+      expect(
+        resolveRouteAccess({
+          pathname,
+          session: fakeAuthenticatedSession([allowedPermission]),
+        }),
+      ).toEqual({ kind: "allow" });
+      expect(
+        resolveRouteAccess({
+          pathname,
+          session: fakeAuthenticatedSession([unrelatedPermission!]),
+        }),
+      ).toEqual({
+        kind: "redirect",
+        destination: "/not-authorized",
+        reason: "forbidden",
+      });
+    },
+  );
 });
 
 describe("isUiActionVisible", () => {

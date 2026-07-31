@@ -249,10 +249,7 @@ function parseAuthenticatedSession(
   if (
     !isRecord(authorization) ||
     authorization.policyVersion !== AUTHORIZATION_POLICY_VERSION ||
-    !Array.isArray(authorization.permissions) ||
-    authorization.permissions.length > MAX_PERMISSION_COUNT ||
-    !authorization.permissions.every(isPermissionCode) ||
-    new Set(authorization.permissions).size !== authorization.permissions.length
+    !isValidPermissionSnapshot(authorization.permissions)
   ) {
     return null;
   }
@@ -304,6 +301,25 @@ function isSafeInternalPathname(pathname: string): boolean {
 
 function isPermissionCode(value: unknown): value is PermissionCode {
   return typeof value === "string" && PERMISSION_CODE_SET.has(value);
+}
+
+function isValidPermissionSnapshot(
+  value: unknown,
+): value is readonly PermissionCode[] {
+  if (!Array.isArray(value) || value.length > MAX_PERMISSION_COUNT) {
+    return false;
+  }
+
+  const permissions = new Set<PermissionCode>();
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index) || !isPermissionCode(value[index])) {
+      return false;
+    }
+
+    permissions.add(value[index]);
+  }
+
+  return permissions.size === value.length;
 }
 
 function isRedirectReason(
