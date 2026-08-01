@@ -13,7 +13,7 @@ dependencies = [
     "argon2-cffi==25.1.0",
     "camera-ai-audit-producer==0.1.0",
     "camera-ai-crypto-runtime==0.1.0",
-    "fastapi==0.139.0",
+    "fastapi==0.140.13",
     "psycopg[binary]==3.3.4",
     "pydantic==2.13.4",
     "PyJWT==2.13.0",
