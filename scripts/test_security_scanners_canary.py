@@ -36,9 +36,7 @@ def _executable(name: str, explicit: str | None = None) -> str:
     return candidate
 
 
-def _run(
-    command: Sequence[str], cwd: Path, env_overrides: dict[str, str] | None = None
-) -> int:
+def _run(command: Sequence[str], cwd: Path, env_overrides: dict[str, str] | None = None) -> int:
     environment = os.environ.copy()
     environment.update(env_overrides or {})
     completed = subprocess.run(
@@ -68,6 +66,71 @@ def _wait_json_document(path: Path) -> object:
             return document
         time.sleep(0.05)
     return None
+
+
+def _safe_report_path(value: object, repo_root: Path) -> str:
+    if not isinstance(value, str) or not value:
+        return "unavailable"
+    if any(ord(character) < 32 for character in value):
+        return "invalid"
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    try:
+        relative = candidate.resolve(strict=False).relative_to(repo_root.resolve())
+    except (OSError, ValueError):
+        return "outside_workspace"
+    return relative.as_posix()
+
+
+def _safe_report_type(value: object) -> str:
+    if not isinstance(value, str) or not value:
+        return "unknown"
+    sanitized = "".join(
+        character if character.isalnum() or character in "._-" else "_" for character in value
+    )
+    return sanitized[:64] or "unknown"
+
+
+def _inspect_opengrep_report(report: Path, scanner_status: int, repo_root: Path) -> int:
+    document = _json_document(report)
+    if not isinstance(document, dict):
+        print(f"opengrep_gate=FAIL code=OPENGREP_REPORT_INVALID scanner_status={scanner_status}")
+        return 1
+
+    results = document.get("results", [])
+    errors = document.get("errors", [])
+    if not isinstance(results, list) or not isinstance(errors, list):
+        print(
+            "opengrep_gate=FAIL code=OPENGREP_REPORT_SCHEMA_INVALID "
+            f"scanner_status={scanner_status}"
+        )
+        return 1
+
+    finding_count = len(results)
+    error_count = len(errors)
+    if scanner_status != 0 or finding_count or error_count:
+        print(
+            "opengrep_gate=FAIL "
+            f"scanner_status={scanner_status} findings={finding_count} errors={error_count}"
+        )
+        for error in errors[:10]:
+            if not isinstance(error, dict):
+                print("opengrep_error path=unavailable type=unknown")
+                continue
+            path = error.get("path")
+            if path is None:
+                spans = error.get("spans", [])
+                if isinstance(spans, list) and spans and isinstance(spans[0], dict):
+                    path = spans[0].get("file")
+            print(
+                f"opengrep_error path={_safe_report_path(path, repo_root)} "
+                f"type={_safe_report_type(error.get('type'))}"
+            )
+        return 1
+
+    print("opengrep_gate=PASS scanner_status=0 findings=0 errors=0 report_discarded=true")
+    return 0
 
 
 def _pip_audit(temp_dir: Path, repo_root: Path) -> CanaryResult:
@@ -151,9 +214,7 @@ def _opengrep(temp_dir: Path, explicit: str | None, repo_root: Path) -> CanaryRe
         {
             "LOCALAPPDATA": str(repo_root / ".local" / "data" / "opengrep"),
             "OPENGREP_ENABLE_VERSION_CHECK": "0",
-            "SEMGREP_LOG_FILE": str(
-                repo_root / ".local" / "data" / "opengrep" / "opengrep.log"
-            ),
+            "SEMGREP_LOG_FILE": str(repo_root / ".local" / "data" / "opengrep" / "opengrep.log"),
             "TMPDIR": str(repo_root / ".local" / "tmp"),
             "XDG_CACHE_HOME": str(repo_root / ".local" / "cache"),
         },
@@ -226,6 +287,16 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("scanner", choices=("all", *SCANNERS), nargs="?", default="all")
     parser.add_argument("--trivy", help="Explicit path to the pinned Trivy executable")
     parser.add_argument("--opengrep", help="Explicit path to the pinned OpenGrep executable")
+    parser.add_argument(
+        "--inspect-opengrep-report",
+        type=Path,
+        help="Validate a local OpenGrep JSON report without printing source or messages",
+    )
+    parser.add_argument(
+        "--scanner-status",
+        type=int,
+        help="Exit status returned by the OpenGrep process",
+    )
     return parser.parse_args(argv)
 
 
@@ -248,6 +319,17 @@ def _run_scanner(
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     repo_root = Path(__file__).resolve().parents[1]
+    if args.inspect_opengrep_report is not None:
+        if args.scanner_status is None:
+            print("opengrep_gate=FAIL code=OPENGREP_STATUS_MISSING")
+            return 1
+        return _inspect_opengrep_report(
+            args.inspect_opengrep_report, args.scanner_status, repo_root
+        )
+    if args.scanner_status is not None:
+        print("opengrep_gate=FAIL code=OPENGREP_REPORT_MISSING")
+        return 1
+
     temp_root = repo_root / ".local" / "tmp"
     temp_root.mkdir(parents=True, exist_ok=True)
     selected = SCANNERS if args.scanner == "all" else (args.scanner,)
@@ -258,9 +340,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) as directory:
             temp_dir = Path(directory)
             try:
-                result = _run_scanner(
-                    scanner, temp_dir, repo_root, args.trivy, args.opengrep
-                )
+                result = _run_scanner(scanner, temp_dir, repo_root, args.trivy, args.opengrep)
             except RuntimeError as exc:
                 print(f"scanner_canary=FAIL scanner={scanner} code={exc}")
                 return 1

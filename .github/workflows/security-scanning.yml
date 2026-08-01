@@ -104,19 +104,30 @@ jobs:
         run: bandit -q -r services packages workers scripts -lll
 
       - name: Run Semgrep-compatible OpenGrep High/Critical gate
-        run: >-
-          opengrep scan
-          --config .semgrep/security.yml
-          --disable-version-check
-          --oss-only
-          --strict
-          --error
-          --severity ERROR
-          --exclude .git
-          --exclude .local
-          --exclude .venv
-          --exclude apps/web-portal/node_modules
-          services packages workers scripts apps/web-portal
+        shell: bash
+        run: |
+          report="$GITHUB_WORKSPACE/.local/tmp/opengrep-gate.json"
+          console="$GITHUB_WORKSPACE/.local/tmp/opengrep-console.log"
+          set +e
+          opengrep scan \
+            --config .semgrep/security.yml \
+            --disable-version-check \
+            --oss-only \
+            --strict \
+            --error \
+            --severity ERROR \
+            --json-output "$report" \
+            --exclude .git \
+            --exclude .local \
+            --exclude .venv \
+            --exclude apps/web-portal/node_modules \
+            services packages workers scripts apps/web-portal \
+            >"$console" 2>&1
+          scanner_status=$?
+          set -e
+          python scripts/test_security_scanners_canary.py \
+            --inspect-opengrep-report "$report" \
+            --scanner-status "$scanner_status"
 
       - name: Scan repository filesystem with Trivy
         run: >-
