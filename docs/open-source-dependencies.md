@@ -24,7 +24,7 @@ permission to download or add packages.
 
 | Package | Resolved version | Used by | Canonical source | SPDX license | Status |
 |---|---:|---|---|---|---|
-| setuptools | 80.9.0 | Service build backend | https://github.com/pypa/setuptools | MIT | Preferred |
+| setuptools | 83.0.0 | Service build backend | https://github.com/pypa/setuptools | MIT | Preferred |
 | Alembic | 1.18.5 | Audit, Consent, School | https://github.com/sqlalchemy/alembic | MIT | Preferred |
 | Psycopg | 3.3.4 | Audit, Consent, School | https://github.com/psycopg/psycopg | LGPL-3.0-only | Recorded PostgreSQL-driver exception |
 | psycopg-binary | 3.3.4 | Binary extra for Psycopg | https://github.com/psycopg/psycopg | LGPL-3.0-only | Same PostgreSQL-driver exception |
@@ -37,6 +37,12 @@ permission to download or add packages.
 | httpx2 | 2.7.0 | API Gateway, ANSVIS Adapter and Identity tests | https://github.com/pydantic/httpx2 | BSD-3-Clause | Recorded test-client exception |
 | mypy | 2.3.0 | Repository type checking | https://github.com/python/mypy | MIT | Preferred |
 | Ruff | 0.15.21 | Repository lint and format checking | https://github.com/astral-sh/ruff | MIT | Preferred |
+| pip-audit | 2.10.1 | Python vulnerability audit | https://github.com/pypa/pip-audit | Apache-2.0 | Recorded security-tool exception |
+| Bandit | 1.9.4 | Python SAST | https://github.com/PyCQA/bandit | Apache-2.0 | Recorded security-tool exception |
+| OpenGrep standalone | 1.22.0 (`sha256:45bcd584...f62e319`) | Semgrep-compatible Python/TypeScript local-rule SAST | https://github.com/opengrep/opengrep | LGPL-2.1 | Official release binary pinned by SHA-256; remote version check/config and source upload disabled |
+| Trivy | 0.70.0 | Filesystem vulnerability/misconfiguration scan | https://github.com/aquasecurity/trivy | Apache-2.0 | Checksum-verified standalone CI/local tool |
+| PostCSS | 8.5.18 | Security override for the version bundled by Next.js | https://github.com/postcss/postcss | MIT | Exact override for fixed release |
+| sharp | 0.35.0 | Security override for the optional image runtime bundled by Next.js | https://github.com/lovell/sharp | Apache-2.0 | Exact override for fixed release |
 
 Versions are the environment resolved during the 2026-07-19 review. Service declarations may use
 compatible ranges, so dependency updates must re-resolve, re-verify upstream metadata, and update

@@ -1,0 +1,28 @@
+rules:
+  - id: camera-ai.python.dynamic-code-execution
+    message: Dynamic Python code execution can turn untrusted input into arbitrary code.
+    languages: [python]
+    severity: ERROR
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: camera-ai.python.subprocess-shell-true
+    message: Shell-enabled subprocess execution expands command-injection risk.
+    languages: [python]
+    severity: ERROR
+    pattern: subprocess.$FUNC(..., shell=True, ...)
+
+  - id: camera-ai.web.dynamic-code-execution
+    message: Dynamic JavaScript code execution can turn untrusted input into arbitrary code.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: camera-ai.web.untrusted-html-rendering
+    message: Rendering raw HTML bypasses React escaping and requires explicit sanitization review.
+    languages: [typescript]
+    severity: ERROR
+    pattern: <$ELEMENT ... dangerouslySetInnerHTML={...} ... />

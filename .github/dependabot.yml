@@ -1,0 +1,63 @@
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directories:
+      - "/"
+      - "/packages/*"
+      - "/services/*"
+      - "/workers/*"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 4
+    assignees: ["HIepNgoc2006"]
+    labels: ["type:security", "scope:active-delivery"]
+    groups:
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      python-routine:
+        applies-to: version-updates
+        group-by: dependency-name
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: npm
+    directory: "/apps/web-portal"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 2
+    assignees: ["HIepNgoc2006"]
+    labels: ["type:security", "scope:active-delivery"]
+    groups:
+      web-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      web-routine:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 2
+    assignees: ["HIepNgoc2006"]
+    labels: ["type:security", "scope:active-delivery"]
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      actions-routine:
+        applies-to: version-updates
+        patterns: ["*"]

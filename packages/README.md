@@ -39,5 +39,7 @@ Các contract hiện có:
   cancellation và audit; runtime activation vẫn fail closed tới khi đủ named approval.
 - `time-policy/time-policy-v1.json`: policy versioned cho UTC/IANA, clock health và replay window;
   không chứa cấu hình endpoint hoặc secret theo môi trường.
+- `security-scanning-policy/`: scanner/version/threshold contract, exception registry có hạn dùng và
+  fail-closed activation gate cho image/SBOM/DAST; không chứa finding log hay credential.
 - `ansvis-event-contract/`: JSON Schema, Bearer source auth/replay/idempotency policy và contract ACK
   versioned cho HTTP Trigger; không chứa endpoint runtime, secret, media hoặc raw ANSVIS payload.

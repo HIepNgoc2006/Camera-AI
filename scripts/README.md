@@ -9,7 +9,11 @@ Chứa script có thể review để build, test, lint, migrate, deploy, backup 
 
 Các entry point hiện có:
 
-- `quality.py`: chạy repository policy, Ruff, Mypy và unit tests bằng một lệnh ổn định.
+- `quality.py`: chạy repository/security policy, Ruff, Mypy và unit tests bằng một lệnh ổn định.
+- `check_security_scanning_policy.py`: kiểm tra scanner pin, audit inventory, exception expiry,
+  automation files và fail-closed image/SBOM activation gate.
+- `test_security_scanners_canary.py`: tạo canary giả lập trong `.local/tmp`, bỏ scanner output và xác
+  minh pip-audit/Bandit/OpenGrep/Trivy thực sự từ chối.
 - `check_foundation_safety.py`: kiểm structure, local links, ignore coverage và fail-closed defaults.
 - `check_compose_safety.py`: kiểm topology Compose tĩnh mà không khởi động/xóa container.
 - `check_fixture_safety.py`: từ chối fixture/seed nhạy cảm và chỉ báo category + path.
@@ -38,5 +42,5 @@ Các entry point hiện có:
   metric và số lượng.
 
 Xem `docs/quality-gates.md`, `docs/project-progress.md`,
-`docs/security/repository-protection.md` và `docs/security/secret-scanning.md` để cài tool và chạy
-local.
+`docs/security/repository-protection.md`, `docs/security/secret-scanning.md` và
+`docs/security/supply-chain-scanning.md` để cài tool và chạy local.

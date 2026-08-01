@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import partial
 from pathlib import Path
-from typing import Never
+from typing import Never, TypeAlias
 
 from scripts.check_time_policy import (
     TIME_EVENT_FUTURE,
@@ -198,8 +198,9 @@ IDEMPOTENCY_KEY = re.compile(r"^idem_(?:source|fallback)_v1_[0-9a-f]{64}$")
 FINGERPRINT = re.compile(r"^sha256:[0-9a-f]{64}$")
 BEARER_TOKEN = re.compile(r"^Bearer [A-Za-z0-9._~-]{32,2048}$")
 
-type JsonValue = object
-type JsonObject = dict[str, object]
+# OpenGrep 1.22 only partially parses the equivalent Python 3.12 PEP 695 syntax.
+JsonValue: TypeAlias = object  # noqa: UP040
+JsonObject: TypeAlias = dict[str, object]  # noqa: UP040
 
 
 class ContractError(ValueError):

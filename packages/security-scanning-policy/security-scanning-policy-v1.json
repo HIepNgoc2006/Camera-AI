@@ -1,0 +1,102 @@
+{
+  "policy_id": "security_scanning_policy_v1",
+  "schema_version": 1,
+  "status": "active",
+  "owner": "security_ops",
+  "data_classification": {
+    "dependency_and_image_metadata": "Medium",
+    "scanner_credentials": "Critical",
+    "customer_or_production_data_allowed": false
+  },
+  "merge_gates": {
+    "dependency_audit": {
+      "tool": "pip-audit",
+      "version": "2.10.1",
+      "command": "pip-audit --strict --cache-dir .local/cache/pip-audit --requirement requirements-security-audit.txt",
+      "failure_threshold": "any_known_vulnerability"
+    },
+    "python_sast": {
+      "tools": [{"name": "bandit", "version": "1.9.4"}],
+      "bandit_minimum_severity": "HIGH",
+      "failure_threshold": "HIGH_OR_CRITICAL",
+      "semgrep_compatible_engine": {
+        "name": "opengrep",
+        "version": "1.22.0",
+        "linux_binary_sha256": "45bcd58440e397ed52c50e953ccf5948909ea77087c9186fc7d277216f62e319",
+        "rules": ".semgrep/security.yml",
+        "rules_sha256": "f5f3fd551bf6e7b57fc349cc58e77b9baad6cafb2c6c53c85e34d5bd17677b8d",
+        "engine": "oss_only",
+        "strict_config": true,
+        "version_check": "disabled",
+        "remote_config": false,
+        "source_upload": false
+      }
+    },
+    "filesystem_scan": {
+      "tool": "trivy",
+      "version": "0.70.0",
+      "linux_archive_sha256": "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9",
+      "failure_threshold": "HIGH_OR_CRITICAL",
+      "scanners": ["vuln", "misconfig"],
+      "privacy_flags": ["offline-scan", "disable-telemetry", "skip-version-check"]
+    },
+    "web_dependency_audit": {
+      "tool": "npm-audit",
+      "failure_threshold": "HIGH_OR_CRITICAL",
+      "lockfile": "apps/web-portal/package-lock.json"
+    }
+  },
+  "canaries": {
+    "required_scanners": ["pip-audit", "bandit", "opengrep", "trivy"],
+    "fixture_policy": "runtime_generated_synthetic_only",
+    "scanner_output_policy": "discard_after_structured_finding_check"
+  },
+  "exceptions": {
+    "registry": "packages/security-scanning-policy/security-scanning-exceptions-v1.json",
+    "required_fields": [
+      "exception_id",
+      "finding_id",
+      "owner",
+      "justification",
+      "compensating_control",
+      "approved_by",
+      "expires_on"
+    ],
+    "expired_behavior": "fail_ci",
+    "critical_merge_exception_allowed": false,
+    "high_release_sla_days": 7,
+    "medium_remediation_sla_days": 30
+  },
+  "activation_gates": {
+    "container_image_scan_and_sbom": {
+      "status": "blocked_until_dockerfile_exists",
+      "trigger": "first_tracked_Dockerfile",
+      "requirements": [
+        "scan_immutable_image_digest",
+        "trivy_HIGH_CRITICAL_exit_1",
+        "cyclonedx_or_spdx_sbom",
+        "artifact_digest",
+        "restricted_artifact_access"
+      ]
+    },
+    "dast_baseline": {
+      "status": "blocked_until_approved_staging_api_exists",
+      "trigger": "approved_staging_api_base_url_and_preproduction_environment_gate",
+      "requirements": [
+        "OWASP_ZAP_baseline",
+        "fixed_non_user_controlled_target",
+        "no_production_credentials",
+        "required_before_production_promotion"
+      ]
+    }
+  },
+  "network_sources": [
+    "https://pypi.org/",
+    "https://files.pythonhosted.org/",
+    "https://api.osv.dev/",
+    "https://registry.npmjs.org/",
+    "https://github.com/opengrep/opengrep/releases/",
+    "https://github.com/aquasecurity/trivy/releases/",
+    "https://ghcr.io/aquasecurity/trivy-db"
+  ]
+}

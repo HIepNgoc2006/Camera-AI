@@ -18,6 +18,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
 
     return {
         "repository": ((python, "scripts/check_repository_safety.py"),),
+        "security-scanning-policy": ((python, "scripts/check_security_scanning_policy.py"),),
         "foundation": ((python, "scripts/check_foundation_safety.py"),),
         "compose": ((python, "scripts/check_compose_safety.py"),),
         "fixtures": (
@@ -220,6 +221,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
             command
             for name in (
                 "repository",
+                "security-scanning-policy",
                 "foundation",
                 "compose",
                 "fixtures",
@@ -251,6 +253,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         choices=(
             "all",
             "repository",
+            "security-scanning-policy",
             "foundation",
             "compose",
             "fixtures",

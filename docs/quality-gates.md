@@ -34,6 +34,7 @@ MIT code.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/quality.py repository
+.\.venv\Scripts\python.exe scripts/quality.py security-scanning-policy
 .\.venv\Scripts\python.exe scripts/quality.py foundation
 .\.venv\Scripts\python.exe scripts/quality.py compose
 .\.venv\Scripts\python.exe scripts/quality.py fixtures
@@ -52,7 +53,8 @@ MIT code.
 non-zero exit status. The unit suite contains a synthetic negative test proving failure propagation;
 it uses no customer, student, biometric, camera, event, or credential data.
 
-The current gates cover tracked-path safety, repository structure/local links/ignore/defaults,
+The current gates cover tracked-path safety, scanner pins/audit-inventory/exception-expiry policy,
+repository structure/local links/ignore/defaults,
 static Docker Compose safety, synthetic fixture/seed safety, versioned UTC/IANA/drift/replay policy,
 versioned API/error/authorization/rate-limit contracts, versioned ANSVIS HTTP Trigger
 schema/auth/replay/idempotency/ACK behavior, sanitized cross-system abuse threat model and inherited
@@ -69,3 +71,8 @@ versions in `requirements-quality.txt` and each service `pyproject.toml`. Any li
 repository-policy, or test failure fails the job. CI requires no production credential, `.env`, or
 real fixture. Database integration uses only the CI-owned loopback PostgreSQL service with fake opaque
 identifiers.
+
+`.github/workflows/security-scanning.yml` is a separate required security lane. It runs synthetic
+canaries and then pip-audit, npm audit, Bandit, checksum-verified local-rule OpenGrep, and checksum-verified
+Trivy. See [security/supply-chain-scanning.md](security/supply-chain-scanning.md) for thresholds,
+approved download sources, local commands, exception expiry, and the blocked image/SBOM/DAST gates.
