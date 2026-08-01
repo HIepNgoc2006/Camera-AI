@@ -1,0 +1,384 @@
+{
+  "policy_schema_version": 1,
+  "policy_version": "abuse_protection_policy_v1",
+  "status": "implementation_baseline_inactive",
+  "runtime_activation": "blocked_pending_staging_and_provider_evidence",
+  "default_decision": "deny",
+  "scope": [
+    "public_web_edge",
+    "web_mobile_api",
+    "authentication",
+    "ansvis_webhook",
+    "report_export",
+    "signed_evidence_access",
+    "object_storage_delivery"
+  ],
+  "data_classes": [
+    "medium",
+    "high",
+    "critical"
+  ],
+  "authoritative_sources": {
+    "api_contract": {
+      "path": "packages/api-contract/api-contract-policy-v1.json",
+      "version": "api_contract_policy_v1"
+    },
+    "ansvis_contract": {
+      "path": "packages/ansvis-event-contract/http-trigger-policy-v1.json",
+      "version": "ansvis_http_trigger_policy_v1"
+    },
+    "evidence_access": {
+      "path": "packages/evidence-access-policy/evidence-access-policy-v1.json",
+      "version": "evidence_access_policy_v1"
+    },
+    "queue_backpressure": {
+      "path": "packages/metrics-runtime/src/camera_ai_metrics/queue_policy_v1.json",
+      "version": "queue_operational_policy_v1"
+    }
+  },
+  "responsibility_boundaries": {
+    "provider_edge": {
+      "owns": [
+        "volumetric_l3_l4_l7_absorption",
+        "cdn_static_cache",
+        "waf_managed_rules",
+        "connection_and_bandwidth_protection",
+        "origin_concealment"
+      ],
+      "must_not_own": [
+        "business_authorization",
+        "consent_decision",
+        "audit_decision",
+        "ansvis_idempotency"
+      ],
+      "activation_evidence": [
+        "named_provider_profile",
+        "origin_access_restriction_test",
+        "staging_load_and_failover_result",
+        "security_ops_approval",
+        "rollback_record"
+      ]
+    },
+    "api_gateway": {
+      "owns": [
+        "sole_public_api_entry",
+        "tls_termination_policy",
+        "method_content_type_and_body_bounds",
+        "route_rate_limit_bucket",
+        "retry_after_and_stable_error",
+        "request_id"
+      ],
+      "must_not_own": [
+        "object_authorization_final_decision",
+        "consent_final_decision",
+        "evidence_object_delivery"
+      ]
+    },
+    "application_services": {
+      "owns": [
+        "authentication_throttle",
+        "authorization_and_object_scope",
+        "consent_and_retention_gate",
+        "idempotency_and_replay_control",
+        "actor_and_resource_quota",
+        "sensitive_action_audit"
+      ],
+      "must_not_own": [
+        "volumetric_ddos_absorption",
+        "public_object_storage"
+      ]
+    },
+    "queue_and_workers": {
+      "owns": [
+        "bounded_backlog",
+        "bounded_retry",
+        "circuit_breaker",
+        "dead_letter_and_recovery",
+        "drain_observability"
+      ],
+      "must_not_own": [
+        "front_door_flood_defense",
+        "authentication_bypass",
+        "unbounded_buffering"
+      ]
+    },
+    "private_object_storage": {
+      "owns": [
+        "private_bucket_policy",
+        "bounded_get_delivery",
+        "storage_lifecycle_defense_in_depth",
+        "provider_request_and_egress_observability"
+      ],
+      "must_not_own": [
+        "public_listing",
+        "permanent_url",
+        "business_authorization",
+        "client_direct_write"
+      ]
+    },
+    "security_operations": {
+      "owns": [
+        "aggregate_alerting",
+        "provider_incident_escalation",
+        "rule_change_approval",
+        "rollback_and_post_incident_review"
+      ],
+      "must_not_own": [
+        "raw_sensitive_payload_capture",
+        "credential_or_topology_publication"
+      ]
+    }
+  },
+  "controls": {
+    "api_gateway": {
+      "rate_limit_scope": "authenticated_actor_or_trusted_source_plus_route_bucket",
+      "unknown_route_behavior": "deny",
+      "dependency_unavailable_behavior": "fail_closed_for_auth_sensitive_and_ingestion_routes",
+      "retry_after_required": true,
+      "rate_limit_buckets": {
+        "ansvis_ingestion": {"sustained_rps": 50, "burst": 200, "retry_after_required": true},
+        "login": {"sustained_rps": 5, "burst": 10, "retry_after_required": true},
+        "standard_read": {"sustained_rps": 20, "burst": 60, "retry_after_required": true},
+        "sensitive_write": {"sustained_rps": 5, "burst": 15, "retry_after_required": true},
+        "signed_access": {"sustained_rps": 10, "burst": 30, "retry_after_required": true},
+        "export": {"sustained_rps": 1, "burst": 3, "retry_after_required": true},
+        "destructive_request": {"sustained_rps": 1, "burst": 3, "retry_after_required": true},
+        "admin_read": {"sustained_rps": 10, "burst": 20, "retry_after_required": true},
+        "admin_write": {"sustained_rps": 2, "burst": 5, "retry_after_required": true},
+        "report_read": {"sustained_rps": 5, "burst": 15, "retry_after_required": true},
+        "audit_read": {"sustained_rps": 5, "burst": 10, "retry_after_required": true},
+        "operations_read": {"sustained_rps": 10, "burst": 30, "retry_after_required": true}
+      }
+    },
+    "authentication": {
+      "max_body_bytes": 8192,
+      "edge_bucket": "login",
+      "account_failure_limit": 5,
+      "source_failure_limit": 20,
+      "window_seconds": 300,
+      "key_material": "one_way_digest_only",
+      "success_behavior": "clear_account_counter_only",
+      "dependency_unavailable_behavior": "fail_closed_503"
+    },
+    "ansvis_webhook": {
+      "method": "POST",
+      "max_body_bytes": 65536,
+      "rate_limit_scope": "source_namespace",
+      "sustained_requests_per_second": 50,
+      "burst_requests": 200,
+      "replay_window_seconds": 300,
+      "future_tolerance_seconds": 30,
+      "duplicate_outcome": "idempotent_200",
+      "conflict_outcome": "reject_409",
+      "clock_or_limiter_unavailable_behavior": "fail_closed",
+      "durable_receipt_required_before_ack": true
+    },
+    "report_export": {
+      "edge_bucket": "export",
+      "max_concurrent_exports_per_actor": 2,
+      "max_queue_depth": 5000,
+      "artifact_ttl_seconds": 604800,
+      "signed_get_ttl_seconds": 60,
+      "asynchronous_only": true,
+      "queue_full_behavior": "deny_new_429_preserve_accepted_jobs",
+      "synchronous_fallback_allowed": false
+    },
+    "signed_evidence_access": {
+      "edge_bucket": "signed_access",
+      "standard_default_ttl_seconds": 60,
+      "standard_hard_max_ttl_seconds": 300,
+      "export_hard_max_ttl_seconds": 120,
+      "method": "GET",
+      "cache_control": "private, no-store",
+      "authorization_required_at_issue": true,
+      "public_or_permanent_url_allowed": false
+    },
+    "queue_backpressure": {
+      "warning_depth_messages": 5000,
+      "warning_depth_for_seconds": 300,
+      "critical_depth_messages": 20000,
+      "critical_drain_eta_seconds": 900,
+      "circuit_open_error_ratio": 0.1,
+      "circuit_window_seconds": 60,
+      "front_door_limits_remain_enabled": true,
+      "unbounded_buffering_allowed": false
+    },
+    "object_storage_delivery": {
+      "bucket_visibility": "private",
+      "listing_allowed": false,
+      "client_direct_write_allowed": false,
+      "delivery_grant": "authorized_short_lived_get_only",
+      "provider_request_egress_and_concurrency_profile_required": true,
+      "provider_values_recorded_in_repository": false,
+      "overload_behavior": "deny_new_grants_or_delivery_without_public_fallback"
+    }
+  },
+  "threat_scenarios": [
+    {
+      "threat_id": "ABUSE-001",
+      "category": "volumetric_ddos",
+      "surfaces": ["public_web_edge", "web_mobile_api"],
+      "control_owners": ["provider_edge", "api_gateway", "security_operations"],
+      "safe_degradation": "serve_cacheable_public_assets_when_safe_and_shed_api_load_without_exposing_origin"
+    },
+    {
+      "threat_id": "ABUSE-002",
+      "category": "credential_attack",
+      "surfaces": ["authentication"],
+      "control_owners": ["provider_edge", "api_gateway", "application_services"],
+      "safe_degradation": "deny_login_with_stable_429_or_503_without_account_existence_disclosure"
+    },
+    {
+      "threat_id": "ABUSE-003",
+      "category": "api_resource_exhaustion",
+      "surfaces": ["web_mobile_api"],
+      "control_owners": ["api_gateway", "application_services", "queue_and_workers"],
+      "safe_degradation": "reject_excess_or_expensive_work_before_database_or_queue_amplification"
+    },
+    {
+      "threat_id": "ABUSE-004",
+      "category": "replay_and_duplicate_flood",
+      "surfaces": ["ansvis_webhook"],
+      "control_owners": ["api_gateway", "application_services", "queue_and_workers"],
+      "safe_degradation": "return_bounded_duplicate_or_conflict_outcome_without_duplicate_business_effect"
+    },
+    {
+      "threat_id": "ABUSE-005",
+      "category": "malformed_or_oversized_payload_flood",
+      "surfaces": ["authentication", "ansvis_webhook", "web_mobile_api"],
+      "control_owners": ["provider_edge", "api_gateway"],
+      "safe_degradation": "reject_before_deserialization_or_downstream_calls_with_stable_error"
+    },
+    {
+      "threat_id": "ABUSE-006",
+      "category": "report_export_amplification",
+      "surfaces": ["report_export"],
+      "control_owners": ["api_gateway", "application_services", "queue_and_workers"],
+      "safe_degradation": "deny_new_jobs_at_quota_or_queue_bound_and_preserve_already_accepted_jobs"
+    },
+    {
+      "threat_id": "ABUSE-007",
+      "category": "signed_url_minting_or_reuse_abuse",
+      "surfaces": ["signed_evidence_access"],
+      "control_owners": ["api_gateway", "application_services", "private_object_storage"],
+      "safe_degradation": "deny_new_grants_without_weakening_object_authorization_consent_retention_or_audit"
+    },
+    {
+      "threat_id": "ABUSE-008",
+      "category": "object_storage_egress_exhaustion",
+      "surfaces": ["object_storage_delivery"],
+      "control_owners": ["provider_edge", "private_object_storage", "security_operations"],
+      "safe_degradation": "throttle_or_deny_delivery_without_public_bucket_permanent_url_or_origin_bypass"
+    },
+    {
+      "threat_id": "ABUSE-009",
+      "category": "queue_retry_amplification",
+      "surfaces": ["ansvis_webhook", "report_export"],
+      "control_owners": ["application_services", "queue_and_workers", "security_operations"],
+      "safe_degradation": "open_bounded_circuit_stop_new_claims_and_recover_through_controlled_retry_or_dlq"
+    },
+    {
+      "threat_id": "ABUSE-010",
+      "category": "low_and_slow_distributed_abuse",
+      "surfaces": ["authentication", "web_mobile_api", "report_export", "signed_evidence_access"],
+      "control_owners": ["provider_edge", "api_gateway", "application_services", "security_operations"],
+      "safe_degradation": "combine_route_actor_resource_and_provider_signals_without_logging_raw_identifiers"
+    }
+  ],
+  "degradation_invariants": [
+    "api_gateway_remains_the_only_public_api_entry",
+    "internal_services_databases_queues_and_object_storage_remain_private",
+    "authentication_authorization_object_scope_consent_retention_and_audit_are_never_bypassed",
+    "accepted_events_and_exports_are_not_silently_discarded",
+    "rate_limit_or_clock_dependency_loss_fails_closed_on_sensitive_routes",
+    "queue_backpressure_never_replaces_front_door_limits",
+    "evidence_never_falls_back_to_public_or_permanent_delivery",
+    "errors_and_monitoring_never_expose_credentials_topology_payloads_or_personal_data"
+  ],
+  "monitoring_evidence": {
+    "registered_metrics": [
+      "event_ingestion_total",
+      "event_ingestion_rejections_total",
+      "event_ingestion_ack_seconds",
+      "event_outbox_backlog_messages",
+      "event_outbox_drain_eta_seconds",
+      "evidence_access_total",
+      "report_export_total",
+      "report_export_queue_depth_messages",
+      "report_export_drain_eta_seconds"
+    ],
+    "provider_or_future_signal_codes": [
+      "EDGE_REQUEST_RATE",
+      "EDGE_BLOCK_RATE",
+      "ORIGIN_CONNECTION_PRESSURE",
+      "LOGIN_THROTTLE_RATE",
+      "API_ROUTE_THROTTLE_RATE",
+      "OBJECT_DELIVERY_REQUEST_RATE",
+      "OBJECT_DELIVERY_EGRESS_RATE"
+    ],
+    "allowed_dimensions": [
+      "policy_version",
+      "deployment_version",
+      "surface_code",
+      "route_bucket_code",
+      "outcome_code",
+      "reason_code",
+      "status_code_class",
+      "aggregate_count",
+      "aggregate_rate",
+      "aggregate_latency",
+      "time_window",
+      "request_id",
+      "correlation_id"
+    ],
+    "forbidden_dimensions": [
+      "access_token",
+      "refresh_token",
+      "api_key",
+      "cookie",
+      "credentialed_url",
+      "signed_url",
+      "raw_source_address",
+      "raw_user_identifier",
+      "student_or_staff_identifier",
+      "camera_or_provider_identifier",
+      "bucket_or_object_key",
+      "provider_topology",
+      "raw_request_or_ansvis_payload",
+      "image_video_or_face_data"
+    ],
+    "minimum_review_windows": [
+      "one_minute",
+      "five_minutes",
+      "one_hour"
+    ],
+    "raw_request_capture_allowed": false
+  },
+  "implementation_issue_mapping": {
+    "17": "api_gateway_and_api_contract_baseline_complete",
+    "35": "queue_backpressure_and_dlq_policy_complete",
+    "45": "ansvis_webhook_hardening_complete",
+    "46": "sanitized_abuse_load_and_soak_tests",
+    "59": "ansvis_event_and_http_trigger_contract_complete",
+    "67": "private_evidence_storage_and_delivery_boundary_complete",
+    "78": "web_headers_csp_and_frontend_abuse_controls",
+    "89": "production_provider_activation_readiness",
+    "95": "sustained_capacity_and_backpressure_benchmark",
+    "96": "deployment_capacity_baseline_complete",
+    "112": "dependency_container_sast_and_dast_scanning",
+    "137": "identity_authentication_and_throttling_runtime_complete"
+  },
+  "review_record": {
+    "review_scope": ["backend", "ansvis", "security", "operations", "web_mobile_clients"],
+    "review_status": "single_developer_baseline_reviewed_pending_cross_role_activation_review",
+    "customer_or_production_data_used": false,
+    "provider_identifiers_or_topology_recorded": false,
+    "activation_requires": [
+      "issue_46_sanitized_test_evidence",
+      "issue_78_client_and_web_review",
+      "issue_89_provider_and_operations_approval",
+      "issue_95_capacity_evidence",
+      "production_change_and_rollback_record"
+    ]
+  }
+}

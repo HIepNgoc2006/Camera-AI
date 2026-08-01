@@ -41,6 +41,7 @@ MIT code.
 .\.venv\Scripts\python.exe scripts/quality.py authorization-catalog
 .\.venv\Scripts\python.exe scripts/quality.py api-contract
 .\.venv\Scripts\python.exe scripts/quality.py ansvis-contract
+.\.venv\Scripts\python.exe scripts/quality.py abuse-protection-policy
 .\.venv\Scripts\python.exe scripts/quality.py lint
 .\.venv\Scripts\python.exe scripts/quality.py typecheck
 .\.venv\Scripts\python.exe scripts/quality.py unit
@@ -54,7 +55,8 @@ it uses no customer, student, biometric, camera, event, or credential data.
 The current gates cover tracked-path safety, repository structure/local links/ignore/defaults,
 static Docker Compose safety, synthetic fixture/seed safety, versioned UTC/IANA/drift/replay policy,
 versioned API/error/authorization/rate-limit contracts, versioned ANSVIS HTTP Trigger
-schema/auth/replay/idempotency/ACK behavior, Python lint/format, strict type checking,
+schema/auth/replay/idempotency/ACK behavior, sanitized cross-system abuse threat model and inherited
+limit/metric/issue-owner drift checks, Python lint/format, strict type checking,
 repository-script tests, and backend service unit, integration, and contract tests.
 The `compose` gate requires Docker Compose but does not start, stop, reset, or delete containers. Add
 Web and Mobile lint/typecheck/test commands only when each app scaffold exists.

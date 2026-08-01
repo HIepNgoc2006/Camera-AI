@@ -34,6 +34,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "ansvis-contract": ((python, "-m", "scripts.check_ansvis_event_contract"),),
         "metrics-registry": ((python, "scripts/check_metrics_registry.py"),),
         "queue-policy": ((python, "scripts/check_queue_policy.py"),),
+        "abuse-protection-policy": ((python, "scripts/check_abuse_protection_policy.py"),),
         "web": ((npm, "--prefix", "apps/web-portal", "run", "quality"),),
         "lint": (
             (python, "-m", "ruff", "check", "scripts", "services", "packages", "workers"),
@@ -232,6 +233,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "ansvis-contract",
                 "metrics-registry",
                 "queue-policy",
+                "abuse-protection-policy",
                 "web",
                 "lint",
                 "typecheck",
@@ -262,6 +264,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "ansvis-contract",
             "metrics-registry",
             "queue-policy",
+            "abuse-protection-policy",
             "web",
             "lint",
             "typecheck",
