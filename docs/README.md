@@ -28,3 +28,5 @@ Runbook hiện có:
 - `security/fixture-safety.md`: quy tắc fake fixture/seed, scanner và incident response.
 - `security/repository-protection.md`: branch protection và required-check baseline.
 - `security/secret-scanning.md`: Gitleaks, canary và quy trình xử lý finding.
+- `security/supply-chain-scanning.md`: dependency/SAST/Trivy gates, synthetic canaries, exception
+  expiry, Dependabot grouping và activation gate cho image/SBOM/DAST.

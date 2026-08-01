@@ -1,0 +1,137 @@
+name: Supply-chain security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_CACHE_DIR: ${{ github.workspace }}/.local/cache/pip
+      PIP_AUDIT_CACHE_DIR: ${{ github.workspace }}/.local/cache/pip-audit
+      NPM_CONFIG_CACHE: ${{ github.workspace }}/.local/cache/npm
+      XDG_CACHE_HOME: ${{ github.workspace }}/.local/cache
+      TMPDIR: ${{ github.workspace }}/.local/tmp
+      SEMGREP_SETTINGS_FILE: ${{ github.workspace }}/.local/data/opengrep/settings.yml
+      SEMGREP_LOG_FILE: ${{ github.workspace }}/.local/data/opengrep/opengrep.log
+      OPENGREP_ENABLE_VERSION_CHECK: "0"
+      OPENGREP_VERSION: "1.22.0"
+      OPENGREP_LINUX_SHA256: "45bcd58440e397ed52c50e953ccf5948909ea77087c9186fc7d277216f62e319"
+      TRIVY_VERSION: "0.70.0"
+      TRIVY_LINUX_SHA256: "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9"
+      TRIVY_CACHE_DIR: ${{ github.workspace }}/.local/cache/trivy
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js for Web Portal audit
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: apps/web-portal/.nvmrc
+          package-manager-cache: false
+
+      - name: Prepare workspace-local tool directories
+        shell: bash
+        run: >-
+          mkdir -p .local/cache/pip .local/cache/pip-audit .local/cache/npm
+          .local/cache/trivy .local/data/opengrep .local/downloads/opengrep
+          .local/downloads/trivy .local/tmp .local/tools/opengrep .local/tools/trivy
+
+      - name: Install exact Python scanner versions into workspace venv
+        shell: bash
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --requirement requirements-security-tools.txt
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Validate scanning policy and exception expiry
+        run: python scripts/check_security_scanning_policy.py
+
+      - name: Install checksum-verified Trivy release
+        shell: bash
+        run: |
+          archive="$GITHUB_WORKSPACE/.local/downloads/trivy/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          tool_dir="$GITHUB_WORKSPACE/.local/tools/trivy/${TRIVY_VERSION}"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_LINUX_SHA256}  ${archive}" | sha256sum --check --status
+          mkdir -p "$tool_dir" "$TRIVY_CACHE_DIR"
+          tar -xzf "$archive" -C "$tool_dir" trivy
+          echo "$tool_dir" >> "$GITHUB_PATH"
+
+      - name: Install checksum-verified OpenGrep release
+        shell: bash
+        run: |
+          download="$GITHUB_WORKSPACE/.local/downloads/opengrep/opengrep_manylinux_x86"
+          tool_dir="$GITHUB_WORKSPACE/.local/tools/opengrep/${OPENGREP_VERSION}"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$download" \
+            "https://github.com/opengrep/opengrep/releases/download/v${OPENGREP_VERSION}/opengrep_manylinux_x86"
+          echo "${OPENGREP_LINUX_SHA256}  ${download}" | sha256sum --check --status
+          mkdir -p "$tool_dir"
+          install --mode 0755 "$download" "$tool_dir/opengrep"
+          echo "$tool_dir" >> "$GITHUB_PATH"
+
+      - name: Prove every scanner rejects its synthetic canary
+        run: python scripts/test_security_scanners_canary.py all
+
+      - name: Audit exact Python dependency inventory
+        run: >-
+          pip-audit --strict --cache-dir "$PIP_AUDIT_CACHE_DIR"
+          --requirement requirements-security-audit.txt
+
+      - name: Audit Web Portal lockfile
+        working-directory: apps/web-portal
+        run: npm audit --audit-level=high --ignore-scripts
+
+      - name: Run Bandit high-severity gate
+        run: bandit -q -r services packages workers scripts -lll
+
+      - name: Run Semgrep-compatible OpenGrep High/Critical gate
+        run: >-
+          opengrep scan
+          --config .semgrep/security.yml
+          --disable-version-check
+          --oss-only
+          --strict
+          --error
+          --severity ERROR
+          --exclude .git
+          --exclude .local
+          --exclude .venv
+          --exclude apps/web-portal/node_modules
+          services packages workers scripts apps/web-portal
+
+      - name: Scan repository filesystem with Trivy
+        run: >-
+          trivy --cache-dir "$TRIVY_CACHE_DIR"
+          --db-repository ghcr.io/aquasecurity/trivy-db:2 fs
+          --scanners vuln,misconfig
+          --severity HIGH,CRITICAL
+          --exit-code 1
+          --no-progress
+          --skip-check-update
+          --offline-scan
+          --disable-telemetry
+          --skip-version-check
+          --skip-dirs .git
+          --skip-dirs .local
+          --skip-dirs .venv
+          --skip-dirs apps/web-portal/node_modules
+          .
