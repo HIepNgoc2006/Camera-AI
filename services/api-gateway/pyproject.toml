@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["httpx2==2.7.0"]
+test = ["httpx2==2.9.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
