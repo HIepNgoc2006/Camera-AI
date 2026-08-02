@@ -76,6 +76,8 @@ sessions = sa.Table(
     sa.Column("school_id", postgresql.UUID(as_uuid=True), nullable=True),
     sa.Column("mfa_verified", sa.Boolean(), nullable=False),
     sa.Column("issued_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("last_activity_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("inactivity_expires_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
 )

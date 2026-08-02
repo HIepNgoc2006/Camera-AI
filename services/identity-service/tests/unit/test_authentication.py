@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -11,7 +13,14 @@ from fastapi.testclient import TestClient
 from identity_service.application.authentication import AuthenticationService, TokenPair
 from identity_service.application.errors import AuthenticationError
 from identity_service.config import Settings
-from identity_service.domain.auth import LoginSubject, MfaFactor, MfaState
+from identity_service.domain.auth import (
+    LoginSubject,
+    MfaFactor,
+    MfaState,
+    RefreshRecord,
+    RefreshRotationResult,
+    SessionRecord,
+)
 from identity_service.domain.models import UserStatus
 from identity_service.infrastructure.memory import (
     InMemoryAuthRepository,
@@ -39,10 +48,74 @@ SOURCE = "source.synthetic.0001"
 TOTP_SECRET = "JBSWY3DPEHPK3PXP"
 
 
+class RevokeAtMutationRepository(InMemoryAuthRepository):
+    revoke_before_touch = False
+    revoke_before_rotate = False
+
+    def active_session(
+        self, *, expected: SessionRecord, observed_at: datetime
+    ) -> SessionRecord | None:
+        if self.revoke_before_touch:
+            self.revoke_before_touch = False
+            self.revoke_session(
+                session_id=expected.session_id,
+                revoked_at=observed_at,
+                audit=_audit_placeholder(),
+            )
+        return super().active_session(expected=expected, observed_at=observed_at)
+
+    def touch_session_activity(
+        self,
+        *,
+        expected: SessionRecord,
+        activity_at: datetime,
+        inactivity_expires_at: datetime,
+    ) -> SessionRecord | None:
+        if self.revoke_before_touch:
+            self.revoke_before_touch = False
+            self.revoke_session(
+                session_id=expected.session_id,
+                revoked_at=activity_at,
+                audit=_audit_placeholder(),
+            )
+        return super().touch_session_activity(
+            expected=expected,
+            activity_at=activity_at,
+            inactivity_expires_at=inactivity_expires_at,
+        )
+
+    def rotate_refresh(
+        self,
+        *,
+        previous: RefreshRecord,
+        replacement: RefreshRecord,
+        expected_session: SessionRecord,
+        rotated_at: datetime,
+        inactivity_expires_at: datetime,
+    ) -> RefreshRotationResult:
+        if self.revoke_before_rotate:
+            self.revoke_before_rotate = False
+            self.revoke_session(
+                session_id=previous.session_id,
+                revoked_at=rotated_at,
+                audit=_audit_placeholder(),
+            )
+        return super().rotate_refresh(
+            previous=previous,
+            replacement=replacement,
+            expected_session=expected_session,
+            rotated_at=rotated_at,
+            inactivity_expires_at=inactivity_expires_at,
+        )
+
+
 def _build(
     *,
     roles: frozenset[str] = frozenset({"teacher"}),
     limiter: InMemoryLoginRateLimiter | UnavailableLoginRateLimiter | None = None,
+    session_lifetime: timedelta = timedelta(days=30),
+    inactivity_lifetime: timedelta = timedelta(minutes=30),
+    repository: InMemoryAuthRepository | None = None,
 ) -> tuple[
     AuthenticationService,
     InMemoryAuthRepository,
@@ -50,7 +123,7 @@ def _build(
     Argon2idPasswordVerifier,
     Encv1MfaProtector,
 ]:
-    repository = InMemoryAuthRepository()
+    repository = repository or InMemoryAuthRepository()
     lookup = LoginLookupHasher(b"l" * 32)
     passwords = Argon2idPasswordVerifier()
     protector = Encv1MfaProtector(EncryptionService(DeterministicFakeKeyProvider(seed=b"k" * 32)))
@@ -78,6 +151,8 @@ def _build(
         ),
         mfa=protector,
         totp=PyotpTotpVerifier(),
+        session_lifetime=session_lifetime,
+        inactivity_lifetime=inactivity_lifetime,
     )
     return service, repository, lookup, passwords, protector
 
@@ -163,6 +238,32 @@ def test_refresh_rotation_and_replay_revoke_entire_family() -> None:
     with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
         service.verify_access(rotated.access_token, now=NOW + timedelta(minutes=2))
     assert "SESSION_REVOKED" in {intent.action for intent in repository.audit_intents}
+
+
+def test_refresh_fails_closed_when_role_change_requires_unverified_mfa() -> None:
+    service, repository, lookup, passwords, _ = _build()
+    initial = _login(service)
+    repository.seed_subject(
+        tenant_id=TENANT,
+        login_digest=lookup.digest(IDENTIFIER, tenant_id=TENANT),
+        subject=LoginSubject(
+            user_id=USER,
+            tenant_id=TENANT,
+            school_id=SCHOOL,
+            status=UserStatus.ACTIVE,
+            password_hash=passwords.hash(PASSWORD),
+            role_codes=frozenset({"admin"}),
+        ),
+    )
+
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.refresh(
+            refresh_token=initial.refresh_token,
+            request_id=REQUEST_ID,
+            now=NOW + timedelta(minutes=1),
+        )
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.verify_access(initial.access_token, now=NOW + timedelta(minutes=1))
 
 
 def test_logout_all_revokes_access_and_refresh() -> None:
@@ -252,9 +353,150 @@ def test_access_token_rejects_cross_tenant_expiry_revocation_and_clock_skew() ->
     service.verify_access(pair.access_token, now=NOW + timedelta(minutes=5, seconds=29))
     with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
         service.verify_access(pair.access_token, now=NOW + timedelta(minutes=5, seconds=31))
-    service.logout(pair.access_token, request_id=REQUEST_ID, now=NOW)
+    service.logout(
+        pair.access_token,
+        request_id=REQUEST_ID,
+        now=NOW + timedelta(minutes=5, seconds=29),
+    )
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.verify_access(pair.access_token, now=NOW + timedelta(minutes=5, seconds=29))
+
+
+def test_session_snapshot_is_read_only_and_access_never_extends_absolute_expiry() -> None:
+    service, repository, _, _, _ = _build(
+        session_lifetime=timedelta(minutes=20),
+        inactivity_lifetime=timedelta(minutes=15),
+    )
+    pair = _login(service)
+
+    snapshot = service.session_snapshot(pair.access_token, now=NOW + timedelta(minutes=5))
+
+    assert snapshot.policy_version == "identity_session_snapshot_v1"
+    assert snapshot.status == "authenticated"
+    assert snapshot.session_id == pair.session_id
+    assert snapshot.actor_id == USER
+    assert snapshot.tenant_id == TENANT
+    assert snapshot.school_id == SCHOOL
+    assert snapshot.mfa_state == "not_required"
+    assert snapshot.issued_at == NOW
+    assert snapshot.absolute_expires_at == NOW + timedelta(minutes=20)
+    assert snapshot.inactivity_expires_at == NOW + timedelta(minutes=15)
+    stored = repository.session(pair.session_id)
+    assert stored is not None
+    assert stored.last_activity_at == NOW
+    assert stored.inactivity_expires_at == NOW + timedelta(minutes=15)
+    assert (
+        repository.active_session(
+            expected=replace(stored, tenant_id=OTHER_TENANT),
+            observed_at=NOW + timedelta(minutes=5),
+        )
+        is None
+    )
+
+    principal = service.verify_access(pair.access_token, now=NOW + timedelta(minutes=5))
+    assert principal.inactivity_expires_at == snapshot.absolute_expires_at
+    stored = repository.session(pair.session_id)
+    assert stored is not None
+    assert stored.last_activity_at == NOW + timedelta(minutes=5)
+    assert stored.inactivity_expires_at == snapshot.absolute_expires_at
+
+
+def test_inactivity_boundary_and_backward_activity_fail_closed() -> None:
+    service, _, _, _, _ = _build(inactivity_lifetime=timedelta(minutes=2))
+    pair = _login(service)
+    service.verify_access(pair.access_token, now=NOW + timedelta(minutes=1))
+
     with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
         service.verify_access(pair.access_token, now=NOW)
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.refresh(
+            refresh_token=pair.refresh_token,
+            request_id=REQUEST_ID,
+            now=NOW + timedelta(minutes=3),
+        )
+
+
+def test_activity_and_refresh_cannot_revive_concurrently_revoked_session() -> None:
+    touch_repository = RevokeAtMutationRepository()
+    touch_service, _, _, _, _ = _build(repository=touch_repository)
+    touch_pair = _login(touch_service)
+    touch_repository.revoke_before_touch = True
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        touch_service.session_snapshot(touch_pair.access_token, now=NOW + timedelta(minutes=1))
+
+    rotate_repository = RevokeAtMutationRepository()
+    rotate_service, _, _, _, _ = _build(repository=rotate_repository)
+    rotate_pair = _login(rotate_service)
+    rotate_repository.revoke_before_rotate = True
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        rotate_service.refresh(
+            refresh_token=rotate_pair.refresh_token,
+            request_id=REQUEST_ID,
+            now=NOW + timedelta(minutes=1),
+        )
+
+
+def test_snapshot_http_contract_is_canonical_and_excludes_credentials() -> None:
+    service, _, _, _, _ = _build()
+    pair = _login(service, now=datetime.now(UTC))
+    application = create_app(
+        Settings(environment="test", log_level="CRITICAL"),
+        authentication_service=service,
+    )
+    with TestClient(application) as client:
+        response = client.post(
+            "/api/v1/auth/session/snapshot",
+            headers={
+                "Authorization": f"Bearer {pair.access_token}",
+                "X-Request-ID": REQUEST_ID,
+            },
+        )
+        missing = client.post(
+            "/api/v1/auth/session/snapshot",
+            headers={"X-Request-ID": REQUEST_ID},
+        )
+        logout = client.post(
+            "/api/v1/auth/logout",
+            headers={
+                "Authorization": f"Bearer {pair.access_token}",
+                "X-Request-ID": REQUEST_ID,
+            },
+        )
+        revoked = client.post(
+            "/api/v1/auth/session/snapshot",
+            headers={
+                "Authorization": f"Bearer {pair.access_token}",
+                "X-Request-ID": REQUEST_ID,
+            },
+        )
+    assert response.status_code == 200
+    assert missing.status_code == 401
+    assert missing.json()["error_code"] == "AUTHENTICATION_REQUIRED"
+    assert logout.status_code == 200
+    assert revoked.status_code == 401
+    assert revoked.json()["error_code"] == "AUTHENTICATION_REQUIRED"
+    payload = response.json()
+    assert set(payload) == {
+        "policyVersion",
+        "status",
+        "sessionId",
+        "actorId",
+        "tenantId",
+        "schoolId",
+        "mfaState",
+        "issuedAt",
+        "absoluteExpiresAt",
+        "inactivityExpiresAt",
+        "request_id",
+    }
+    assert payload["policyVersion"] == "identity_session_snapshot_v1"
+    canonical_utc = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
+    assert canonical_utc.fullmatch(payload["issuedAt"])
+    assert canonical_utc.fullmatch(payload["absoluteExpiresAt"])
+    assert canonical_utc.fullmatch(payload["inactivityExpiresAt"])
+    serialized = response.text
+    assert pair.access_token not in serialized
+    assert pair.refresh_token not in serialized
 
 
 def _audit_placeholder() -> AuditIntent:

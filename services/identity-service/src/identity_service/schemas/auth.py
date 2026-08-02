@@ -11,6 +11,10 @@ Identifier = Annotated[str, Field(min_length=1, max_length=254)]
 Password = Annotated[str, Field(min_length=1, max_length=1024)]
 TotpCode = Annotated[str, Field(pattern=r"^\d{6}$")]
 RefreshToken = Annotated[str, Field(min_length=32, max_length=1024)]
+CanonicalUtc = Annotated[
+    str,
+    Field(pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$"),
+]
 
 
 class LoginRequest(BaseModel):
@@ -44,6 +48,22 @@ class TokenResponse(BaseModel):
     expires_in: int
     session_id: UUID
     mfa_verified: bool
+    request_id: str
+
+
+class SessionSnapshotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    policy_version: Literal["identity_session_snapshot_v1"] = Field(alias="policyVersion")
+    status: Literal["authenticated"]
+    session_id: UUID = Field(alias="sessionId")
+    actor_id: UUID = Field(alias="actorId")
+    tenant_id: UUID = Field(alias="tenantId")
+    school_id: UUID | None = Field(alias="schoolId")
+    mfa_state: Literal["verified", "not_required"] = Field(alias="mfaState")
+    issued_at: CanonicalUtc = Field(alias="issuedAt")
+    absolute_expires_at: CanonicalUtc = Field(alias="absoluteExpiresAt")
+    inactivity_expires_at: CanonicalUtc = Field(alias="inactivityExpiresAt")
     request_id: str
 
 

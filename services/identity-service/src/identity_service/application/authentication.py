@@ -6,7 +6,7 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Never
+from typing import Literal, Never
 from uuid import UUID, uuid4
 
 from camera_ai_audit import AuditIntent, IntentResult
@@ -21,9 +21,11 @@ from identity_service.application.ports import (
     TotpVerifier,
 )
 from identity_service.domain.auth import (
+    AuthDomainError,
     MfaFactor,
     MfaState,
     RefreshRecord,
+    RefreshRotationResult,
     RefreshState,
     SessionRecord,
 )
@@ -32,6 +34,9 @@ from identity_service.infrastructure.security import LoginLookupHasher
 
 ADMIN_ROLE_CODES = frozenset({"admin", "school_admin", "system_admin"})
 MFA_REQUIRED_ROLES = ADMIN_ROLE_CODES | {"bgh"}
+IDENTITY_SESSION_SNAPSHOT_VERSION: Literal["identity_session_snapshot_v1"] = (
+    "identity_session_snapshot_v1"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +57,23 @@ class VerifiedAccess:
     school_id: UUID | None
     roles: frozenset[str]
     mfa_verified: bool
+    issued_at: datetime
+    absolute_expires_at: datetime
+    inactivity_expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class IdentitySessionSnapshot:
+    policy_version: Literal["identity_session_snapshot_v1"]
+    status: Literal["authenticated"]
+    session_id: UUID
+    actor_id: UUID
+    tenant_id: UUID
+    school_id: UUID | None
+    mfa_state: Literal["verified", "not_required"]
+    issued_at: datetime
+    absolute_expires_at: datetime
+    inactivity_expires_at: datetime
 
 
 class AuthenticationService:
@@ -69,7 +91,15 @@ class AuthenticationService:
         totp: TotpVerifier,
         access_lifetime: timedelta = timedelta(minutes=5),
         session_lifetime: timedelta = timedelta(days=30),
+        inactivity_lifetime: timedelta = timedelta(minutes=30),
     ) -> None:
+        if (
+            access_lifetime <= timedelta(0)
+            or session_lifetime <= timedelta(0)
+            or inactivity_lifetime <= timedelta(0)
+            or inactivity_lifetime > session_lifetime
+        ):
+            raise ValueError("authentication lifetimes must be positive and bounded")
         self._repository = repository
         self._limiter = limiter
         self._lookup = lookup
@@ -79,6 +109,7 @@ class AuthenticationService:
         self._totp = totp
         self._access_lifetime = access_lifetime
         self._session_lifetime = session_lifetime
+        self._inactivity_lifetime = inactivity_lifetime
 
     def login(
         self,
@@ -146,6 +177,8 @@ class AuthenticationService:
             school_id=subject.school_id,
             mfa_verified=mfa_verified,
             issued_at=at,
+            last_activity_at=at,
+            inactivity_expires_at=at + self._inactivity_lifetime,
             expires_at=at + self._session_lifetime,
         )
         raw_refresh = _new_refresh_token()
@@ -182,29 +215,50 @@ class AuthenticationService:
         if session is None or not session.is_active(at) or at >= stored.expires_at:
             raise AuthenticationError("AUTHENTICATION_REQUIRED")
 
+        touched = self._touched_session(session, at=at)
         replacement_raw = _new_refresh_token()
-        replacement = _refresh_record(replacement_raw, session=session, now=at)
-        if not self._repository.rotate_refresh(
+        replacement = _refresh_record(replacement_raw, session=touched, now=at)
+        rotation = self._repository.rotate_refresh(
             previous=stored,
             replacement=replacement,
+            expected_session=touched,
             rotated_at=at,
-        ):
+            inactivity_expires_at=touched.inactivity_expires_at,
+        )
+        if rotation is RefreshRotationResult.REPLAYED:
             self._revoke_replayed_family(stored, request_id=request_id, now=at)
-        roles = self._repository.role_codes(session.user_id)
-        if not roles:
+        if rotation is RefreshRotationResult.INACTIVE:
+            raise AuthenticationError("AUTHENTICATION_REQUIRED")
+        roles = self._repository.role_codes(touched.user_id)
+        if not roles or (roles & MFA_REQUIRED_ROLES and not touched.mfa_verified):
             self._repository.revoke_family(
-                family_id=session.family_id,
+                family_id=touched.family_id,
                 revoked_at=at,
-                audit=_session_revoke_audit(session.session_id, request_id=request_id, now=at),
+                audit=_session_revoke_audit(touched.session_id, request_id=request_id, now=at),
             )
             raise AuthenticationError("AUTHENTICATION_REQUIRED")
-        return self._pair(session=session, roles=roles, refresh=replacement_raw, now=at)
+        return self._pair(session=touched, roles=roles, refresh=replacement_raw, now=at)
 
     def verify_access(
         self,
         access_token: str,
         *,
         expected_tenant_id: UUID | None = None,
+        now: datetime | None = None,
+    ) -> VerifiedAccess:
+        return self._verified_access(
+            access_token,
+            expected_tenant_id=expected_tenant_id,
+            extend_inactivity=True,
+            now=now,
+        )
+
+    def _verified_access(
+        self,
+        access_token: str,
+        *,
+        expected_tenant_id: UUID | None = None,
+        extend_inactivity: bool,
         now: datetime | None = None,
     ) -> VerifiedAccess:
         at = _now(now)
@@ -236,8 +290,23 @@ class AuthenticationService:
             or session.tenant_id != tenant_id
             or session.school_id != school_id
             or session.mfa_verified != mfa_verified
+            or (roles & MFA_REQUIRED_ROLES and not mfa_verified)
             or (expected_tenant_id is not None and tenant_id != expected_tenant_id)
         ):
+            raise AuthenticationError("AUTHENTICATION_REQUIRED")
+        if extend_inactivity:
+            session = self._touched_session(session, at=at)
+            persisted = self._repository.touch_session_activity(
+                expected=session,
+                activity_at=session.last_activity_at,
+                inactivity_expires_at=session.inactivity_expires_at,
+            )
+        else:
+            persisted = self._repository.active_session(
+                expected=session,
+                observed_at=at,
+            )
+        if persisted is None:
             raise AuthenticationError("AUTHENTICATION_REQUIRED")
         return VerifiedAccess(
             user_id=user_id,
@@ -246,6 +315,26 @@ class AuthenticationService:
             school_id=school_id,
             roles=roles,
             mfa_verified=mfa_verified,
+            issued_at=persisted.issued_at,
+            absolute_expires_at=persisted.expires_at,
+            inactivity_expires_at=persisted.inactivity_expires_at,
+        )
+
+    def session_snapshot(
+        self, access_token: str, *, now: datetime | None = None
+    ) -> IdentitySessionSnapshot:
+        principal = self._verified_access(access_token, extend_inactivity=False, now=now)
+        return IdentitySessionSnapshot(
+            policy_version=IDENTITY_SESSION_SNAPSHOT_VERSION,
+            status="authenticated",
+            session_id=principal.session_id,
+            actor_id=principal.user_id,
+            tenant_id=principal.tenant_id,
+            school_id=principal.school_id,
+            mfa_state="verified" if principal.mfa_verified else "not_required",
+            issued_at=principal.issued_at,
+            absolute_expires_at=principal.absolute_expires_at,
+            inactivity_expires_at=principal.inactivity_expires_at,
         )
 
     def logout(self, access_token: str, *, request_id: str, now: datetime | None = None) -> None:
@@ -333,6 +422,12 @@ class AuthenticationService:
         except Exception:
             raise AuthenticationError("AUTH_RATE_LIMIT_UNAVAILABLE") from None
 
+    def _touched_session(self, session: SessionRecord, *, at: datetime) -> SessionRecord:
+        try:
+            return session.touched(at=at, inactivity_lifetime=self._inactivity_lifetime)
+        except AuthDomainError:
+            raise AuthenticationError("AUTHENTICATION_REQUIRED") from None
+
     def _failed_mfa(
         self, account_key: bytes, source_key: str, request_id: str, now: datetime
     ) -> Never:
@@ -381,7 +476,7 @@ def _now(value: datetime | None) -> datetime:
     current = datetime.now(UTC) if value is None else value
     if current.tzinfo is None or current.utcoffset() is None:
         raise AuthenticationError("AUTH_DEPENDENCY_UNAVAILABLE")
-    return current
+    return current.astimezone(UTC)
 
 
 def _new_refresh_token() -> str:

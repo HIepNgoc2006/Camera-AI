@@ -9,6 +9,12 @@ MIGRATION = (
     / "versions"
     / "20260728_0001_create_identity_auth_runtime.py"
 )
+SESSION_EXPIRY_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / "20260802_0002_add_session_inactivity_expiry.py"
+)
 
 
 def test_migration_owns_only_identity_schema_and_all_auth_state() -> None:
@@ -68,3 +74,17 @@ def test_migration_has_explicit_reverse_order_downgrade() -> None:
         )
     ]
     assert positions == sorted(positions)
+
+
+def test_session_expiry_migration_is_fail_closed_and_bounded() -> None:
+    source = SESSION_EXPIRY_MIGRATION.read_text(encoding="utf-8")
+    assert 'down_revision: str | None = "20260728_0001"' in source
+    assert "last_activity_at = issued_at" in source
+    assert "inactivity_expires_at = issued_at" in source
+    assert "issued_at <= last_activity_at" in source
+    assert "last_activity_at <= inactivity_expires_at" in source
+    assert "inactivity_expires_at <= expires_at" in source
+    assert "ix_identity_sessions_activity_active" in source
+    assert "SET revoked_at = COALESCE" in source
+    assert 'op.drop_column("sessions", "inactivity_expires_at"' in source
+    assert 'op.drop_column("sessions", "last_activity_at"' in source

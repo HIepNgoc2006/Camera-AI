@@ -8,7 +8,13 @@ from uuid import UUID
 
 from camera_ai_audit import AuditIntent
 
-from identity_service.domain.auth import LoginSubject, MfaFactor, RefreshRecord, SessionRecord
+from identity_service.domain.auth import (
+    LoginSubject,
+    MfaFactor,
+    RefreshRecord,
+    RefreshRotationResult,
+    SessionRecord,
+)
 
 
 class AuthRepository(Protocol):
@@ -28,6 +34,18 @@ class AuthRepository(Protocol):
 
     def session(self, session_id: UUID) -> SessionRecord | None: ...
 
+    def active_session(
+        self, *, expected: SessionRecord, observed_at: datetime
+    ) -> SessionRecord | None: ...
+
+    def touch_session_activity(
+        self,
+        *,
+        expected: SessionRecord,
+        activity_at: datetime,
+        inactivity_expires_at: datetime,
+    ) -> SessionRecord | None: ...
+
     def role_codes(self, user_id: UUID) -> frozenset[str]: ...
 
     def rotate_refresh(
@@ -35,8 +53,10 @@ class AuthRepository(Protocol):
         *,
         previous: RefreshRecord,
         replacement: RefreshRecord,
+        expected_session: SessionRecord,
         rotated_at: datetime,
-    ) -> bool: ...
+        inactivity_expires_at: datetime,
+    ) -> RefreshRotationResult: ...
 
     def revoke_family(
         self, *, family_id: UUID, revoked_at: datetime, audit: AuditIntent

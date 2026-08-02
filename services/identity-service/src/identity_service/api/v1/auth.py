@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from identity_service.api.errors import authentication_error_response, request_id_from
-from identity_service.application.authentication import AuthenticationService, TokenPair
+from identity_service.application.authentication import (
+    AuthenticationService,
+    IdentitySessionSnapshot,
+    TokenPair,
+)
 from identity_service.application.errors import AuthenticationError
 from identity_service.infrastructure.security import validate_source_key
 from identity_service.schemas import (
@@ -16,6 +21,7 @@ from identity_service.schemas import (
     MfaEnrollRequest,
     OperationResponse,
     RefreshRequest,
+    SessionSnapshotResponse,
     TokenResponse,
 )
 
@@ -56,6 +62,28 @@ def _source_key(request: Request) -> str:
     if value is None:
         raise AuthenticationError("AUTH_SOURCE_CONTEXT_REQUIRED")
     return validate_source_key(value)
+
+
+def _canonical_utc(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _snapshot_response(
+    snapshot: IdentitySessionSnapshot, request_id: str
+) -> SessionSnapshotResponse:
+    return SessionSnapshotResponse(
+        policyVersion=snapshot.policy_version,
+        status=snapshot.status,
+        sessionId=snapshot.session_id,
+        actorId=snapshot.actor_id,
+        tenantId=snapshot.tenant_id,
+        schoolId=snapshot.school_id,
+        mfaState=snapshot.mfa_state,
+        issuedAt=_canonical_utc(snapshot.issued_at),
+        absoluteExpiresAt=_canonical_utc(snapshot.absolute_expires_at),
+        inactivityExpiresAt=_canonical_utc(snapshot.inactivity_expires_at),
+        request_id=request_id,
+    )
 
 
 def _error(error: AuthenticationError, request_id: str) -> JSONResponse:
@@ -106,6 +134,18 @@ def logout(request: Request) -> OperationResponse | JSONResponse:
     try:
         _service(request).logout(_bearer(request), request_id=request_id)
         return OperationResponse(operation="logout", request_id=request_id)
+    except AuthenticationError as error:
+        return _error(error, request_id)
+
+
+@router.post("/session/snapshot", response_model=SessionSnapshotResponse)
+def session_snapshot(request: Request) -> SessionSnapshotResponse | JSONResponse:
+    request_id = request_id_from(request)
+    try:
+        return _snapshot_response(
+            _service(request).session_snapshot(_bearer(request)),
+            request_id,
+        )
     except AuthenticationError as error:
         return _error(error, request_id)
 

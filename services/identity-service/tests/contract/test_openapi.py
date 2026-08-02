@@ -14,6 +14,7 @@ def test_openapi_exposes_approved_authentication_surface() -> None:
         "/api/v1/auth/refresh",
         "/api/v1/auth/logout",
         "/api/v1/auth/logout-all",
+        "/api/v1/auth/session/snapshot",
         "/api/v1/auth/mfa/enroll",
         "/api/v1/auth/sessions/{session_id}/revoke",
     }

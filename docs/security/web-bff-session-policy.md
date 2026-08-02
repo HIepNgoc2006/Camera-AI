@@ -57,11 +57,12 @@ warning timestamp, but the Web policy contains no copied duration. The boundary 
 never refreshes or extends a session. Missing, invalid, reordered, stale, or client-augmented metadata
 fails closed.
 
-The currently tracked Identity runtime exposes one `expires_at` value and optional `last_seen_at`; it
-does not yet expose or enforce the separate absolute and inactivity expiry fields required by this
-snapshot. Issue #70 must not derive a second lifetime in Web code. Runtime integration stays blocked
-until an approved Identity-owned contract supplies both authoritative expiry instants; only the
-display-only warning timestamp may come from a separately named and approved runtime profile.
+Identity now exposes the gateway-only `POST /api/v1/auth/session/snapshot` contract versioned as
+`identity_session_snapshot_v1`. It enforces the absolute and inactivity boundaries before returning
+canonical `absoluteExpiresAt` and `inactivityExpiresAt` values, and successful activity can extend
+only the inactivity value up to the absolute cap. Issue #70 must map this minimized Identity response
+into the exact Web snapshot and must not derive a second lifetime in Web code. Only the display-only
+warning timestamp may come from a separately named and approved runtime profile.
 
 MFA failures use stable, non-enumerating UI state. `unavailable` and `malformed` never reuse a cached
 allow. Backend object authorization still runs for every sensitive request after route access.

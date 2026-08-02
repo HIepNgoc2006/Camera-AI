@@ -30,7 +30,7 @@ Errors use this stable public shape and never include stack traces or exception 
 ```
 
 The gateway exposes the Identity Service authentication surface under `/api/v1/auth`: login,
-refresh, logout, logout-all, MFA enrollment, and administrative session revoke. It derives a
+refresh, logout, logout-all, the authoritative session snapshot, MFA enrollment, and administrative session revoke. It derives a
 pseudonymous source key from the transport client address and overwrites any caller-supplied
 `X-Client-Source`. Only request ID, that source key, optional Authorization, JSON body, and three safe
 upstream response headers cross the service boundary. Bodies are capped at 8 KiB and never logged.
@@ -78,7 +78,7 @@ TLS, trusted proxy handling, CORS, and production service authentication require
 Tests use synthetic identifiers only. They cover liveness minimization, request-ID validation,
 correlated error envelopes, production documentation defaults, log allowlisting, the OpenAPI
 contract, fail-closed upstream behavior, enumeration-safe forwarding, and an in-process local
-login/refresh/logout flow through Gateway and Identity Service.
+login/session-snapshot/refresh/logout flow through Gateway and Identity Service.
 
 ## Logs and security
 

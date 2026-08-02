@@ -14,7 +14,7 @@ from api_gateway.application.identity import (
 )
 
 _PATH_PATTERN = re.compile(
-    r"^/api/v1/auth/(?:login|refresh|logout|logout-all|mfa/enroll|"
+    r"^/api/v1/auth/(?:login|refresh|logout|logout-all|session/snapshot|mfa/enroll|"
     r"sessions/[0-9a-f-]{36}/revoke)$"
 )
 _SAFE_RESPONSE_HEADERS = frozenset({"content-type", "retry-after", "x-request-id"})

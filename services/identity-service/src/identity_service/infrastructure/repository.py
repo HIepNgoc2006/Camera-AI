@@ -15,6 +15,7 @@ from identity_service.domain.auth import (
     MfaFactor,
     MfaState,
     RefreshRecord,
+    RefreshRotationResult,
     RefreshState,
     SessionRecord,
 )
@@ -162,6 +163,62 @@ class PostgresAuthRepository:
         except Exception:
             raise AuthenticationError("AUTH_DEPENDENCY_UNAVAILABLE") from None
 
+    def active_session(
+        self, *, expected: SessionRecord, observed_at: datetime
+    ) -> SessionRecord | None:
+        try:
+            with self._engine.connect() as connection:
+                row = (
+                    connection.execute(
+                        sa.select(sessions).where(
+                            *_session_binding_predicates(expected),
+                            sessions.c.revoked_at.is_(None),
+                            sessions.c.expires_at > observed_at,
+                            sessions.c.inactivity_expires_at > observed_at,
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                return None if row is None else _session(row)
+        except Exception:
+            raise AuthenticationError("AUTH_DEPENDENCY_UNAVAILABLE") from None
+
+    def touch_session_activity(
+        self,
+        *,
+        expected: SessionRecord,
+        activity_at: datetime,
+        inactivity_expires_at: datetime,
+    ) -> SessionRecord | None:
+        if inactivity_expires_at <= activity_at:
+            return None
+        try:
+            with self._engine.begin() as connection:
+                row = (
+                    connection.execute(
+                        sessions.update()
+                        .where(
+                            *_session_binding_predicates(expected),
+                            sessions.c.revoked_at.is_(None),
+                            sessions.c.expires_at > activity_at,
+                            sessions.c.inactivity_expires_at > activity_at,
+                            sessions.c.last_activity_at <= activity_at,
+                            sessions.c.expires_at >= inactivity_expires_at,
+                        )
+                        .values(
+                            last_activity_at=activity_at,
+                            inactivity_expires_at=inactivity_expires_at,
+                        )
+                        .returning(*sessions.c)
+                    )
+                    .mappings()
+                    .first()
+                )
+                return None if row is None else _session(row)
+        except Exception:
+            raise AuthenticationError("AUTH_DEPENDENCY_UNAVAILABLE") from None
+
     def role_codes(self, user_id: UUID) -> frozenset[str]:
         try:
             with self._engine.connect() as connection:
@@ -187,22 +244,69 @@ class PostgresAuthRepository:
         *,
         previous: RefreshRecord,
         replacement: RefreshRecord,
+        expected_session: SessionRecord,
         rotated_at: datetime,
-    ) -> bool:
+        inactivity_expires_at: datetime,
+    ) -> RefreshRotationResult:
+        if (
+            inactivity_expires_at <= rotated_at
+            or previous.session_id != expected_session.session_id
+            or previous.family_id != expected_session.family_id
+            or replacement.session_id != expected_session.session_id
+            or replacement.family_id != expected_session.family_id
+        ):
+            return RefreshRotationResult.INACTIVE
         try:
             with self._engine.begin() as connection:
-                updated = connection.execute(
-                    refresh_tokens.update()
-                    .where(
-                        refresh_tokens.c.refresh_id == previous.refresh_id,
-                        refresh_tokens.c.state == RefreshState.ACTIVE.value,
+                # All revocation paths lock session state before refresh state. Keep
+                # that order here to avoid a refresh/logout deadlock.
+                session_row = (
+                    connection.execute(
+                        sa.select(
+                            sessions.c.revoked_at,
+                            sessions.c.expires_at,
+                            sessions.c.inactivity_expires_at,
+                            sessions.c.last_activity_at,
+                        )
+                        .where(*_session_binding_predicates(expected_session))
+                        .with_for_update()
                     )
+                    .mappings()
+                    .first()
+                )
+                if (
+                    session_row is None
+                    or session_row["revoked_at"] is not None
+                    or session_row["expires_at"] <= rotated_at
+                    or session_row["inactivity_expires_at"] <= rotated_at
+                    or session_row["last_activity_at"] > rotated_at
+                    or session_row["expires_at"] < inactivity_expires_at
+                ):
+                    return RefreshRotationResult.INACTIVE
+                current_state = connection.execute(
+                    sa.select(refresh_tokens.c.state)
+                    .where(refresh_tokens.c.refresh_id == previous.refresh_id)
+                    .with_for_update()
+                ).scalar_one_or_none()
+                if current_state == RefreshState.ROTATED.value:
+                    return RefreshRotationResult.REPLAYED
+                if current_state != RefreshState.ACTIVE.value:
+                    return RefreshRotationResult.INACTIVE
+                connection.execute(
+                    sessions.update()
+                    .where(sessions.c.session_id == previous.session_id)
+                    .values(
+                        last_activity_at=rotated_at,
+                        inactivity_expires_at=inactivity_expires_at,
+                    )
+                )
+                connection.execute(
+                    refresh_tokens.update()
+                    .where(refresh_tokens.c.refresh_id == previous.refresh_id)
                     .values(state=RefreshState.ROTATED.value, rotated_at=rotated_at)
                 )
-                if updated.rowcount != 1:
-                    return False
                 connection.execute(refresh_tokens.insert().values(**_refresh_values(replacement)))
-                return True
+                return RefreshRotationResult.ROTATED
         except Exception:
             raise AuthenticationError("AUTH_DEPENDENCY_UNAVAILABLE") from None
 
@@ -344,9 +448,24 @@ def _session_values(value: SessionRecord) -> dict[str, object]:
         "school_id": value.school_id,
         "mfa_verified": value.mfa_verified,
         "issued_at": value.issued_at,
+        "last_activity_at": value.last_activity_at,
+        "inactivity_expires_at": value.inactivity_expires_at,
         "expires_at": value.expires_at,
         "revoked_at": value.revoked_at,
     }
+
+
+def _session_binding_predicates(value: SessionRecord) -> tuple[sa.ColumnElement[bool], ...]:
+    return (
+        sessions.c.session_id == value.session_id,
+        sessions.c.family_id == value.family_id,
+        sessions.c.user_id == value.user_id,
+        sessions.c.tenant_id == value.tenant_id,
+        sessions.c.school_id.is_not_distinct_from(value.school_id),
+        sessions.c.mfa_verified == value.mfa_verified,
+        sessions.c.issued_at == value.issued_at,
+        sessions.c.expires_at == value.expires_at,
+    )
 
 
 def _refresh_values(value: RefreshRecord) -> dict[str, object]:
@@ -371,6 +490,8 @@ def _session(row: sa.RowMapping) -> SessionRecord:
         school_id=row["school_id"],
         mfa_verified=bool(row["mfa_verified"]),
         issued_at=row["issued_at"],
+        last_activity_at=row["last_activity_at"],
+        inactivity_expires_at=row["inactivity_expires_at"],
         expires_at=row["expires_at"],
         revoked_at=row["revoked_at"],
     )
