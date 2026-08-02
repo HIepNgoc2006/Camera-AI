@@ -1,9 +1,9 @@
-import { LoginPlaceholder } from "@/features/auth/components/login-placeholder";
+import { LoginPanel } from "@/features/auth/components/login-panel";
 
 export default function LoginPage() {
   return (
     <main className="centered-page">
-      <LoginPlaceholder />
+      <LoginPanel />
     </main>
   );
 }

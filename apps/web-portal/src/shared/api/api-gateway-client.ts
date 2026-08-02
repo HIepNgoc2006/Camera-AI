@@ -13,7 +13,10 @@ export class ApiGatewayConfigurationError extends Error {
 export class ApiGatewayResponseError extends Error {
   readonly code = "API_GATEWAY_RESPONSE_ERROR";
 
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly upstreamErrorCode: string | null = null,
+  ) {
     super("API Gateway request failed.");
     this.name = "ApiGatewayResponseError";
   }
@@ -97,10 +100,37 @@ export function createApiGatewayClient(
       );
 
       if (!response.ok) {
-        throw new ApiGatewayResponseError(response.status);
+        throw new ApiGatewayResponseError(
+          response.status,
+          await readStableErrorCode(response),
+        );
       }
 
       return (await response.json()) as TResponse;
     },
   };
+}
+
+async function readStableErrorCode(response: Response): Promise<string | null> {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("application/json")) {
+    return null;
+  }
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      !Array.isArray(body) &&
+      typeof (body as Record<string, unknown>).error_code === "string" &&
+      /^[A-Z][A-Z0-9_]{2,63}$/.test(
+        (body as Record<string, unknown>).error_code as string,
+      )
+    ) {
+      return (body as Record<string, string>).error_code;
+    }
+  } catch {
+    // Error bodies are never surfaced or logged.
+  }
+  return null;
 }

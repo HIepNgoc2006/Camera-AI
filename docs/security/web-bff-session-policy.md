@@ -89,9 +89,27 @@ The checker must pass the synthetic positive/negative matrix. Web tests must cov
 versions, every state transition, either-expiry boundary, malformed and client-augmented snapshots,
 and same-origin redirects. Secret scanning must find no credential/session value.
 
-Rollback is code/config revert to the fail-closed null session seam. Do not roll back by enabling a
+Rollback is code/config revert to the fail-closed inactive server boundary. Do not roll back by enabling a
 readable cookie, browser token storage, plain non-loopback HTTP, relaxed CSRF/origin validation,
 longer Web-owned timeout, cached authorization, or direct service access. Production activation needs
 Issue #70 completion, an Identity-owned absolute/inactivity snapshot contract, named Security/Ops
 approval, an approved cookie/timeout profile, secret-provider wiring, exact-head review, and a
 deployment change/rollback record.
+
+## Issue 70 implementation boundary
+
+The Web Portal contains the policy-aligned server orchestration and browser UI. The BFF exposes
+same-origin session-challenge, login, logout, and logout-all handlers; validates exact Origin and a
+session-bound anti-CSRF value; rotates the opaque cookie after login; keeps refresh inside an atomic
+server-store transaction; consumes only `identity_session_snapshot_v1`; and maps the result into
+`web_bff_session_policy_v1` before the existing `rbac_policy_v1` route/action guard runs. Browser
+responses contain only stable UI state, a permitted anti-CSRF submission value, and allowlisted
+navigation destinations.
+
+The repository intentionally supplies an inactive server composition. A real server-side session
+store, authoritative permission-snapshot provider, named warning profile, production secret
+provider, hosting configuration, and deployment/change record are not included. Until those gates
+are separately reviewed and wired, the BFF returns `SESSION_UNAVAILABLE`, issues no session cookie,
+and every protected route remains closed. Do not replace that default with an in-memory production
+store, browser token custody, role-name permission inference, a Web-owned timeout, or a readable
+cookie.

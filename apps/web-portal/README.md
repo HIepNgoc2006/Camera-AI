@@ -4,7 +4,9 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
 
 ## Scope
 
-- Public `/login` placeholder that does not collect credentials.
+- Public `/login` UI for credential submission and deterministic MFA state.
+- Same-origin BFF route handlers for session challenge, login, logout and
+  logout-all. Browser code never calls API Gateway directly.
 - Server-side guarded `/app` shell with a versioned, permission-aware,
   default-deny route policy.
 - Public `/not-authorized` fallback.
@@ -12,11 +14,14 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   snapshot as route decisions.
 - One typed API Gateway client boundary under `src/shared/api/`.
 - Fake/session-neutral tests only.
-- Versioned `web_bff_session_policy_v1` contract, synthetic negative canaries,
-  and strict server-snapshot mapping. Runtime session integration remains absent.
+- Versioned `web_bff_session_policy_v1` orchestration, exact
+  `identity_session_snapshot_v1` adapter, synthetic negative canaries, strict
+  server-snapshot mapping, cookie fixation protection, and CSRF/origin checks.
 
-Real authentication, MFA, business dashboards, sensitive data, evidence media,
-analytics, hosting and production deployment are intentionally out of scope.
+Production session-store/authorization/warning-profile provider wiring, real
+credentials, business dashboards, sensitive data, evidence media, analytics,
+hosting and deployment are intentionally out of scope. The checked-in server
+boundary remains inactive and fails closed until that separate activation gate.
 
 ## Runtime
 
@@ -43,10 +48,13 @@ Copy `.env.example` to an ignored local environment file and replace the reserve
 `.invalid` placeholder with the local API Gateway URL:
 
 ```text
-NEXT_PUBLIC_API_GATEWAY_URL=https://api-gateway.example.invalid/
+API_GATEWAY_URL=https://api-gateway.example.invalid/
+WEB_BFF_EXPECTED_ORIGIN=https://web-portal.example.invalid/
+WEB_BFF_SESSION_COOKIE_NAME=__Host-camera-ai-session
 ```
 
-The API client rejects missing or malformed values, embedded credentials, query
+All three values are server-only; none uses the `NEXT_PUBLIC_` prefix. The API
+client rejects missing or malformed values, embedded credentials, query
 parameters, fragments and non-loopback plain HTTP URLs. Error messages never echo
 the configured value.
 
@@ -65,9 +73,10 @@ npm run quality
 
 ## Security notes
 
-- `readSessionSnapshot` deliberately returns `null`, so protected routes remain
-  closed until Issue #70 implements the approved server-only Identity/BFF
-  integration for `web_bff_session_policy_v1`.
+- `readSessionSnapshot` now reads only the server BFF boundary. The checked-in
+  composition is deliberately inactive, so protected routes remain closed until
+  an approved server-side store, `rbac_policy_v1` snapshot provider, warning
+  profile, secret provider and deployment record are wired.
 - The policy source is
   `packages/web-bff-session-policy/web-bff-session-policy-v1.json`; the
   code-coupled operator/developer runbook is
@@ -89,6 +98,12 @@ npm run quality
   is not an authorization mechanism.
 - Redirect destinations and reason codes are internal allowlists. The guard
   never accepts or echoes a client-provided return URL.
+- Unsafe BFF methods require the exact configured Origin plus a session-bound
+  CSRF header. Login rotates the opaque cookie; refresh executes inside the
+  session-store transaction so concurrent requests cannot replay one token.
+- Session warnings are computed from the approved warning timestamp and the
+  Identity-owned expiry instants. Rendering a warning never polls, refreshes or
+  extends the session.
 - UI actions use `isUiActionVisible` and default to hidden, but route/UI guards
   do not replace backend object-level authorization, purpose/consent checks or
   audit.
