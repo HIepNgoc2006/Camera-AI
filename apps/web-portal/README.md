@@ -12,6 +12,8 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   snapshot as route decisions.
 - One typed API Gateway client boundary under `src/shared/api/`.
 - Fake/session-neutral tests only.
+- Versioned `web_bff_session_policy_v1` contract, synthetic negative canaries,
+  and strict server-snapshot mapping. Runtime session integration remains absent.
 
 Real authentication, MFA, business dashboards, sensitive data, evidence media,
 analytics, hosting and production deployment are intentionally out of scope.
@@ -64,7 +66,18 @@ npm run quality
 ## Security notes
 
 - `readSessionSnapshot` deliberately returns `null`, so protected routes remain
-  closed until the approved Identity integration replaces that seam.
+  closed until Issue #70 implements the approved server-only Identity/BFF
+  integration for `web_bff_session_policy_v1`.
+- The policy source is
+  `packages/web-bff-session-policy/web-bff-session-policy-v1.json`; the
+  code-coupled operator/developer runbook is
+  `../../docs/security/web-bff-session-policy.md`.
+- Access/refresh material remains server-only. The browser must not put tokens,
+  MFA values, authorization state, or cookie values in localStorage,
+  sessionStorage, readable cookies, URLs, HTML, analytics, logs, or client state.
+- The route guard requires exact BFF and RBAC policy versions, strict
+  actor/tenant/school/MFA fields, authoritative UTC expiry timestamps, and a
+  non-expired session. Unknown fields and stale/malformed snapshots fail closed.
 - Protected route groups are evaluated in server App Router layouts and remain
   dynamic. Public routes are explicit; unknown routes, policy versions,
   permissions and malformed snapshots fail closed.

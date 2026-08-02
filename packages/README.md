@@ -24,6 +24,9 @@ Các contract hiện có:
 - `abuse-protection-policy/abuse-protection-policy-v1.json`: baseline machine-readable, chưa kích
   hoạt production, cho boundary DDoS/provider, API/login/ANSVIS/export/evidence abuse, safe
   degradation và mapping sang issue triển khai; checker khóa drift ngưỡng từ các authority hiện có.
+- `web-bff-session-policy/web-bff-session-policy-v1.json`: baseline machine-readable chưa kích hoạt
+  cho browser/BFF/API Gateway/Identity boundary, token custody, cookie, CSRF/origin, redirect,
+  session/MFA/expiry/revocation state và fail-closed degradation; không chứa cookie/token/secret thật.
 - `ai-shadow-review-policy/ai-shadow-review-policy-v1.json`: baseline machine-readable fail-closed
   cho lifecycle shadow/review/production gate của Facial Recognition và bốn custom pipeline; runtime
   vẫn disabled, không tự động tạo kết luận kỷ luật và không kích hoạt task/model/camera production.

@@ -40,6 +40,9 @@ Các entry point hiện có:
 - `check_metrics_registry.py`: kiểm registry `metrics_registry_v1` — baseline metric đầy đủ,
   cardinality trong giới hạn, label không mang identifier, bucket histogram tăng dần; chỉ in tên
   metric và số lượng.
+- `check_web_bff_session_policy.py`: kiểm boundary Browser/BFF/API Gateway/Identity, server-only token
+  custody, cookie, CSRF/origin, redirect, session/MFA/expiry/revocation state, timeout authority và
+  synthetic negative canary; không tạo/đọc cookie, token, secret, credential hoặc session thật.
 
 Xem `docs/quality-gates.md`, `docs/project-progress.md`,
 `docs/security/repository-protection.md`, `docs/security/secret-scanning.md` và

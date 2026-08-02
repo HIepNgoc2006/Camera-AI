@@ -1,0 +1,276 @@
+{
+  "policy_schema_version": 1,
+  "policy_id": "web_bff_session_policy_v1",
+  "policy_version": "web_bff_session_policy_v1",
+  "status": "implementation_baseline_inactive",
+  "runtime_activation": "blocked_pending_issue_70_named_security_ops_approval_and_deployment_change_record",
+  "default_decision": "deny",
+  "data_classes": {
+    "critical": [
+      "password",
+      "access_token",
+      "refresh_token",
+      "mfa_secret_or_code",
+      "session_cookie_value",
+      "csrf_secret",
+      "session_signing_or_encryption_secret"
+    ],
+    "high_or_critical": [
+      "session_status",
+      "actor_tenant_school_binding",
+      "mfa_result",
+      "permission_snapshot",
+      "expiry_revocation_and_device_metadata"
+    ],
+    "medium": ["sanitized_policy_metadata", "synthetic_test_state"]
+  },
+  "authoritative_sources": {
+    "identity_session": {
+      "owner": "identity_service",
+      "policy_version": "session_policy_v1",
+      "owns": [
+        "credential_verification",
+        "mfa_verification",
+        "access_and_refresh_lifetimes",
+        "absolute_and_inactivity_expiry",
+        "refresh_rotation_and_replay_revocation",
+        "session_and_family_revocation"
+      ]
+    },
+    "authorization": {
+      "owner": "authorization_runtime_and_backend_resource_owner",
+      "policy_version": "rbac_policy_v1",
+      "owns": [
+        "permission_catalog",
+        "tenant_school_and_object_scope",
+        "purpose_and_consent_checks",
+        "sensitive_action_audit"
+      ]
+    }
+  },
+  "trust_boundaries": {
+    "browser": {
+      "may_hold": [
+        "rendered_non_sensitive_ui_state",
+        "opaque_same_origin_navigation_state",
+        "session_bound_anti_csrf_submission_value"
+      ],
+      "must_not_hold": [
+        "password_after_submission",
+        "access_token",
+        "refresh_token",
+        "mfa_secret_or_code_after_submission",
+        "client_authored_role_permission_tenant_school_actor_or_expiry",
+        "session_cookie_value_in_script_readable_state"
+      ]
+    },
+    "web_bff": {
+      "owns": [
+        "same_origin_browser_boundary",
+        "http_only_cookie_issue_and_clear",
+        "csrf_and_origin_validation",
+        "safe_redirect_allowlist",
+        "server_session_snapshot_validation",
+        "stable_non_enumerating_web_state"
+      ],
+      "must_not_own": [
+        "credential_source_of_truth",
+        "identity_lifetime_extension",
+        "client_side_token_custody",
+        "final_business_object_authorization"
+      ]
+    },
+    "api_gateway": {
+      "owns": [
+        "only_backend_entrypoint_for_web_bff",
+        "request_correlation",
+        "gateway_auth_transport_and_rate_limit_policy"
+      ],
+      "must_not_own": ["browser_cookie_custody", "final_business_object_authorization"]
+    },
+    "identity_service": {
+      "owns": [
+        "password_and_mfa_verification",
+        "access_and_refresh_material",
+        "session_refresh_family_and_revocation_state",
+        "authoritative_session_expiry_metadata"
+      ],
+      "must_not_own": ["browser_rendering", "web_redirect_selection"]
+    }
+  },
+  "token_custody": {
+    "access_and_refresh_material_location": "server_only_web_bff_or_identity_boundary",
+    "browser_storage_allowed": false,
+    "browser_readable_cookie_allowed": false,
+    "url_query_fragment_or_html_allowed": false,
+    "analytics_or_client_state_allowed": false,
+    "log_trace_audit_or_error_allowed": false
+  },
+  "session_cookie": {
+    "value_source": "opaque_server_generated_value_not_recorded_in_policy",
+    "http_only": true,
+    "same_site": "Strict",
+    "path": "/",
+    "domain_attribute": "absent_host_only",
+    "secure_transport": {
+      "production_and_non_loopback": "required",
+      "plaintext_http": "loopback_development_only",
+      "downgrade_behavior": "reject_and_clear_if_safe"
+    },
+    "name_profile": {
+      "production_and_non_loopback": "server_configured_name_with___Host-_prefix",
+      "loopback_plaintext_development": "separate_nonproduction_server_configured_name"
+    },
+    "lifetime_source": "identity_service_authoritative_expiry_only",
+    "web_may_extend_lifetime": false,
+    "cache_control": "private, no-store"
+  },
+  "csrf_and_origin": {
+    "unsafe_methods": ["POST", "PUT", "PATCH", "DELETE"],
+    "origin_required": true,
+    "allowed_origin_source": "server_side_exact_same_origin_allowlist",
+    "wildcard_or_null_origin_allowed": false,
+    "session_bound_anti_csrf_value_required": true,
+    "anti_csrf_value_locations": ["request_header", "form_field"],
+    "anti_csrf_value_forbidden_locations": [
+      "url_query",
+      "url_fragment",
+      "local_storage",
+      "session_storage",
+      "log_trace_audit_or_error"
+    ],
+    "failure_behavior": "deny_without_identity_or_session_detail"
+  },
+  "safe_redirects": {
+    "source": "server_side_route_code_allowlist",
+    "allowed_shapes": ["root_relative_path_without_authority", "allowlisted_route_code"],
+    "forbidden_shapes": [
+      "absolute_url",
+      "scheme_relative_url",
+      "backslash_path",
+      "encoded_separator_or_dot_segment",
+      "client_supplied_return_target"
+    ],
+    "fallback": "/login"
+  },
+  "session_snapshot": {
+    "policy_version_required": "web_bff_session_policy_v1",
+    "authorization_policy_version_required": "rbac_policy_v1",
+    "states": [
+      "unauthenticated",
+      "mfa_required",
+      "mfa_failed",
+      "authenticated",
+      "expired",
+      "revoked",
+      "unavailable",
+      "malformed"
+    ],
+    "authenticated_required_fields": [
+      "policyVersion",
+      "status",
+      "actorId",
+      "tenantId",
+      "schoolId",
+      "mfaState",
+      "issuedAt",
+      "absoluteExpiresAt",
+      "inactivityExpiresAt",
+      "warningStartsAt",
+      "authorization"
+    ],
+    "server_authoritative_fields": [
+      "actorId",
+      "tenantId",
+      "schoolId",
+      "mfaState",
+      "issuedAt",
+      "absoluteExpiresAt",
+      "inactivityExpiresAt",
+      "warningStartsAt",
+      "authorization.policyVersion",
+      "authorization.permissions"
+    ],
+    "client_authored_authority_allowed": false,
+    "cookie_presence_is_authorization": false,
+    "backend_reauthorization_required": true
+  },
+  "timeout_contract": {
+    "absolute_timeout_owner": "identity_service",
+    "inactivity_timeout_owner": "identity_service",
+    "warning_timestamp_owner": "identity_service_or_named_approved_runtime_profile",
+    "numeric_duration_values_in_web_policy": false,
+    "web_may_invent_or_extend_lifetime": false,
+    "boundary_rule": "now_at_or_after_either_expiry_is_expired",
+    "missing_or_invalid_metadata_behavior": "malformed_deny",
+    "warning_behavior": "display_only_never_refresh_or_extend"
+  },
+  "state_decisions": {
+    "unauthenticated": "login_required",
+    "mfa_required": "mfa_challenge_required",
+    "mfa_failed": "mfa_challenge_failed_non_enumerating",
+    "authenticated": "allow_route_guard_evaluation_after_server_validation",
+    "expired": "clear_session_and_login_required",
+    "revoked": "clear_session_and_login_required",
+    "unavailable": "deny_with_stable_unavailable_state",
+    "malformed": "deny_with_stable_malformed_state"
+  },
+  "refresh_and_revocation": {
+    "refresh_rotation_required": true,
+    "rotated_refresh_replay_behavior": "revoke_family_clear_cookie_and_deny",
+    "refresh_dependency_unavailable_behavior": "deny_without_stale_session_extension",
+    "logout_behavior": "identity_revoke_then_clear_cookie",
+    "logout_all_behavior": "identity_revoke_all_then_clear_cookie",
+    "clear_cookie_without_confirmed_revoke": "allowed_only_as_local_deny_not_as_revocation_success",
+    "concurrent_device_behavior": "independent_server_sessions_logout_all_revokes_all_current_user_sessions"
+  },
+  "stable_web_states": {
+    "login_required": "AUTH_REQUIRED",
+    "mfa_required": "MFA_REQUIRED",
+    "mfa_failed": "AUTH_FAILED",
+    "expired_or_revoked": "AUTH_REQUIRED",
+    "malformed": "SESSION_INVALID",
+    "dependency_unavailable": "SESSION_UNAVAILABLE",
+    "csrf_or_origin_failed": "REQUEST_REJECTED"
+  },
+  "forbidden_observability_fields": [
+    "password",
+    "access_token",
+    "refresh_token",
+    "authorization_header",
+    "cookie_header_or_value",
+    "mfa_secret_or_code",
+    "csrf_value",
+    "client_authored_authorization_state",
+    "full_request_or_response_body",
+    "url_query_or_fragment",
+    "personal_or_biometric_data"
+  ],
+  "required_canaries": [
+    "browser_storage_token",
+    "readable_session_cookie",
+    "cookie_transport_downgrade",
+    "missing_origin_check",
+    "missing_csrf_check",
+    "unsafe_redirect_target",
+    "token_logging",
+    "client_authored_authorization",
+    "missing_timeout_authority",
+    "refresh_replay",
+    "revoked_session",
+    "dependency_unavailable"
+  ],
+  "review_record": {
+    "customer_or_production_data_used": false,
+    "credential_or_session_value_recorded": false,
+    "runtime_or_production_activation_included": false,
+    "activation_requires": [
+      "issue_70_runtime_implementation_and_tests",
+      "identity_session_snapshot_contract_with_absolute_and_inactivity_expiry",
+      "named_security_ops_approval",
+      "approved_cookie_and_timeout_runtime_profile",
+      "production_secret_provider",
+      "deployment_change_and_rollback_record"
+    ]
+  }
+}
