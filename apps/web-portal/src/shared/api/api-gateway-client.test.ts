@@ -101,4 +101,27 @@ describe("createApiGatewayClient", () => {
       new ApiGatewayResponseError(403),
     );
   });
+
+  it("retains only a validated stable upstream error code", async () => {
+    const client = createApiGatewayClient(
+      "https://gateway.example.invalid/",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error_code: "AUTH_MFA_REQUIRED",
+            message: "detail that must not be exposed",
+            request_id: "synthetic-request",
+          }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    await expect(client.request("/auth/login")).rejects.toEqual(
+      new ApiGatewayResponseError(401, "AUTH_MFA_REQUIRED"),
+    );
+  });
 });

@@ -518,7 +518,7 @@ def evaluate_case(case: dict[str, Any], forbidden_fields: set[str]) -> str:
 
 
 def validate_implementation(root: Path) -> list[str]:
-    """Check the tracked Web mapping, fail-closed seam, runbook, and quality gate."""
+    """Check the tracked Web mapping, fail-closed boundary, runbook, and quality gate."""
 
     errors: list[str] = []
     try:
@@ -578,8 +578,17 @@ def validate_implementation(root: Path) -> list[str]:
             "implementation browser custody marker",
             errors,
         )
-    _expect("return null;" in session_seam, "fail-closed session seam", errors)
-    _expect(POLICY_VERSION in session_seam, "session seam policy version", errors)
+    _expect(
+        "boundary.service.read" in session_seam,
+        "server-only session reader boundary",
+        errors,
+    )
+    _expect(
+        "inactiveBffAuthService" in auth_sources and "SESSION_UNAVAILABLE" in auth_sources,
+        "fail-closed inactive runtime",
+        errors,
+    )
+    _expect(POLICY_VERSION in auth_sources, "implementation policy version", errors)
     _expect(POLICY_VERSION in runbook, "runbook policy version", errors)
     _expect(
         "Runtime status: inactive and fail-closed" in runbook,
