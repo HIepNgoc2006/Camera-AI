@@ -36,6 +36,7 @@ def quality_commands(python: str) -> dict[str, tuple[Command, ...]]:
         "metrics-registry": ((python, "scripts/check_metrics_registry.py"),),
         "queue-policy": ((python, "scripts/check_queue_policy.py"),),
         "abuse-protection-policy": ((python, "scripts/check_abuse_protection_policy.py"),),
+        "web-bff-session-policy": ((python, "scripts/check_web_bff_session_policy.py"),),
         "web": ((npm, "--prefix", "apps/web-portal", "run", "quality"),),
         "lint": (
             (python, "-m", "ruff", "check", "scripts", "services", "packages", "workers"),
@@ -236,6 +237,7 @@ def selected_commands(gate: str, python: str) -> tuple[Command, ...]:
                 "metrics-registry",
                 "queue-policy",
                 "abuse-protection-policy",
+                "web-bff-session-policy",
                 "web",
                 "lint",
                 "typecheck",
@@ -268,6 +270,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "metrics-registry",
             "queue-policy",
             "abuse-protection-policy",
+            "web-bff-session-policy",
             "web",
             "lint",
             "typecheck",

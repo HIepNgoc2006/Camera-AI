@@ -10,6 +10,7 @@ import {
   PERMISSION_CODES,
   PROTECTED_ROUTE_POLICIES,
   resolveRouteAccess,
+  WEB_BFF_SESSION_POLICY_VERSION,
   type PermissionCode,
   type SessionSnapshot,
 } from "./route-access";
@@ -29,8 +30,16 @@ function fakeAuthenticatedSession(
   permissions: readonly PermissionCode[],
 ): SessionSnapshot {
   return {
+    policyVersion: WEB_BFF_SESSION_POLICY_VERSION,
     status: "authenticated",
     actorId: FAKE_ACTOR_ID,
+    tenantId: "tenant_test_001",
+    schoolId: "school_test_001",
+    mfaState: "verified",
+    issuedAt: "2020-01-01T00:00:00.000Z",
+    warningStartsAt: "2098-12-31T23:00:00.000Z",
+    inactivityExpiresAt: "2099-01-01T00:00:00.000Z",
+    absoluteExpiresAt: "2099-02-01T00:00:00.000Z",
     authorization: {
       policyVersion: AUTHORIZATION_POLICY_VERSION,
       permissions,
@@ -131,6 +140,27 @@ describe("resolveRouteAccess", () => {
     },
   ])("fails malformed session state closed to login", (session) => {
     expect(resolveRouteAccess({ pathname: "/app", session })).toEqual({
+      kind: "redirect",
+      destination: "/login",
+      reason: "auth-required",
+    });
+  });
+
+  it("fails closed at the authoritative inactivity-expiry boundary", () => {
+    const session = {
+      ...fakeAuthenticatedSession(["attendance.view_metadata"]),
+      warningStartsAt: "2026-08-02T02:30:00.000Z",
+      inactivityExpiresAt: "2026-08-02T03:00:00.000Z",
+      absoluteExpiresAt: "2026-08-02T04:00:00.000Z",
+    };
+
+    expect(
+      resolveRouteAccess({
+        pathname: "/app",
+        session,
+        now: new Date("2026-08-02T03:00:00.000Z"),
+      }),
+    ).toEqual({
       kind: "redirect",
       destination: "/login",
       reason: "auth-required",

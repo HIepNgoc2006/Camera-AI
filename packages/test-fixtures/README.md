@@ -20,3 +20,9 @@ event type plus invalid schema, time-window, media/base64, authentication, idemp
 cases. `ansvis/timestamps.synthetic.json` is the
 compatibility matrix for `time_policy_v1`; it contains fake instants only and no raw event body. Run
 `python scripts/quality.py all` before review.
+
+`web-bff-session/web-bff-session-policy-cases.synthetic.json` contains only synthetic state and
+control canaries. It never contains a password, token, MFA value, cookie value, user, tenant, school,
+session, endpoint, or production timeout. The checker rejects unsafe browser custody, cookie
+downgrade, missing CSRF/origin checks, open redirects, token logging, client-authored authority,
+refresh replay, and fail-open dependency behavior.

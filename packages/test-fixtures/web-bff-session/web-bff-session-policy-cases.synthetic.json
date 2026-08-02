@@ -1,0 +1,110 @@
+{
+  "_fixture": "SYNTHETIC_TEST_DATA_ONLY",
+  "fixture_id": "test_web_bff_session_policy_v1_cases",
+  "policy_version": "web_bff_session_policy_v1",
+  "cases": [
+    {
+      "case_id": "test_authenticated_server_snapshot",
+      "category": "session_state",
+      "input": {
+        "state": "authenticated",
+        "policy_version": "web_bff_session_policy_v1",
+        "authorization_policy_version": "rbac_policy_v1",
+        "source": "server_validated",
+        "absolute_expiry": "future",
+        "inactivity_expiry": "future"
+      },
+      "expected_decision": "allow_route_guard"
+    },
+    {
+      "case_id": "test_mfa_required",
+      "category": "session_state",
+      "input": {"state": "mfa_required", "source": "server_validated"},
+      "expected_decision": "mfa_challenge"
+    },
+    {
+      "case_id": "test_expired_session",
+      "category": "session_state",
+      "input": {"state": "authenticated", "absolute_expiry": "past", "source": "server_validated"},
+      "expected_decision": "deny"
+    },
+    {
+      "case_id": "test_revoked_session",
+      "category": "session_state",
+      "input": {"state": "revoked", "source": "server_validated"},
+      "expected_decision": "deny"
+    },
+    {
+      "case_id": "test_dependency_unavailable",
+      "category": "session_state",
+      "input": {"state": "unavailable", "source": "server_validated"},
+      "expected_decision": "unavailable"
+    },
+    {
+      "case_id": "test_browser_storage_token",
+      "category": "custody",
+      "input": {"access_material_location": "local_storage"},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_readable_session_cookie",
+      "category": "cookie",
+      "input": {"http_only": false, "secure": true, "same_site": "Strict", "host_only": true},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_cookie_transport_downgrade",
+      "category": "cookie",
+      "input": {"http_only": true, "secure": false, "same_site": "Strict", "host_only": true, "environment": "production"},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_missing_origin_check",
+      "category": "csrf",
+      "input": {"unsafe_method": true, "origin_validated": false, "csrf_validated": true},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_missing_csrf_check",
+      "category": "csrf",
+      "input": {"unsafe_method": true, "origin_validated": true, "csrf_validated": false},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_safe_same_origin_redirect",
+      "category": "redirect",
+      "input": {"target": "/app", "source": "server_allowlist"},
+      "expected_decision": "allow"
+    },
+    {
+      "case_id": "test_unsafe_redirect_target",
+      "category": "redirect",
+      "input": {"target": "//redirect.invalid/path", "source": "client"},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_token_logging",
+      "category": "observability",
+      "input": {"fields": ["request_id", "access_token"]},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_client_authored_authorization",
+      "category": "authority",
+      "input": {"source": "client", "fields": ["actorId", "tenantId", "authorization.permissions"]},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_missing_timeout_authority",
+      "category": "timeout",
+      "input": {"owner": "web_client", "web_extends_lifetime": true},
+      "expected_decision": "reject"
+    },
+    {
+      "case_id": "test_refresh_replay",
+      "category": "refresh",
+      "input": {"rotated_token_replayed": true},
+      "expected_decision": "revoke_and_deny"
+    }
+  ]
+}

@@ -28,6 +28,7 @@ def test_all_expands_each_supported_gate_in_order() -> None:
         *commands["metrics-registry"],
         *commands["queue-policy"],
         *commands["abuse-protection-policy"],
+        *commands["web-bff-session-policy"],
         *commands["web"],
         *commands["lint"],
         *commands["typecheck"],

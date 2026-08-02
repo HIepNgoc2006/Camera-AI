@@ -1,4 +1,6 @@
 export const AUTHORIZATION_POLICY_VERSION = "rbac_policy_v1" as const;
+export const WEB_BFF_SESSION_POLICY_VERSION =
+  "web_bff_session_policy_v1" as const;
 
 export const PERMISSION_CODES = [
   "school_profile.view_metadata",
@@ -47,10 +49,26 @@ export interface PermissionSnapshot {
 }
 
 export interface AuthenticatedSessionSnapshot {
+  readonly policyVersion: typeof WEB_BFF_SESSION_POLICY_VERSION;
   readonly status: "authenticated";
   readonly actorId: string;
+  readonly tenantId: string;
+  readonly schoolId: string;
+  readonly mfaState: "verified" | "not_required";
+  readonly issuedAt: string;
+  readonly absoluteExpiresAt: string;
+  readonly inactivityExpiresAt: string;
+  readonly warningStartsAt: string;
   readonly authorization: PermissionSnapshot;
 }
+
+export type AuthenticatedSessionSnapshotValidation =
+  | {
+      readonly kind: "active";
+      readonly session: AuthenticatedSessionSnapshot;
+    }
+  | { readonly kind: "expired" }
+  | { readonly kind: "invalid" };
 
 export type SessionSnapshot =
   | AuthenticatedSessionSnapshot
@@ -146,11 +164,13 @@ export type RouteAccessDecision =
 export interface RouteAccessRequest {
   readonly pathname: string;
   readonly session: unknown;
+  readonly now?: Date;
 }
 
 export interface UiActionVisibilityRequest {
   readonly session: unknown;
   readonly requiredPermission: PermissionCode;
+  readonly now?: Date;
 }
 
 const PUBLIC_ROUTE_SET = new Set<string>(PUBLIC_ROUTES);
@@ -167,12 +187,16 @@ const REDIRECT_DESTINATION_BY_REASON = {
 export function resolveRouteAccess({
   pathname,
   session,
+  now = new Date(),
 }: RouteAccessRequest): RouteAccessDecision {
   if (PUBLIC_ROUTE_SET.has(pathname)) {
     return { kind: "allow" };
   }
 
-  const authenticatedSession = parseAuthenticatedSession(session);
+  const authenticatedSession = validateAuthenticatedSessionSnapshot(
+    session,
+    now,
+  );
   if (!authenticatedSession) {
     return {
       kind: "redirect",
@@ -208,8 +232,12 @@ export function resolveRouteAccess({
 export function isUiActionVisible({
   session,
   requiredPermission,
+  now = new Date(),
 }: UiActionVisibilityRequest): boolean {
-  const authenticatedSession = parseAuthenticatedSession(session);
+  const authenticatedSession = validateAuthenticatedSessionSnapshot(
+    session,
+    now,
+  );
 
   return (
     authenticatedSession?.authorization.permissions.includes(
@@ -229,32 +257,140 @@ export function buildInternalRedirect(
   return `${destination}?${search.toString()}`;
 }
 
-function parseAuthenticatedSession(
+export function validateAuthenticatedSessionSnapshot(
   session: unknown,
+  now: Date,
 ): AuthenticatedSessionSnapshot | null {
-  if (!isRecord(session) || session.status !== "authenticated") {
-    return null;
+  const validation = evaluateAuthenticatedSessionSnapshot(session, now);
+  return validation.kind === "active" ? validation.session : null;
+}
+
+export function evaluateAuthenticatedSessionSnapshot(
+  session: unknown,
+  now: Date,
+): AuthenticatedSessionSnapshotValidation {
+  if (
+    !isRecord(session) ||
+    !hasExactKeys(session, [
+      "absoluteExpiresAt",
+      "actorId",
+      "authorization",
+      "inactivityExpiresAt",
+      "issuedAt",
+      "mfaState",
+      "policyVersion",
+      "schoolId",
+      "status",
+      "tenantId",
+      "warningStartsAt",
+    ]) ||
+    session.policyVersion !== WEB_BFF_SESSION_POLICY_VERSION ||
+    session.status !== "authenticated"
+  ) {
+    return { kind: "invalid" };
   }
 
   if (
-    typeof session.actorId !== "string" ||
-    session.actorId.length === 0 ||
-    session.actorId.length > MAX_ACTOR_ID_LENGTH ||
-    session.actorId.trim() !== session.actorId
+    !isOpaqueIdentifier(session.actorId) ||
+    !isOpaqueIdentifier(session.tenantId) ||
+    !isOpaqueIdentifier(session.schoolId) ||
+    (session.mfaState !== "verified" && session.mfaState !== "not_required")
   ) {
-    return null;
+    return { kind: "invalid" };
   }
 
   const authorization = session.authorization;
   if (
     !isRecord(authorization) ||
+    !hasExactKeys(authorization, ["permissions", "policyVersion"]) ||
     authorization.policyVersion !== AUTHORIZATION_POLICY_VERSION ||
     !isValidPermissionSnapshot(authorization.permissions)
+  ) {
+    return { kind: "invalid" };
+  }
+
+  const timeline = evaluateSessionTimeline(session, now);
+  if (timeline === "invalid") {
+    return { kind: "invalid" };
+  }
+  if (timeline === "expired") {
+    return { kind: "expired" };
+  }
+
+  return {
+    kind: "active",
+    session: session as unknown as AuthenticatedSessionSnapshot,
+  };
+}
+
+function isOpaqueIdentifier(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_ACTOR_ID_LENGTH &&
+    value.trim() === value &&
+    /^[A-Za-z0-9._:-]+$/u.test(value)
+  );
+}
+
+function evaluateSessionTimeline(
+  session: Record<string, unknown>,
+  now: Date,
+): "active" | "expired" | "invalid" {
+  if (!Number.isFinite(now.getTime())) {
+    return "invalid";
+  }
+
+  const issuedAt = parseUtcInstant(session.issuedAt);
+  const absoluteExpiresAt = parseUtcInstant(session.absoluteExpiresAt);
+  const inactivityExpiresAt = parseUtcInstant(session.inactivityExpiresAt);
+  const warningStartsAt = parseUtcInstant(session.warningStartsAt);
+  if (
+    issuedAt === null ||
+    absoluteExpiresAt === null ||
+    inactivityExpiresAt === null ||
+    warningStartsAt === null
+  ) {
+    return "invalid";
+  }
+
+  const nowTime = now.getTime();
+  const effectiveExpiry = Math.min(absoluteExpiresAt, inactivityExpiresAt);
+  if (
+    issuedAt > nowTime ||
+    warningStartsAt < issuedAt ||
+    warningStartsAt >= effectiveExpiry
+  ) {
+    return "invalid";
+  }
+
+  return nowTime < effectiveExpiry ? "active" : "expired";
+}
+
+function parseUtcInstant(value: unknown): number | null {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)
   ) {
     return null;
   }
 
-  return session as unknown as AuthenticatedSessionSnapshot;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value
+    ? parsed
+    : null;
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  const keys = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    keys.length === sortedExpected.length &&
+    keys.every((key, index) => key === sortedExpected[index])
+  );
 }
 
 function findProtectedRoutePolicy(
