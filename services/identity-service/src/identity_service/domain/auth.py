@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from enum import StrEnum
 from uuid import UUID
 
@@ -22,6 +22,12 @@ class RefreshState(StrEnum):
     ACTIVE = "active"
     ROTATED = "rotated"
     REVOKED = "revoked"
+
+
+class RefreshRotationResult(StrEnum):
+    ROTATED = "rotated"
+    REPLAYED = "replayed"
+    INACTIVE = "inactive"
 
 
 class MfaState(StrEnum):
@@ -59,6 +65,8 @@ class SessionRecord:
     school_id: UUID | None
     mfa_verified: bool
     issued_at: datetime
+    last_activity_at: datetime
+    inactivity_expires_at: datetime
     expires_at: datetime
     revoked_at: datetime | None = None
 
@@ -73,15 +81,36 @@ class SessionRecord:
         if self.school_id is not None:
             _require_opaque_id(self.school_id, "school_id")
         _require_aware(self.issued_at, "issued_at")
+        _require_aware(self.last_activity_at, "last_activity_at")
+        _require_aware(self.inactivity_expires_at, "inactivity_expires_at")
         _require_aware(self.expires_at, "expires_at")
         if self.expires_at <= self.issued_at:
+            raise AuthDomainError("AUTH_SESSION_INVALID")
+        if not (
+            self.issued_at <= self.last_activity_at <= self.inactivity_expires_at <= self.expires_at
+        ):
             raise AuthDomainError("AUTH_SESSION_INVALID")
         if self.revoked_at is not None:
             _require_aware(self.revoked_at, "revoked_at")
 
     def is_active(self, at: datetime) -> bool:
         _require_aware(at, "at")
-        return self.revoked_at is None and at < self.expires_at
+        return self.revoked_at is None and at < self.inactivity_expires_at and at < self.expires_at
+
+    def touched(self, *, at: datetime, inactivity_lifetime: timedelta) -> SessionRecord:
+        _require_aware(at, "at")
+        if inactivity_lifetime <= timedelta(0) or not self.is_active(at):
+            raise AuthDomainError("AUTH_SESSION_INACTIVE")
+        if at < self.last_activity_at:
+            raise AuthDomainError("AUTH_SESSION_CLOCK_INVALID")
+        inactivity_expires_at = min(at + inactivity_lifetime, self.expires_at)
+        if inactivity_expires_at <= at:
+            raise AuthDomainError("AUTH_SESSION_INACTIVE")
+        return replace(
+            self,
+            last_activity_at=at,
+            inactivity_expires_at=inactivity_expires_at,
+        )
 
 
 @dataclass(frozen=True, slots=True)

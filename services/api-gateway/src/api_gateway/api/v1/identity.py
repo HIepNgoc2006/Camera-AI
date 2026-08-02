@@ -92,6 +92,11 @@ async def logout(request: Request) -> Response:
     return await _forward(request, "/api/v1/auth/logout")
 
 
+@router.post("/session/snapshot")
+async def session_snapshot(request: Request) -> Response:
+    return await _forward(request, "/api/v1/auth/session/snapshot")
+
+
 @router.post("/logout-all")
 async def logout_all(request: Request) -> Response:
     return await _forward(request, "/api/v1/auth/logout-all")

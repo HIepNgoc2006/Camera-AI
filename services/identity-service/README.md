@@ -29,9 +29,10 @@ Authentication routes:
 | Route | Authentication/permission | Audit intent |
 |---|---|---|
 | `POST /api/v1/auth/login` | Gateway context; password; TOTP for `admin`/`bgh` | `AUTH_LOGIN_SUCCEEDED` or `AUTH_LOGIN_FAILED` |
-| `POST /api/v1/auth/refresh` | Active, unrotated refresh token | `SESSION_REVOKED` on replay |
+| `POST /api/v1/auth/refresh` | Active, unrotated refresh token inside both expiry boundaries | `SESSION_REVOKED` on replay |
 | `POST /api/v1/auth/logout` | Active bearer session | `SESSION_REVOKED` |
 | `POST /api/v1/auth/logout-all` | Active bearer session; own user only | `SESSION_REVOKED` |
+| `POST /api/v1/auth/session/snapshot` | Active bearer session through Gateway | None; returns minimized authoritative expiry/binding metadata |
 | `POST /api/v1/auth/mfa/enroll` | Active bearer; current TOTP proof | `MFA_CHANGED` |
 | `POST /api/v1/auth/sessions/{session_id}/revoke` | MFA-verified `admin` | `SESSION_REVOKED` |
 
@@ -57,11 +58,16 @@ a dedicated storage/transport threat review and must never make them client-faci
 
 ## Database and events
 
-The first Alembic migration owns only schema `identity` and creates `users`, `credentials`, `roles`,
+The Alembic chain owns only schema `identity`. Its first migration creates `users`, `credentials`, `roles`,
 `user_role_assignments`, `sessions`, `refresh_tokens`, `mfa_factors`, and `audit_outbox`. Other
 services must not query this schema. Passwords use Argon2id hashes, refresh tokens use one-way
 SHA-256 hashes over purpose-bound high-entropy values, login lookup uses a dedicated HMAC key, and
 TOTP secrets use ENCV1 with record/tenant/field AAD. No plaintext credential or token is persisted.
+
+The follow-up session-expiry migration adds non-null `last_activity_at` and
+`inactivity_expires_at` fields plus a bounded-window constraint. Sessions created before that
+contract are backfilled at the closed inactivity boundary and must authenticate again; guessed
+activity is never used to preserve them.
 
 Session and refresh mutation plus its audit intent are committed in one PostgreSQL transaction.
 Rotated refresh records are retained until credential-retention expiry so replay can revoke the
@@ -100,6 +106,24 @@ IDs, tenant binding, and live session-state verification. Signing material is in
 approved secret provider; it has no default or value in Git. Refresh tokens are cryptographically
 random, only their hashes are stored, and every use rotates the token. Replay of a rotated token
 revokes the affected token family and writes a `SESSION_REVOKED` audit intent.
+
+Identity owns a 30-day absolute session lifetime and a 30-minute inactivity lifetime by default.
+Both boundaries are exclusive: `now >= expires_at` or `now >= inactivity_expires_at` denies access.
+Successful authenticated access and refresh may move `last_activity_at` forward and extend only the
+inactivity boundary, capped by the absolute expiry. PostgreSQL updates are conditional and refresh
+rotation locks session state before refresh state, so a concurrent expiry or revocation cannot
+revive a session or be misreported as token replay. The gateway-only snapshot response is versioned
+as `identity_session_snapshot_v1`, uses canonical millisecond UTC instants, and contains only session,
+actor, tenant, optional school, MFA state, issue time, and the two expiry instants plus request ID. It never
+contains token, cookie, credential, permission, biometric, or evidence data.
+
+Snapshot reads validate live state but do not update activity or either expiry. This preserves the
+Web policy rule that display-only warning polls cannot keep a session alive. Only an authenticated
+operation recorded as activity or a successful refresh may move the inactivity boundary.
+
+Rollback must not restore the older absolute-only behavior for a live session. Downgrading the
+session-expiry migration first revokes every remaining session, then removes the inactivity fields;
+operators must expect mandatory reauthentication and must not bypass that step with manual DDL.
 
 Logout, account disablement, password change, role-risk change, suspected compromise, and retention
 expiry must revoke applicable sessions. Tokens must never appear in URLs, query strings, logs,
@@ -156,7 +180,8 @@ staging, or production database URI into this test.
 ```
 
 Tests use fixed synthetic UUIDs and generic labels only. They cover domain invariants, migration
-ownership/rollback, non-enumerating failures, Argon2id, refresh rotation/replay, logout and
+ownership/rollback, non-enumerating failures, Argon2id, refresh rotation/replay, absolute and
+inactivity expiry boundaries, monotonic activity updates, the sanitized snapshot contract, logout and
 administrative revocation, TOTP/ENCV1 handling, account/source throttle boundaries, limiter
 dependency failure, cross-tenant/expired/revoked/clock-skew tokens, forbidden credential fields,
 request correlation, sanitized errors, OpenAPI exposure, and log allowlisting.

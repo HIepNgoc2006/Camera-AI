@@ -16,6 +16,7 @@ from identity_service.domain.auth import (
     MfaFactor,
     MfaState,
     RefreshRecord,
+    RefreshRotationResult,
     RefreshState,
     SessionRecord,
 )
@@ -68,6 +69,45 @@ class InMemoryAuthRepository:
         with self._lock:
             return self._sessions.get(session_id)
 
+    def active_session(
+        self, *, expected: SessionRecord, observed_at: datetime
+    ) -> SessionRecord | None:
+        with self._lock:
+            session = self._sessions.get(expected.session_id)
+            return (
+                session
+                if session is not None
+                and _same_session_binding(session, expected)
+                and session.is_active(observed_at)
+                else None
+            )
+
+    def touch_session_activity(
+        self,
+        *,
+        expected: SessionRecord,
+        activity_at: datetime,
+        inactivity_expires_at: datetime,
+    ) -> SessionRecord | None:
+        with self._lock:
+            session = self._sessions.get(expected.session_id)
+            if (
+                session is None
+                or not _same_session_binding(session, expected)
+                or not session.is_active(activity_at)
+                or activity_at < session.last_activity_at
+                or inactivity_expires_at <= activity_at
+                or inactivity_expires_at > session.expires_at
+            ):
+                return None
+            touched = replace(
+                session,
+                last_activity_at=activity_at,
+                inactivity_expires_at=inactivity_expires_at,
+            )
+            self._sessions[expected.session_id] = touched
+            return touched
+
     def role_codes(self, user_id: UUID) -> frozenset[str]:
         with self._lock:
             for subject in self._subjects.values():
@@ -80,19 +120,45 @@ class InMemoryAuthRepository:
         *,
         previous: RefreshRecord,
         replacement: RefreshRecord,
+        expected_session: SessionRecord,
         rotated_at: datetime,
-    ) -> bool:
+        inactivity_expires_at: datetime,
+    ) -> RefreshRotationResult:
         with self._lock:
+            if (
+                previous.session_id != expected_session.session_id
+                or previous.family_id != expected_session.family_id
+                or replacement.session_id != expected_session.session_id
+                or replacement.family_id != expected_session.family_id
+            ):
+                return RefreshRotationResult.INACTIVE
             current = self._refresh.get(previous.token_hash)
+            if current is not None and current.state is RefreshState.ROTATED:
+                return RefreshRotationResult.REPLAYED
             if current is None or current.state is not RefreshState.ACTIVE:
-                return False
+                return RefreshRotationResult.INACTIVE
+            session = self._sessions.get(previous.session_id)
+            if (
+                session is None
+                or not _same_session_binding(session, expected_session)
+                or not session.is_active(rotated_at)
+                or rotated_at < session.last_activity_at
+                or inactivity_expires_at <= rotated_at
+                or inactivity_expires_at > session.expires_at
+            ):
+                return RefreshRotationResult.INACTIVE
+            self._sessions[session.session_id] = replace(
+                session,
+                last_activity_at=rotated_at,
+                inactivity_expires_at=inactivity_expires_at,
+            )
             self._refresh[previous.token_hash] = replace(
                 current,
                 state=RefreshState.ROTATED,
                 rotated_at=rotated_at,
             )
             self._refresh[replacement.token_hash] = replacement
-            return True
+            return RefreshRotationResult.ROTATED
 
     def revoke_family(self, *, family_id: UUID, revoked_at: datetime, audit: AuditIntent) -> None:
         with self._lock:
@@ -150,6 +216,19 @@ class InMemoryAuthRepository:
     def record_audit(self, audit: AuditIntent) -> None:
         with self._lock:
             self.audit_intents.append(audit)
+
+
+def _same_session_binding(current: SessionRecord, expected: SessionRecord) -> bool:
+    return (
+        current.session_id == expected.session_id
+        and current.family_id == expected.family_id
+        and current.user_id == expected.user_id
+        and current.tenant_id == expected.tenant_id
+        and current.school_id == expected.school_id
+        and current.mfa_verified == expected.mfa_verified
+        and current.issued_at == expected.issued_at
+        and current.expires_at == expected.expires_at
+    )
 
 
 class InMemoryLoginRateLimiter:

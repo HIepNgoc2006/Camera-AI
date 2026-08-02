@@ -97,6 +97,17 @@ def test_client_logs_in_refreshes_and_logs_out_only_through_gateway() -> None:
         )
         assert login.status_code == 200
         pair = login.json()
+        snapshot = client.post(
+            "/api/v1/auth/session/snapshot",
+            headers={
+                "X-Request-ID": REQUEST_ID,
+                "Authorization": f"Bearer {pair['access_token']}",
+            },
+        )
+        assert snapshot.status_code == 200
+        assert snapshot.json()["policyVersion"] == "identity_session_snapshot_v1"
+        assert pair["access_token"] not in snapshot.text
+        assert pair["refresh_token"] not in snapshot.text
         refreshed = client.post(
             "/api/v1/auth/refresh",
             headers={"X-Request-ID": REQUEST_ID},
