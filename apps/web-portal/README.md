@@ -9,6 +9,10 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   logout-all. Browser code never calls API Gateway directly.
 - Server-side guarded `/app` shell with a versioned, permission-aware,
   default-deny route policy.
+- Protected `/app/attendance` view with bounded day/class/cursor/limit filters,
+  deterministic loading/empty/unavailable/validation/denied/success states,
+  sanitized attendance view-model types, and permission-aware correction entry
+  points.
 - Public `/not-authorized` fallback.
 - Reusable UI-action visibility checks that use the same validated permission
   snapshot as route decisions.
@@ -18,10 +22,12 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   `identity_session_snapshot_v1` adapter, synthetic negative canaries, strict
   server-snapshot mapping, cookie fixation protection, and CSRF/origin checks.
 
-Production session-store/authorization/warning-profile provider wiring, real
-credentials, business dashboards, sensitive data, evidence media, analytics,
-hosting and deployment are intentionally out of scope. The checked-in server
-boundary remains inactive and fails closed until that separate activation gate.
+Production session-store/authorization/warning-profile provider wiring, live
+attendance reads/corrections, real credentials, other business dashboards,
+sensitive data, evidence media, analytics, hosting and deployment are
+intentionally out of scope. The checked-in session and attendance server
+boundaries remain inactive and fail closed until their separate activation
+gates.
 
 ## Runtime
 
@@ -71,6 +77,30 @@ npm run quality
 
 `npm run quality` is also called by the repository quality gate.
 
+## Attendance route
+
+`/app/attendance` requires the exact server session snapshot and
+`attendance.view_metadata`. The page accepts only these query parameters:
+
+| Parameter | Boundary                                                                |
+| --------- | ----------------------------------------------------------------------- |
+| `day`     | Canonical `YYYY-MM-DD`, no future date; defaults to the current UTC day |
+| `classId` | Optional canonical UUID; narrowing only                                 |
+| `cursor`  | Optional opaque value, 16–512 characters                                |
+| `limit`   | Integer `1..100`; defaults to `25`                                      |
+
+School, tenant, actor, guardian/linked-child and permission scope are never
+accepted from the browser. They come only from the authoritative server
+session/provider boundary.
+
+The approved API Gateway `GET /api/v1/attendance` baseline currently returns
+only opaque resource summaries and does not define the day/status/display
+fields required by the screen. The checked-in provider therefore returns the
+stable unavailable state. Present/late/absent/pending-review success rendering
+is exercised with synthetic providers in tests only; no fixture is presented as
+live data. Correction and linked-child UI remain hidden until both their exact
+permissions/contracts and an approved runtime activation are present.
+
 ## Security notes
 
 - `readSessionSnapshot` now reads only the server BFF boundary. The checked-in
@@ -109,6 +139,12 @@ npm run quality
   audit.
 - Feature code must use the typed API Gateway client; it must not call internal
   services, databases, queues or object storage directly.
+- Attendance route filters can only narrow provider-authorized scope. The page
+  revalidates the exact session before any provider call; denied/missing records
+  use one non-enumerating state and provider errors never echo upstream details.
+- Attendance records use a strict sanitized allowlist. Face/biometric fields,
+  evidence/media, raw ANSVIS data, internal producer identifiers, credentials
+  and browser persistence are prohibited.
 - Do not persist access tokens or sensitive records in browser storage.
 - Do not render untrusted HTML or add real people, face, camera or evidence data
   to fixtures.
