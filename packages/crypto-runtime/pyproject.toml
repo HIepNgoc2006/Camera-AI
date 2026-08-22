@@ -9,7 +9,7 @@ description = "ENCV1 field encryption and LOOKUP-V1 exact-lookup runtime for the
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "cryptography==49.0.0",
+    "cryptography==50.0.0",
 ]
 
 [project.optional-dependencies]

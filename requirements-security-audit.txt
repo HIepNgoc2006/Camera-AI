@@ -3,7 +3,7 @@
 alembic==1.18.5
 argon2-cffi==25.1.0
 bandit==1.9.4
-cryptography==49.0.0
+cryptography==50.0.0
 fastapi==0.139.0
 httpx==0.28.1
 httpx2==2.7.0
