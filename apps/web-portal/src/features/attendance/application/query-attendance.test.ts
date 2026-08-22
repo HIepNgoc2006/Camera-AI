@@ -130,7 +130,16 @@ describe("queryAttendanceView", () => {
         capabilities: INACTIVE_CAPABILITIES,
         now: NOW,
       }),
-    ).resolves.toEqual({ kind: "unavailable" });
+    ).resolves.toEqual({
+      kind: "unavailable",
+      query: {
+        day: "2026-08-22",
+        classId: null,
+        cursor: null,
+        limit: 25,
+      },
+      canCorrect: false,
+    });
   });
 
   it("derives provider scope only from the authoritative session", async () => {
@@ -244,17 +253,28 @@ describe("queryAttendanceView", () => {
       read: async () => result,
     };
 
-    await expect(
-      queryAttendanceView({
-        session: fakeSession(["attendance.view_metadata"]),
-        rawQuery: {},
-        provider,
-        capabilities: READ_CAPABILITIES,
-        now: NOW,
-      }),
-    ).resolves.toEqual({
-      kind: result.kind === "denied_or_not_found" ? "denied" : "unavailable",
+    const state = await queryAttendanceView({
+      session: fakeSession(["attendance.view_metadata"]),
+      rawQuery: {},
+      provider,
+      capabilities: READ_CAPABILITIES,
+      now: NOW,
     });
+
+    expect(state).toEqual(
+      result.kind === "denied_or_not_found"
+        ? { kind: "denied" }
+        : {
+            kind: "unavailable",
+            query: {
+              day: "2026-08-22",
+              classId: null,
+              cursor: null,
+              limit: 25,
+            },
+            canCorrect: false,
+          },
+    );
   });
 
   it("does not expose thrown provider error details", async () => {
@@ -272,7 +292,16 @@ describe("queryAttendanceView", () => {
         capabilities: READ_CAPABILITIES,
         now: NOW,
       }),
-    ).resolves.toEqual({ kind: "unavailable" });
+    ).resolves.toEqual({
+      kind: "unavailable",
+      query: {
+        day: "2026-08-22",
+        classId: null,
+        cursor: null,
+        limit: 25,
+      },
+      canCorrect: false,
+    });
   });
 
   it.each([
@@ -305,6 +334,15 @@ describe("queryAttendanceView", () => {
         capabilities: READ_CAPABILITIES,
         now: NOW,
       }),
-    ).resolves.toEqual({ kind: "unavailable" });
+    ).resolves.toEqual({
+      kind: "unavailable",
+      query: {
+        day: "2026-08-22",
+        classId: null,
+        cursor: null,
+        limit: 25,
+      },
+      canCorrect: false,
+    });
   });
 });

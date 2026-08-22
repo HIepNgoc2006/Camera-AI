@@ -42,7 +42,11 @@ export interface AttendanceReadProvider {
 
 export type AttendanceViewState =
   | { readonly kind: "denied" }
-  | { readonly kind: "unavailable" }
+  | {
+      readonly kind: "unavailable";
+      readonly query: AttendanceQuery;
+      readonly canCorrect: false;
+    }
   | {
       readonly kind: "validation";
       readonly errorCode: "ATTENDANCE_FILTER_INVALID";
@@ -101,7 +105,7 @@ export async function queryAttendanceView({
   }
 
   if (capabilities.readActive !== true) {
-    return { kind: "unavailable" };
+    return unavailableState(queryValidation.query);
   }
 
   let result: AttendanceProviderResult;
@@ -115,22 +119,22 @@ export async function queryAttendanceView({
       },
     });
   } catch {
-    return { kind: "unavailable" };
+    return unavailableState(queryValidation.query);
   }
 
   if (!isValidProviderResult(result)) {
-    return { kind: "unavailable" };
+    return unavailableState(queryValidation.query);
   }
   if (result.kind === "denied_or_not_found") {
     return { kind: "denied" };
   }
   if (result.kind === "unavailable") {
-    return { kind: "unavailable" };
+    return unavailableState(queryValidation.query);
   }
 
   const page = readSafeAttendancePage(result.page, queryValidation.query);
   if (!page) {
-    return { kind: "unavailable" };
+    return unavailableState(queryValidation.query);
   }
 
   const canCorrect =
@@ -150,6 +154,10 @@ export async function queryAttendanceView({
     page,
     canCorrect,
   };
+}
+
+function unavailableState(query: AttendanceQuery): AttendanceViewState {
+  return { kind: "unavailable", query, canCorrect: false };
 }
 
 function isValidProviderResult(
