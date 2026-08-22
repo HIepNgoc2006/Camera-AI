@@ -140,9 +140,33 @@ button:disabled {
 }
 
 .shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 1rem 2rem;
   border-bottom: 1px solid #dbe4f0;
   background: #ffffff;
+}
+
+.shell-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.shell-nav a {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  color: #4a5870;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.shell-nav a[aria-current="page"] {
+  background: #e8f1fd;
+  color: #204f8a;
 }
 
 .shell-main {
@@ -248,6 +272,23 @@ button:disabled {
 .attendance-results {
   display: grid;
   gap: 1.25rem;
+}
+
+.attendance-loading {
+  display: grid;
+  gap: 0.5rem;
+  min-height: 8rem;
+  place-content: center;
+  padding: 1.5rem;
+  border: 1px solid #dbe4f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: #34435a;
+  text-align: center;
+}
+
+.attendance-loading span {
+  color: #5d6b82;
 }
 
 .attendance-summary {
@@ -387,6 +428,11 @@ button:disabled {
   .attendance-heading {
     display: grid;
     gap: 0.75rem;
+  }
+
+  .shell-header {
+    align-items: flex-start;
+    padding: 1rem;
   }
 
   .attendance-filters,
