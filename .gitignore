@@ -100,6 +100,7 @@ desktop.ini
 .codex/
 .agents/
 .local/
+.worktrees/
 
 # Local planning/reference workspace; implementation delivery stays focused
 AGENTS.md
