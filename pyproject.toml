@@ -22,9 +22,11 @@ files = [
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
+    "services/attendance-service/src",
     "services/timekeeping-service/src",
     "services/notification-service/src",
     "services/evidence-service/src",
+    "services/report-service/src",
     "workers/event-outbox-worker/src",
 ]
 pretty = true
@@ -41,9 +43,11 @@ mypy_path = [
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
+    "services/attendance-service/src",
     "services/timekeeping-service/src",
     "services/notification-service/src",
     "services/evidence-service/src",
+    "services/report-service/src",
     "workers/event-outbox-worker/src",
 ]
 
@@ -69,9 +73,11 @@ testpaths = [
     "services/consent-service/tests",
     "services/camera-registry-service/tests",
     "services/ansvis-adapter/tests",
+    "services/attendance-service/tests",
     "services/timekeeping-service/tests",
     "services/notification-service/tests",
     "services/evidence-service/tests",
+    "services/report-service/tests",
     "workers/event-outbox-worker/tests",
 ]
 pythonpath = [
@@ -87,9 +93,11 @@ pythonpath = [
     "services/consent-service/src",
     "services/camera-registry-service/src",
     "services/ansvis-adapter/src",
+    "services/attendance-service/src",
     "services/timekeeping-service/src",
     "services/notification-service/src",
     "services/evidence-service/src",
+    "services/report-service/src",
     "workers/event-outbox-worker/src",
 ]
 addopts = ["--strict-config", "--strict-markers", "--import-mode=importlib"]

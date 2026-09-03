@@ -3,6 +3,7 @@
 .gitignore
 .codex
 .agents
+.codegraph
 
 # Environment files and secrets; examples are documentation, not image inputs
 .env
