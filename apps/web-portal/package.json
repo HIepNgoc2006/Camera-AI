@@ -33,8 +33,16 @@
     "vitest": "4.1.10"
   },
   "overrides": {
+    "js-yaml": "4.3.1",
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.18"
+    },
+    "minimatch@10.2.6": {
+      "brace-expansion": "5.0.9"
+    },
+    "nanoid": "3.3.18",
     "next": {
-      "postcss": "8.5.18",
+      "postcss": "8.5.25",
       "sharp": "0.35.0"
     }
   }
