@@ -46,13 +46,13 @@ def test_runner_propagates_a_failing_command_status() -> None:
 def test_direct_discovery_covers_quality_runner_services() -> None:
     config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     commands = quality_commands("python")
-    service_test_targets = {
+    unit_service_test_targets = {
         argument
         for command in commands["unit"]
         for argument in command
         if argument.startswith("services/") and argument.endswith("/tests")
     }
-    service_source_targets = {
+    mypy_service_source_targets = {
         argument
         for command in commands["typecheck"]
         for argument in command
@@ -61,8 +61,39 @@ def test_direct_discovery_covers_quality_runner_services() -> None:
 
     pytest_config = config["tool"]["pytest"]["ini_options"]
     mypy_config = config["tool"]["mypy"]
+    pytest_service_testpaths = {
+        target
+        for target in pytest_config["testpaths"]
+        if target.startswith("services/") and target.endswith("/tests")
+    }
+    pytest_service_pythonpath = {
+        target
+        for target in pytest_config["pythonpath"]
+        if target.startswith("services/") and target.endswith("/src")
+    }
+    configured_mypy_service_sources = {
+        target
+        for target in mypy_config["files"]
+        if target.startswith("services/") and target.endswith("/src")
+    }
+    configured_mypy_service_import_roots = {
+        target
+        for target in mypy_config["mypy_path"]
+        if target.startswith("services/") and target.endswith("/src")
+    }
 
-    assert service_test_targets <= set(pytest_config["testpaths"])
-    assert service_source_targets <= set(pytest_config["pythonpath"])
-    assert service_source_targets <= set(mypy_config["files"])
-    assert service_source_targets <= set(mypy_config["mypy_path"])
+    assert unit_service_test_targets == pytest_service_testpaths
+    assert mypy_service_source_targets == pytest_service_pythonpath
+    assert mypy_service_source_targets == configured_mypy_service_sources
+    assert mypy_service_source_targets == configured_mypy_service_import_roots
+
+    for service in ("attendance-service", "report-service"):
+        source_target = f"services/{service}/src"
+        test_target = f"services/{service}/tests"
+
+        assert source_target in mypy_service_source_targets
+        assert source_target in pytest_service_pythonpath
+        assert source_target in configured_mypy_service_sources
+        assert source_target in configured_mypy_service_import_roots
+        assert test_target in unit_service_test_targets
+        assert test_target in pytest_service_testpaths
