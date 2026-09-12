@@ -34,7 +34,7 @@ permission to download or add packages.
 | Uvicorn | 0.51.0 | API Gateway, ANSVIS Adapter, Identity | https://github.com/Kludex/uvicorn | BSD-3-Clause | Recorded runtime-server exception |
 | pytest | 9.1.1 | Implemented service test suites | https://github.com/pytest-dev/pytest | MIT | Preferred |
 | pytest-asyncio | 1.4.0 | Repository async test support | https://github.com/pytest-dev/pytest-asyncio | Apache-2.0 | Recorded test-tool exception |
-| httpx2 | 2.7.0 | API Gateway, ANSVIS Adapter and Identity tests | https://github.com/pydantic/httpx2 | BSD-3-Clause | Recorded test-client exception |
+| httpx2 | 2.12.0 | API Gateway, ANSVIS Adapter and Identity tests | https://github.com/pydantic/httpx2 | BSD-3-Clause | Recorded test-client exception |
 | mypy | 2.3.0 | Repository type checking | https://github.com/python/mypy | MIT | Preferred |
 | Ruff | 0.15.21 | Repository lint and format checking | https://github.com/astral-sh/ruff | MIT | Preferred |
 | pip-audit | 2.10.1 | Python vulnerability audit | https://github.com/pypa/pip-audit | Apache-2.0 | Recorded security-tool exception |
@@ -44,6 +44,7 @@ permission to download or add packages.
 | PostCSS | 8.5.18 | Security override for the version bundled by Next.js | https://github.com/postcss/postcss | MIT | Exact override for fixed release |
 | sharp | 0.35.0 | Security override for the optional image runtime bundled by Next.js | https://github.com/lovell/sharp | Apache-2.0 | Exact override for fixed release |
 
-Versions are the environment resolved during the 2026-07-19 review. Service declarations may use
-compatible ranges, so dependency updates must re-resolve, re-verify upstream metadata, and update
-this table in the same implementation change.
+Unless a dependency row records a later scoped refresh, versions reflect the environment resolved
+during the 2026-07-19 review. The `httpx2` row was reverified and updated to 2.12.0 on 2026-09-12 by
+SEC-DEP-HTTPX2-001. Service declarations may use compatible ranges, so dependency updates must
+re-resolve, re-verify upstream metadata, and update this table in the same implementation change.
