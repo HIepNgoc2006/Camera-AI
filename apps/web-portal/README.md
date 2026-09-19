@@ -33,7 +33,7 @@ gates.
 
 - Node.js `24.17.0` from `.nvmrc`
 - npm `11.13.0`
-- Next.js `16.2.12`
+- Next.js `16.3.5`
 - React `19.2.8`
 - TypeScript `6.0.3`
 
