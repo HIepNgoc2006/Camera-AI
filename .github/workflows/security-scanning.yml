@@ -96,9 +96,13 @@ jobs:
           pip-audit --strict --cache-dir "$PIP_AUDIT_CACHE_DIR"
           --requirement requirements-security-audit.txt
 
-      - name: Audit Web Portal lockfile
+      - name: Audit Web Portal lockfile through the fail-closed gate
         working-directory: apps/web-portal
-        run: npm audit --audit-level=high --ignore-scripts
+        run: |
+          npm audit --json --ignore-scripts > "$GITHUB_WORKSPACE/.local/tmp/npm-audit.json" || true
+          python "$GITHUB_WORKSPACE/scripts/npm_audit_gate.py" \
+            --audit-json "$GITHUB_WORKSPACE/.local/tmp/npm-audit.json" \
+            --registry "$GITHUB_WORKSPACE/packages/security-scanning-policy/security-scanning-exceptions-v1.json"
 
       - name: Run Bandit high-severity gate
         run: bandit -q -r services packages workers scripts -lll

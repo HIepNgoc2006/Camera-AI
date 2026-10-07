@@ -83,9 +83,13 @@ Do not paste raw scanner logs into public issues. Record only package/rule ident
 affected implementation path, safe remediation summary, owner, and workflow URL. If a non-Critical
 temporary exception is unavoidable, add a reviewed entry to
 `security-scanning-exceptions-v1.json`; all required fields must be non-empty and `expires_on` must be
-an ISO date that has not passed. Expired exceptions fail CI. The registry does not suppress scanner
-execution by itself, so a scanner failure still fails closed until an explicitly reviewed scoped
-suppression mechanism is implemented.
+an ISO date that has not passed. Expired exceptions fail CI.
+
+The npm lockfile audit is enforced by `scripts/npm_audit_gate.py` over the captured
+`npm audit --json` report instead of npm's exit code alone. The gate fails closed on every advisory
+without a reviewed registry entry, on any critical severity regardless of entries, on unreadable or
+malformed reports, and on expired or misregistered exceptions. Python scanners (pip-audit, Bandit,
+OpenGrep, Trivy) have no suppression mechanism: their failures always fail closed.
 
 For a suspected scanner compromise or malicious package: stop the affected workflow/release lane,
 preserve only sanitized metadata, rotate any potentially exposed scanner credential through the
