@@ -384,7 +384,8 @@ function isSafeViolationCaseFields(
     isUtcInstant(value.occurredAt) &&
     occurredWithinWindow(value.occurredAt, query) &&
     typeof value.reviewStatus === "string" &&
-    value.reviewStatus in VIOLATION_CASE_STATUS_LOOKUP &&
+    Object.hasOwn(VIOLATION_CASE_STATUS_LOOKUP, value.reviewStatus) &&
+    (query.status === null || value.reviewStatus === query.status) &&
     value.reviewStatus !== "appealed" &&
     value.reviewStatus !== "corrected" &&
     typeof value.appealState === "string" &&

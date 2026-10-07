@@ -18,6 +18,36 @@ export const BFF_SESSION_STATES = [
 
 export type BffSessionState = (typeof BFF_SESSION_STATES)[number];
 
+export function evaluateLogoutResponse(
+  responseOk: boolean,
+  input: unknown,
+): "confirmed" | "reauthentication_required" | "unconfirmed" {
+  if (
+    !isRecord(input) ||
+    input.policyVersion !== WEB_BFF_SESSION_POLICY_VERSION
+  ) {
+    return "unconfirmed";
+  }
+  if (
+    responseOk &&
+    input.status === "unauthenticated" &&
+    input.errorCode === "AUTH_REQUIRED" &&
+    input.redirectTo === "/login"
+  ) {
+    return "confirmed";
+  }
+  if (
+    !responseOk &&
+    ((input.status === "unavailable" &&
+      input.errorCode === "SESSION_UNAVAILABLE") ||
+      (input.status === "unauthenticated" &&
+        input.errorCode === "REQUEST_REJECTED"))
+  ) {
+    return "reauthentication_required";
+  }
+  return "unconfirmed";
+}
+
 export type BffSessionEvaluation =
   | {
       readonly kind: "authenticated";

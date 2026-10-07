@@ -58,7 +58,7 @@ gates.
 
 - Node.js `24.17.0` from `.nvmrc`
 - npm `11.13.0`
-- Next.js `16.3.5`
+- Next.js `16.4.0`
 - React `19.2.8`
 - TypeScript `6.0.3`
 
@@ -302,8 +302,23 @@ quality, which remain separate gated scopes.
 - Redirect destinations and reason codes are internal allowlists. The guard
   never accepts or echoes a client-provided return URL.
 - Unsafe BFF methods require the exact configured Origin plus a session-bound
-  CSRF header. Login rotates the opaque cookie; refresh executes inside the
+  CSRF header. The server session store holds one random submission token and
+  its validation digest; session reads reuse it across tabs. Keep both server
+  fields out of logs, persistence exports and client authority snapshots; only
+  the submission token crosses the no-store challenge response. Login rotates
+  both token and opaque cookie; refresh preserves the challenge and executes inside the
   session-store transaction so concurrent requests cannot replay one token.
+- Invalid credentials return a generic authentication failure without requiring
+  MFA; actual MFA verification failures retain the MFA challenge. Logout-all
+  cannot complete from a pre-auth session. If upstream revocation cannot be
+  confirmed, the UI requires reauthentication and never claims other devices
+  have been logged out merely because a local session was cleared.
+- Native GET forms may submit empty optional class/status filters; these mean
+  no filter. Dates, cursors, limits, duplicate values and nonempty invalid
+  filters still fail closed. Violation list/detail status codes must be own
+  allowlist entries and returned list items must match any selected status.
+- Camera health without an observation timestamp cannot be reported as healthy;
+  explicit failure signals remain separate and no freshness threshold is invented.
 - Session warnings are computed from the approved warning timestamp and the
   Identity-owned expiry instants. Rendering a warning never polls, refreshes or
   extends the session.

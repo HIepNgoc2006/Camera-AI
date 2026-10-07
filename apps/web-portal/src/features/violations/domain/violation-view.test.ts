@@ -10,6 +10,26 @@ const CASE_ID = "00000000-0000-4000-8000-000000000073";
 const CURSOR = "cursor_fake_00001";
 
 describe("parseViolationQuery", () => {
+  it("accepts resetting a native GET status select to all", () => {
+    const query = Object.fromEntries(
+      new URLSearchParams(
+        "occurredFrom=2026-08-20&occurredTo=2026-08-21&status=",
+      ),
+    );
+    expect(parseViolationQuery(query, NOW)).toEqual(
+      parseViolationQuery(
+        { occurredFrom: "2026-08-20", occurredTo: "2026-08-21" },
+        NOW,
+      ),
+    );
+  });
+
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "rejects inherited status %s",
+    (status) => {
+      expect(parseViolationQuery({ status }, NOW).kind).toBe("invalid");
+    },
+  );
   it("requires a bounded occurred window and defaults page size", () => {
     expect(
       parseViolationQuery(
@@ -110,7 +130,7 @@ describe("parseViolationQuery", () => {
     {
       occurredFrom: "2026-08-20",
       occurredTo: "2026-08-21",
-      status: "",
+      status: ["", "confirmed"],
     },
     {
       occurredFrom: "2026-08-20",

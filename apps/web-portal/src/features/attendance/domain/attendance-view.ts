@@ -160,7 +160,7 @@ function readOptionalString(
   key: string,
 ): string | null | typeof INVALID_STRING {
   const value = input[key];
-  if (value === undefined) {
+  if (value === undefined || (key === "classId" && value === "")) {
     return null;
   }
   return typeof value === "string" && value.length > 0 ? value : INVALID_STRING;

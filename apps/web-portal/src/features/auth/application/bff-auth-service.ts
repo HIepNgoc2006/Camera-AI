@@ -74,11 +74,13 @@ export interface WarningTimestampProvider {
 
 type PreAuthSessionRecord = Readonly<{
   status: "unauthenticated" | "mfa_required" | "mfa_failed";
+  csrfToken: string;
   csrfDigest: Uint8Array;
 }>;
 
 type AuthenticatedSessionRecord = Readonly<{
   status: "authenticated";
+  csrfToken: string;
   csrfDigest: Uint8Array;
   tokens: IdentityTokenPair;
 }>;
@@ -183,17 +185,18 @@ export function createBffAuthService(
         return createPreAuthSession(dependencies.store);
       }
 
-      const csrfToken = newSecret();
       const transaction = await dependencies.store.transact(
         cookieValue,
         async (record) => {
+          const csrfToken = record.csrfToken;
           const resolved = await resolveRecord(record, dependencies, now);
           if (resolved.evaluation.kind === "authenticated") {
             return {
               action: "replace",
               record: {
                 status: "authenticated",
-                csrfDigest: digestSecret(csrfToken),
+                csrfToken,
+                csrfDigest: record.csrfDigest,
                 tokens: resolved.tokens,
               },
               result: resultFromEvaluation(
@@ -215,7 +218,8 @@ export function createBffAuthService(
                   resolved.evaluation.kind === "mfa_challenge"
                     ? resolved.evaluation.state
                     : "unauthenticated",
-                csrfDigest: digestSecret(csrfToken),
+                csrfToken,
+                csrfDigest: record.csrfDigest,
               },
               result: resultFromEvaluation(
                 resolved.evaluation,
@@ -279,7 +283,7 @@ export function createBffAuthService(
               : resolvedFailureMutation(record, resolved, now);
           }
           if (parsed === null) {
-            return failedLoginMutation(record.csrfDigest);
+            return failedLoginMutation(record);
           }
 
           let tokens: IdentityTokenPair;
@@ -287,13 +291,13 @@ export function createBffAuthService(
             tokens = await dependencies.identity.login(parsed);
           } catch (error) {
             if (isIdentityError(error, "AUTH_MFA_REQUIRED")) {
-              return stateMutation("mfa_required", record.csrfDigest);
+              return stateMutation("mfa_required", record);
             }
-            if (
-              isIdentityError(error, "AUTH_MFA_VERIFICATION_FAILED") ||
-              isIdentityError(error, "AUTH_CREDENTIAL_INVALID")
-            ) {
-              return failedLoginMutation(record.csrfDigest);
+            if (isIdentityError(error, "AUTH_MFA_VERIFICATION_FAILED")) {
+              return failedLoginMutation(record, true);
+            }
+            if (isIdentityError(error, "AUTH_CREDENTIAL_INVALID")) {
+              return failedLoginMutation(record);
             }
             return {
               action: "keep",
@@ -317,11 +321,13 @@ export function createBffAuthService(
               ),
             };
           }
+          const rotatedCsrfToken = newSecret();
           return {
             action: "rotate",
             record: {
               status: "authenticated",
-              csrfDigest: digestSecret(newSecret()),
+              csrfToken: rotatedCsrfToken,
+              csrfDigest: digestSecret(rotatedCsrfToken),
               tokens: resolved.tokens,
             },
             result: resultFromEvaluation(
@@ -350,6 +356,9 @@ export function createBffAuthService(
             return { action: "keep", result: rejectedResult() };
           }
           if (record.status !== "authenticated") {
+            if (allDevices) {
+              return { action: "keep", result: rejectedResult() };
+            }
             return {
               action: "delete",
               result: simpleResult("unauthenticated", { kind: "clear" }),
@@ -387,6 +396,7 @@ async function createPreAuthSession(
   try {
     const cookieValue = await store.create({
       status: "unauthenticated",
+      csrfToken,
       csrfDigest: digestSecret(csrfToken),
     });
     return simpleResult(
@@ -574,19 +584,26 @@ function rejectedResult(
 
 function stateMutation(
   status: "mfa_required" | "mfa_failed",
-  csrfDigest: Uint8Array,
+  csrf: Pick<ServerSessionRecord, "csrfToken" | "csrfDigest">,
 ): SessionMutation<BffAuthResult> {
   return {
     action: "replace",
-    record: { status, csrfDigest },
+    record: { status, csrfToken: csrf.csrfToken, csrfDigest: csrf.csrfDigest },
     result: simpleResult(status, { kind: "none" }),
   };
 }
 
 function failedLoginMutation(
-  csrfDigest: Uint8Array,
+  csrf: Pick<ServerSessionRecord, "csrfToken" | "csrfDigest">,
+  mfaFailed = false,
 ): SessionMutation<BffAuthResult> {
-  return stateMutation("mfa_failed", csrfDigest);
+  const status = mfaFailed ? "mfa_failed" : "unauthenticated";
+  const result = simpleResult(status, { kind: "none" });
+  return {
+    action: "replace",
+    record: { status, csrfToken: csrf.csrfToken, csrfDigest: csrf.csrfDigest },
+    result: { ...result, state: { ...result.state, errorCode: "AUTH_FAILED" } },
+  };
 }
 
 function applyRotatedCookie(
@@ -618,7 +635,7 @@ function authenticatedResolutionMutation(
   if (tokensChanged(record, resolved)) {
     return {
       action: "replace",
-      record: authenticatedRecord(record.csrfDigest, resolved.tokens),
+      record: authenticatedRecord(record, resolved.tokens),
       result,
     };
   }
@@ -645,7 +662,7 @@ function resolvedFailureMutation(
   if (tokensChanged(record, resolved)) {
     return {
       action: "replace",
-      record: authenticatedRecord(record.csrfDigest, resolved.tokens),
+      record: authenticatedRecord(record, resolved.tokens),
       result,
     };
   }
@@ -664,10 +681,15 @@ function tokensChanged(
 }
 
 function authenticatedRecord(
-  csrfDigest: Uint8Array,
+  csrf: Pick<ServerSessionRecord, "csrfToken" | "csrfDigest">,
   tokens: IdentityTokenPair,
 ): AuthenticatedSessionRecord {
-  return { status: "authenticated", csrfDigest, tokens };
+  return {
+    status: "authenticated",
+    csrfToken: csrf.csrfToken,
+    csrfDigest: csrf.csrfDigest,
+    tokens,
+  };
 }
 
 function parseLoginInput(value: unknown): LoginInput | null {

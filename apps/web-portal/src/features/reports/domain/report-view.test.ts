@@ -8,6 +8,12 @@ const REPORT_ID = "00000000-0000-4000-8000-000000000075";
 const CURSOR = "cursor_fake_00001";
 
 describe("parseReportQuery", () => {
+  it("accepts an unselected class submitted by a native GET form", () => {
+    const query = Object.fromEntries(
+      new URLSearchParams("day=2026-08-22&classId="),
+    );
+    expect(parseReportQuery(query, NOW)).toEqual(parseReportQuery({}, NOW));
+  });
   it("defaults to the current UTC day and a bounded page size", () => {
     expect(parseReportQuery({}, NOW)).toEqual({
       kind: "valid",
@@ -67,7 +73,7 @@ describe("parseReportQuery", () => {
     { day: "" },
     { day: ["2026-08-21"] },
     { classId: "opaque-class" },
-    { classId: "" },
+    { classId: ["", CLASS_ID] },
     { cursor: "short" },
     { cursor: 12 },
     { limit: "0" },

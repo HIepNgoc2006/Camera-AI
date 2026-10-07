@@ -116,6 +116,137 @@ function secretValue(): string {
 }
 
 describe("BFF authentication service", () => {
+  it("keeps the challenge usable across tabs and rotates it on login", async () => {
+    const { service, identity } = createSubject();
+    const first = await service.prepare(null, NOW);
+    const cookieValue = cookieFrom(first);
+    const otherTab = await service.prepare(cookieValue, NOW);
+    expect(otherTab.state.csrfToken).toBe(first.state.csrfToken);
+    const loggedIn = await service.login({
+      cookieValue,
+      csrfToken: first.state.csrfToken,
+      originAccepted: true,
+      credentials: credentials(),
+      now: NOW,
+    });
+    expect(loggedIn.state.status).toBe("authenticated");
+    const rotatedCookie = cookieFrom(loggedIn);
+    const prepared = await service.prepare(rotatedCookie, NOW);
+    expect(prepared.state.csrfToken).not.toBe(first.state.csrfToken);
+    const stale = await service.logout({
+      cookieValue: rotatedCookie,
+      csrfToken: first.state.csrfToken,
+      originAccepted: true,
+      allDevices: true,
+    });
+    expect(stale.state.errorCode).toBe("REQUEST_REJECTED");
+    expect(identity.logoutAll).not.toHaveBeenCalled();
+    await service.prepare(rotatedCookie, NOW);
+    const ended = await service.logout({
+      cookieValue: rotatedCookie,
+      csrfToken: prepared.state.csrfToken,
+      originAccepted: true,
+      allDevices: true,
+    });
+    expect(ended.state.status).toBe("unauthenticated");
+    expect(identity.logoutAll).toHaveBeenCalledOnce();
+  });
+
+  it("permits correct-password retry without inventing an MFA requirement", async () => {
+    const { service, identity } = createSubject();
+    vi.mocked(identity.login).mockRejectedValueOnce(
+      new IdentityGatewayError(401, "AUTH_CREDENTIAL_INVALID"),
+    );
+    const prepared = await service.prepare(null, NOW);
+    const cookieValue = cookieFrom(prepared);
+    const wrong = await service.login({
+      cookieValue,
+      csrfToken: prepared.state.csrfToken,
+      originAccepted: true,
+      credentials: credentials(),
+      now: NOW,
+    });
+    expect(wrong.state).toMatchObject({
+      status: "unauthenticated",
+      errorCode: "AUTH_FAILED",
+    });
+    const retry = await service.prepare(cookieValue, NOW);
+    const correct = await service.login({
+      cookieValue,
+      csrfToken: retry.state.csrfToken,
+      originAccepted: true,
+      credentials: credentials(),
+      now: NOW,
+    });
+    expect(correct.state.status).toBe("authenticated");
+    expect(vi.mocked(identity.login).mock.calls[1][0]).not.toHaveProperty(
+      "mfaCode",
+    );
+  });
+
+  it("keeps the challenge across refresh and rejects tokens from another session", async () => {
+    const { service, identity } = createSubject();
+    const first = await service.prepare(null, NOW);
+    const second = await service.prepare(null, NOW);
+    const crossed = await service.login({
+      cookieValue: cookieFrom(first),
+      csrfToken: second.state.csrfToken,
+      originAccepted: true,
+      credentials: credentials(),
+      now: NOW,
+    });
+    expect(crossed.state.errorCode).toBe("REQUEST_REJECTED");
+    expect(identity.login).not.toHaveBeenCalled();
+    const authenticated = await service.login({
+      cookieValue: cookieFrom(first),
+      csrfToken: first.state.csrfToken,
+      originAccepted: true,
+      credentials: credentials(),
+      now: NOW,
+    });
+    const cookieValue = cookieFrom(authenticated);
+    const challenge = await service.prepare(cookieValue, NOW);
+    vi.mocked(identity.sessionSnapshot).mockRejectedValueOnce(
+      new IdentityGatewayError(401, "AUTHENTICATION_REQUIRED"),
+    );
+    const refreshed = await service.prepare(cookieValue, NOW);
+    expect(identity.refresh).toHaveBeenCalledOnce();
+    expect(refreshed.state.csrfToken).toBe(challenge.state.csrfToken);
+    expect(refreshed.state.status).toBe("authenticated");
+  });
+
+  it("does not report logout-all completion from a preauth retry after upstream failure", async () => {
+    const { service, identity } = createSubject();
+    const prepared = await service.prepare(null, NOW);
+    const loggedIn = await service.login({
+      cookieValue: cookieFrom(prepared),
+      csrfToken: prepared.state.csrfToken,
+      originAccepted: true,
+      credentials: credentials(),
+      now: NOW,
+    });
+    const active = await service.prepare(cookieFrom(loggedIn), NOW);
+    vi.mocked(identity.logoutAll).mockRejectedValueOnce(
+      new IdentityGatewayError(503, "AUTH_DEPENDENCY_UNAVAILABLE"),
+    );
+    const failed = await service.logout({
+      cookieValue: cookieFrom(loggedIn),
+      csrfToken: active.state.csrfToken,
+      originAccepted: true,
+      allDevices: true,
+    });
+    expect(failed.cookie.kind).toBe("clear");
+    expect(failed.state.errorCode).toBe("SESSION_UNAVAILABLE");
+    const preauth = await service.prepare(null, NOW);
+    const retry = await service.logout({
+      cookieValue: cookieFrom(preauth),
+      csrfToken: preauth.state.csrfToken,
+      originAccepted: true,
+      allDevices: true,
+    });
+    expect(retry.state.errorCode).toBe("REQUEST_REJECTED");
+    expect(identity.logoutAll).toHaveBeenCalledOnce();
+  });
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -182,7 +313,7 @@ describe("BFF authentication service", () => {
   it.each([
     ["AUTH_MFA_REQUIRED", "mfa_required", "MFA_REQUIRED"],
     ["AUTH_MFA_VERIFICATION_FAILED", "mfa_failed", "AUTH_FAILED"],
-    ["AUTH_CREDENTIAL_INVALID", "mfa_failed", "AUTH_FAILED"],
+    ["AUTH_CREDENTIAL_INVALID", "unauthenticated", "AUTH_FAILED"],
   ] as const)(
     "maps %s to a non-enumerating public state",
     async (upstreamCode, status, errorCode) => {
