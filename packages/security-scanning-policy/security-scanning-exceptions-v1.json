@@ -1,4 +1,14 @@
 {
   "schema_version": 1,
-  "exceptions": []
+  "exceptions": [
+    {
+      "exception_id": "SEC-NPM-BRACES-001",
+      "finding_id": "GHSA-vfj7-8cjw-p6xm",
+      "owner": "HIepNgoc2006",
+      "justification": "braces@3.0.3 in the ESLint dev toolchain only (eslint-config-next -> @next/eslint-plugin-next -> fast-glob -> micromatch -> braces); no patched release exists upstream as of 2026-10-07; stack-exhaustion DoS is not reachable from the production Next.js build because braces never executes in deployed runtime paths; dependabot brace-expansion overrides cover the related sibling advisories already",
+      "compensating_control": "npm audit gate still fails closed for every other advisory and for critical severity; the exception expires 2026-11-06 (30-day remediation SLA per docs/security/supply-chain-scanning.md) and must be renewed only after re-verifying that no patched braces release is available; supply-chain-security workflow drops the gate automatically once upstream patches and the override is bumped",
+      "approved_by": "HIepNgoc2006",
+      "expires_on": "2026-11-06"
+    }
+  ]
 }

@@ -17,36 +17,44 @@ Compose pins each image by exact version and digest. PostgreSQL is under the `te
 
 Use placeholder values from the tracked example. Never copy production values into the workspace.
 
-```powershell
-rtk docker compose --env-file .env.example -f compose.yml --profile test-db config --quiet
-rtk python scripts/quality.py compose
-```
+1. Invoke `docker_camera.docker_compose_validate` with `{}`. This validates the fixed project
+   topology and security constraints without starting containers or resolving environment values
+   into output.
+2. Run the repository Compose-quality gate from the workspace root:
+
+   ```powershell
+   rtk .\.venv\Scripts\python.exe scripts/quality.py compose
+   ```
 
 ## Start and verify
 
-Start the default local dependencies:
+Ask for explicit approval before starting services. Start the default local dependencies by invoking
+`docker_camera.docker_compose_up` with:
 
-```powershell
-rtk docker compose --env-file .env.example -f compose.yml up -d redis rabbitmq minio
-rtk docker compose --env-file .env.example -f compose.yml ps
+```json
+{"services": ["redis", "rabbitmq", "minio"]}
 ```
 
-Start the isolated PostgreSQL test database only when an integration test requires it:
+Start the isolated PostgreSQL test database only when an approved integration test requires it. It
+is not part of the default service set and must be requested explicitly through
+`docker_camera.docker_compose_up`:
 
-```powershell
-rtk docker compose --env-file .env.example -f compose.yml --profile test-db up -d
-rtk docker compose --env-file .env.example -f compose.yml --profile test-db ps
+```json
+{"services": ["postgres-test"]}
 ```
 
-Expected state is `healthy` for every started service. The stack uses an internal Docker network and publishes required ports on loopback only.
+Inspect the project stack only through `docker_camera.docker_compose_status` with `{}`. Expected
+state is `healthy` for every started service. The stack uses an internal network and publishes
+required ports on loopback only.
 
 ## Stop without deleting data
 
-```powershell
-rtk docker compose --env-file .env.example -f compose.yml --profile test-db down
-```
+Use `docker_camera.docker_compose_stop` with the exact services that were started. For the default
+set, pass `{"services": ["redis", "rabbitmq", "minio"]}`. If the isolated database was started,
+stop it separately with `{"services": ["postgres-test"]}`.
 
-`down` stops and removes containers/network but preserves the bind-mounted service data.
+This safe stop operation does not delete containers, images, networks, volumes, or bind-mounted
+data.
 
 ## Reset one service safely
 
@@ -56,7 +64,9 @@ Reset is destructive and is never part of normal shutdown.
 2. Resolve the target to an absolute path and verify it is exactly under `D:\WORKSAPCE\Camera AI\.local\docker-data\<service>\`.
 3. Identify whether fake/sanitized data needs backup or migration.
 4. Obtain explicit user approval naming the service and verified target.
-5. Delete only that service directory, recreate it with the container's expected permissions, then start and verify the service.
+5. Perform only the separately reviewed reset procedure for that exact service, then restart it
+   through `docker_camera.docker_compose_up` and verify it through
+   `docker_camera.docker_compose_status`.
 
 Never reset native PostgreSQL data, the whole workspace, `.git`, user profile, Docker socket, credential store, or any directory outside `.local\docker-data\`.
 
