@@ -272,6 +272,35 @@ describe("resolveRouteAccess", () => {
     });
   });
 
+  it("allows the cameras route only with the camera status view permission", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/cameras",
+        session: fakeAuthenticatedSession(["camera_status.view_metadata"]),
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/cameras",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/cameras/zones/00000000-0000-4000-8000-000000000001",
+        session: fakeAuthenticatedSession(["consent.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+  });
+
   it("allows the protected shell for any recognized Web view permission", () => {
     expect(
       resolveRouteAccess({

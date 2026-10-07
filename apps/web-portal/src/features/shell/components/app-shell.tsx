@@ -8,6 +8,7 @@ export function AppShell({
   showReportNavigation = false,
   showAccessNavigation = false,
   showConsentNavigation = false,
+  showCameraNavigation = false,
 }: Readonly<{
   children: ReactNode;
   showAttendanceNavigation?: boolean;
@@ -15,13 +16,15 @@ export function AppShell({
   showReportNavigation?: boolean;
   showAccessNavigation?: boolean;
   showConsentNavigation?: boolean;
+  showCameraNavigation?: boolean;
 }>) {
   const showNavigation =
     showAttendanceNavigation ||
     showViolationNavigation ||
     showReportNavigation ||
     showAccessNavigation ||
-    showConsentNavigation;
+    showConsentNavigation ||
+    showCameraNavigation;
 
   return (
     <div className="shell">
@@ -49,6 +52,11 @@ export function AppShell({
             {showConsentNavigation ? (
               <Link href="/app/consent" aria-current="page">
                 Đồng ý
+              </Link>
+            ) : null}
+            {showCameraNavigation ? (
+              <Link href="/app/cameras" aria-current="page">
+                Camera
               </Link>
             ) : null}
           </nav>

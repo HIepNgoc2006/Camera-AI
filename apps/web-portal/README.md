@@ -33,6 +33,11 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   approved `consent.correct` runtime exists. Withdrawal requests stay
   structurally denied because the withdrawal permission codes are outside
   `rbac_policy_v1`.
+- Protected `/app/cameras` view with bounded cursor/limit filters,
+  deterministic states, sanitized camera health view-model types that keep
+  connectivity, ANSVIS task state, event delay and collection availability
+  separate; unknown is never merged into offline and no freshness threshold
+  is invented client-side.
 - Public `/not-authorized` fallback.
 - Reusable UI-action visibility checks that use the same validated permission
   snapshot as route decisions.
@@ -241,6 +246,33 @@ effective withdrawal blocks new processing immediately while disposal
 follows the backend propagation lifecycle — it never promises instant
 erasure, never renders identity-proof or biometric material, and never
 deletes media or database rows directly.
+
+## Cameras route
+
+`/app/cameras` requires the exact server session snapshot and
+`camera_status.view_metadata`. The page accepts only these query parameters:
+
+| Parameter | Boundary                                 |
+| --------- | ---------------------------------------- |
+| `cursor`  | Optional opaque value, 16–512 characters |
+| `limit`   | Integer `1..100`; defaults to `25`       |
+
+School, tenant, zone and permission scope are never accepted from the
+browser; the approved route is `GET /api/v1/cameras/status` with cursor
+paging. The checked-in provider returns the stable unavailable state until
+the Camera Registry health runtime is activated.
+
+The view keeps four health dimensions separate: camera connectivity
+(`online/offline/unknown`), ANSVIS task state (`running/stopped/unknown`),
+event delay (`flowing/delayed/no_recent_event/unknown`) and collection
+availability (`available/unavailable/unknown`). No approved monitoring
+policy pins a camera freshness threshold, so a missing or malformed sample
+time renders as unknown — the UI never infers offline from staleness and
+never treats a metrics outage as every camera being offline. The screen is
+read-only: no camera control, no task start/stop, no live stream or RTSP
+URL, and an online camera with events is never presented as AI-quality
+validation. Health visibility is distinct from ANSVIS task control and model
+quality, which remain separate gated scopes.
 
 ## Security notes
 
