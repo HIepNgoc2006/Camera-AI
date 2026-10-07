@@ -1439,3 +1439,251 @@ button:disabled {
     width: 100%;
   }
 }
+
+.camera-page {
+  display: grid;
+  width: min(100%, 80rem);
+  gap: 1.5rem;
+  margin: 0 auto;
+}
+
+.camera-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.camera-heading-copy {
+  max-width: 36rem;
+  margin: 0;
+  color: #5d6b82;
+}
+
+.camera-filters {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.5fr) auto;
+  gap: 1rem;
+  align-items: end;
+  padding: 1.25rem;
+  border: 1px solid #dbe4f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.camera-filters label {
+  display: grid;
+  gap: 0.5rem;
+  color: #34435a;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.camera-filters input {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid #aebdd0;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+}
+
+.camera-filters input:focus-visible,
+.camera-filters button:focus-visible,
+.camera-pagination a:focus-visible {
+  outline: 0.2rem solid #5a8fd1;
+  outline-offset: 0.2rem;
+}
+
+.camera-notice,
+.camera-empty,
+.camera-loading {
+  padding: 1.5rem;
+  border: 1px solid #dbe4f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.camera-loading {
+  display: grid;
+  gap: 0.5rem;
+  min-height: 8rem;
+  place-content: center;
+  color: #34435a;
+  text-align: center;
+}
+
+.camera-loading span {
+  color: #5d6b82;
+}
+
+.camera-notice h2,
+.camera-empty h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.camera-notice p,
+.camera-empty p {
+  margin: 0.5rem 0 0;
+}
+
+.camera-notice code {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.camera-notice-error {
+  border-color: #e9b9bd;
+  background: #fff5f5;
+  color: #79242d;
+}
+
+.camera-notice-warning {
+  border-color: #ead398;
+  background: #fff9e8;
+  color: #694b0d;
+}
+
+.camera-results {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.camera-updated {
+  margin: 0;
+  color: #5d6b82;
+  font-size: 0.875rem;
+}
+
+.camera-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.camera-table {
+  width: 100%;
+  min-width: 60rem;
+  border-collapse: collapse;
+}
+
+.camera-table caption {
+  padding: 1rem 1.25rem;
+  color: #34435a;
+  font-weight: 750;
+  text-align: left;
+}
+
+.camera-table th,
+.camera-table td {
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid #e7edf5;
+  text-align: left;
+  vertical-align: top;
+}
+
+.camera-table thead th {
+  background: #f7f9fc;
+  color: #4a5870;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.camera-table tbody th {
+  color: #172033;
+  font-weight: 700;
+}
+
+.camera-zone {
+  display: block;
+  margin-top: 0.25rem;
+  color: #5d6b82;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.camera-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999rem;
+  font-size: 0.8125rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.camera-state-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999rem;
+  background: currentColor;
+}
+
+.camera-state-online {
+  background: #e7f6ed;
+  color: #17643a;
+}
+
+.camera-state-offline {
+  background: #feeceb;
+  color: #8a2530;
+}
+
+.camera-state-unknown {
+  background: #eef1f6;
+  color: #4a5870;
+}
+
+.camera-task-running {
+  color: #17643a;
+  font-weight: 750;
+}
+
+.camera-task-stopped {
+  color: #8a2530;
+  font-weight: 750;
+}
+
+.camera-task-unknown {
+  color: #4a5870;
+  font-weight: 600;
+}
+
+.camera-diagnosis {
+  color: #34435a;
+  font-weight: 600;
+}
+
+.camera-pagination {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.camera-pagination a {
+  padding: 0.7rem 1rem;
+  border: 1px solid #245a9d;
+  border-radius: 0.5rem;
+  color: #245a9d;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+@media (max-width: 48rem) {
+  .camera-heading {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .camera-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-filters button {
+    width: 100%;
+  }
+}

@@ -22,6 +22,8 @@ describe("AppShell", () => {
     expect(html).not.toContain("Phân quyền");
     expect(html).not.toContain("/app/consent");
     expect(html).not.toContain("Đồng ý");
+    expect(html).not.toContain('href="/app/cameras"');
+    expect(html).not.toContain(">Camera</a>");
   });
 
   it("renders the attendance navigation for an authorized feature page", () => {
@@ -105,5 +107,19 @@ describe("AppShell", () => {
     expect(html).toContain("Đồng ý");
     expect(html).not.toContain('href="/app/access"');
     expect(html).not.toContain('href="/app/reports"');
+  });
+
+  it("renders the camera navigation only for an authorized feature page", () => {
+    const html = renderToStaticMarkup(
+      AppShell({
+        showCameraNavigation: true,
+        children: createElement("p", null, "Nội dung"),
+      }),
+    );
+
+    expect(html).toContain('href="/app/cameras"');
+    expect(html).toContain("Camera");
+    expect(html).not.toContain('href="/app/consent"');
+    expect(html).not.toContain('href="/app/access"');
   });
 });
