@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from typing import Protocol
 
 from event_outbox_worker.config import EXCHANGE_NAME
@@ -21,11 +22,18 @@ from event_outbox_worker.config import EXCHANGE_NAME
 PUBLISH_FAILED = "EVENT_OUTBOX_PUBLISH_FAILED"
 
 
+class PublishConnection(Protocol):
+    def close(self) -> None: ...
+
+
 class PublishChannel(Protocol):
     """The narrow channel surface the publisher relies on."""
 
+    @property
+    def connection(self) -> PublishConnection: ...
+
     def basic_publish(
-        self, exchange: str, routing_key: str, body: bytes, properties: object
+        self, exchange: str, routing_key: str, body: bytes, properties: object, mandatory: bool
     ) -> None: ...
 
     def close(self) -> None: ...
@@ -37,9 +45,14 @@ def _pika_channel_factory(broker_url: str) -> PublishChannel:
     import pika
 
     connection = pika.BlockingConnection(pika.URLParameters(broker_url))
-    channel = connection.channel()
-    channel.confirm_delivery()
-    channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type="topic", durable=True)
+    try:
+        channel = connection.channel()
+        channel.confirm_delivery()
+        channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type="topic", durable=True)
+    except Exception:
+        with suppress(Exception):
+            connection.close()
+        raise
     return channel  # type: ignore[no-any-return]
 
 
@@ -89,6 +102,7 @@ class RabbitMqEventPublisher:
                 routing_key=topic,
                 body=body,
                 properties=self._properties_factory(),
+                mandatory=True,
             )
         except Exception:
             self.close()
@@ -103,7 +117,10 @@ class RabbitMqEventPublisher:
         try:
             channel.close()
         except Exception:
-            return
+            pass
+        finally:
+            with suppress(Exception):
+                channel.connection.close()
 
     def __repr__(self) -> str:
         connected = self._channel is not None

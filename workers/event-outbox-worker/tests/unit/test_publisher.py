@@ -17,11 +17,18 @@ class FakeChannel:
         self.fail = fail
         self.published: list[tuple[str, str, bytes]] = []
         self.closed = False
+        self.connection = FakeConnection()
 
     def basic_publish(
-        self, exchange: str, routing_key: str, body: bytes, properties: object
+        self,
+        exchange: str,
+        routing_key: str,
+        body: bytes,
+        properties: object,
+        mandatory: bool = False,
     ) -> None:
         del properties
+        self.mandatory = mandatory
         if self.fail:
             raise ConnectionError("socket reset with payload echo: " + body.decode())
         self.published.append((exchange, routing_key, body))
@@ -50,6 +57,32 @@ def test_publish_sends_canonical_json_to_the_pinned_exchange() -> None:
     assert routing_key == "events.attendance.face.observed"
     assert json.loads(body) == PAYLOAD
     assert body == json.dumps(PAYLOAD, sort_keys=True, separators=(",", ":")).encode()
+    assert channel.mandatory is True
+
+
+def test_unroutable_message_fails_instead_of_silent_broker_acknowledgment() -> None:
+    class Unroutable(FakeChannel):
+        def basic_publish(
+            self,
+            exchange: str,
+            routing_key: str,
+            body: bytes,
+            properties: object,
+            mandatory: bool = False,
+        ) -> None:
+            if mandatory:
+                import pika
+
+                raise pika.exceptions.UnroutableError([])
+            super().basic_publish(exchange, routing_key, body, properties, mandatory)
+
+    channel = Unroutable()
+    publisher = make_publisher(channel)
+    assert publisher.ensure_connected()
+    with pytest.raises(RuntimeError, match=PUBLISH_FAILED):
+        publisher.publish(topic="events.test.unbound", payload=PAYLOAD)
+    assert channel.closed
+    assert channel.published == []
 
 
 def test_publish_without_connection_fails_with_stable_code() -> None:
@@ -73,7 +106,23 @@ def test_publish_failure_is_redacted_and_resets_the_channel() -> None:
     assert "socket reset" not in rendered
     assert excinfo.value.__cause__ is None
     assert channel.closed is True
+    assert channel.connection.closed is True
     assert publisher.ensure_connected() is True  # factory re-invoked after reset
+
+
+class FakeConnection:
+    closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_shutdown_closes_the_owned_broker_connection() -> None:
+    channel = FakeChannel()
+    publisher = make_publisher(channel)
+    assert publisher.ensure_connected()
+    publisher.close()
+    assert channel.closed and channel.connection.closed
 
 
 def test_ensure_connected_returns_false_on_broker_outage_without_raising() -> None:

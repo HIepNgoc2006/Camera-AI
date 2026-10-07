@@ -66,6 +66,10 @@ Cùng vòng drain, worker giao audit intent từ `events.audit_outbox` (adapter 
 - Broker chưa kết nối được ⇒ không claim message nào (không đốt attempt), chờ
   `WORKER_BROKER_RETRY_SECONDS` rồi thử lại.
 - Publish lỗi ⇒ message đó retry/dead-letter theo policy; message khác trong batch không bị chặn.
+- Publish dùng `mandatory=True` cùng confirms: thiếu binding hoặc broker trả unroutable không
+  được đánh dấu published; đi qua cùng retry/dead-letter và stable masked error. Consumers vẫn
+  chịu trách nhiệm queues/bindings. Reset/shutdown đóng cả channel và connection sở hữu.
+- Composite drain cộng cả `refused` để event bị consent guard chặn vẫn reconcile đủ tổng batch.
 - SIGINT/SIGTERM ⇒ hoàn tất batch hiện tại, thoát mã 0; crash cứng ⇒ lease 30s hết hạn và message
   được worker khác claim lại.
 - Log chỉ chứa metadata allowlisted + counter; không payload, không broker URL, không identifier.

@@ -148,16 +148,18 @@ class CompositeDrain:
         self._drains = tuple(drains)
 
     def execute(self) -> BatchDrainResult:
-        claimed = published = retry = dead = 0
+        claimed = published = retry = dead = refused = 0
         for drain in self._drains:
             result = drain.execute()
             claimed += result.claimed
             published += result.published
             retry += result.retry_scheduled
             dead += result.dead_lettered
+            refused += result.refused
         return BatchDrainResult(
             claimed=claimed,
             published=published,
             retry_scheduled=retry,
             dead_lettered=dead,
+            refused=refused,
         )
