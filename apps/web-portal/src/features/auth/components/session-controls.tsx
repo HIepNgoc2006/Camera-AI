@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { WEB_BFF_SESSION_POLICY_VERSION } from "@/features/auth/domain/route-access";
 
@@ -18,6 +19,7 @@ export function SessionControls({
   const [warning, setWarning] = useState(warningInitially);
   const [busy, setBusy] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!warningStartsAt || !expiresAt) return;
@@ -56,7 +58,7 @@ export function SessionControls({
       ) {
         throw new Error("BFF_LOGOUT_RESPONSE_INVALID");
       }
-      window.location.assign("/login");
+      router.push("/login");
     } catch {
       setUnavailable(true);
     } finally {

@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { WEB_BFF_SESSION_POLICY_VERSION } from "@/features/auth/domain/route-access";
 
@@ -38,6 +39,7 @@ export function LoginPanel() {
     errorCode: "SESSION_UNAVAILABLE",
   });
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     let current = true;
@@ -45,7 +47,7 @@ export function LoginPanel() {
       .then((next) => {
         if (!current) return;
         if (next.status === "authenticated" && next.redirectTo === "/app") {
-          window.location.assign("/app");
+          router.push("/app");
           return;
         }
         setView(next);
@@ -61,7 +63,7 @@ export function LoginPanel() {
     return () => {
       current = false;
     };
-  }, []);
+  }, [router]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,7 +92,7 @@ export function LoginPanel() {
       const response = await pendingResponse;
       const next = await parseAuthView(response);
       if (next.status === "authenticated" && next.redirectTo === "/app") {
-        window.location.assign("/app");
+        router.push("/app");
         return;
       }
       const prepared = await loadAuthView();

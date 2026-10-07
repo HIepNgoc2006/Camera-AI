@@ -41,12 +41,12 @@ Portal. It is a code-coupled compliance record, not permission to download or ad
 | Bandit | 1.9.4 | Python SAST | https://github.com/PyCQA/bandit | Apache-2.0 | Recorded security-tool exception |
 | OpenGrep standalone | 1.22.0 (`sha256:45bcd584...f62e319`) | Semgrep-compatible Python/TypeScript local-rule SAST | https://github.com/opengrep/opengrep | LGPL-2.1 | Official release binary pinned by SHA-256; remote version check/config and source upload disabled |
 | Trivy | 0.70.0 | Filesystem vulnerability/misconfiguration scan | https://github.com/aquasecurity/trivy | Apache-2.0 | Checksum-verified standalone CI/local tool |
-| Next.js | 16.3.5 | Web Portal runtime | https://github.com/vercel/next.js | MIT | Exact patched runtime release |
+| Next.js | 16.4.0 | Web Portal runtime | https://github.com/vercel/next.js | MIT | Exact patched runtime release |
 | Vitest | 4.1.11 | Web Portal test runner | https://github.com/vitest-dev/vitest | MIT | Exact patched test release |
 | js-yaml | 4.3.2 | Security override for the version used by ESLint tooling | https://github.com/nodeca/js-yaml | MIT | Exact override for fixed release |
 | Vite | 8.1.5 | Compatibility override for the Vitest toolchain | https://github.com/vitejs/vite | MIT | Preserves the verified pre-remediation toolchain baseline |
 | PostCSS | 8.5.25 | Security override for the version bundled by Next.js | https://github.com/postcss/postcss | MIT | Exact override for fixed release |
-| sharp | 0.35.4 | Security override for the optional image runtime bundled by Next.js | https://github.com/lovell/sharp | Apache-2.0 | Exact override for fixed release |
+| sharp | 0.35.5 | Security override for the optional image runtime bundled by Next.js | https://github.com/lovell/sharp | Apache-2.0 | Exact override for fixed release |
 
 Unless a dependency row records a later scoped refresh, versions reflect the environment resolved
 during the 2026-07-19 review. The `httpx2` row was reverified and updated to 2.12.0 on 2026-09-12 by
