@@ -214,6 +214,35 @@ describe("resolveRouteAccess", () => {
     });
   });
 
+  it("allows the access route only with the role assignment view permission", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/access",
+        session: fakeAuthenticatedSession(["role_assignment.view_metadata"]),
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/access",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/access/users/00000000-0000-4000-8000-000000000001",
+        session: fakeAuthenticatedSession(["violation.review"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+  });
+
   it("allows the protected shell for any recognized Web view permission", () => {
     expect(
       resolveRouteAccess({

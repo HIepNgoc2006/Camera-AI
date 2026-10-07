@@ -22,6 +22,11 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   deterministic states, sanitized report summary types, and an export
   affordance that stays hidden or marked unavailable until the approved
   dual-control `report.export` runtime exists.
+- Protected `/app/access` view with bounded cursor/limit filters,
+  deterministic states, sanitized role-assignment view-model types, and a
+  change affordance that stays hidden or marked unavailable until the approved
+  dual-control `role_assignment.correct` runtime exists. MFA-verified sessions
+  are enforced for every access read.
 - Public `/not-authorized` fallback.
 - Reusable UI-action visibility checks that use the same validated permission
   snapshot as route decisions.
@@ -169,6 +174,36 @@ artifact reference is ever produced client-side, and export job states
 Report Service policy requires the minimum cohort threshold; aggregates below
 it are suppressed server-side and the UI must never render a zero for a
 suppressed value.
+
+## Access route
+
+`/app/access` requires the exact server session snapshot,
+`role_assignment.view_metadata` AND an MFA-verified session (`mfaState:
+"verified"`); the approved contract marks the identity operations
+`bearer_mfa`, so a `not_required` session is denied before any provider call.
+The page accepts only these query parameters:
+
+| Parameter | Boundary                                 |
+| --------- | ---------------------------------------- |
+| `cursor`  | Optional opaque value, 16–512 characters |
+| `limit`   | Integer `1..100`; defaults to `25`       |
+
+School, tenant, actor and permission scope are never accepted from the
+browser. The approved API Gateway baseline defines `GET /api/v1/role-
+assignments/{assignment_id}` and `POST /api/v1/role-assignments/{assignment_id}/
+changes` with `bearer_mfa` auth; it does not define a list operation or the
+label/role/status fields required by the screen. The checked-in provider
+therefore returns the stable unavailable state.
+
+`role_assignment.correct` is dual-control in `rbac_policy_v1` and has no
+approved runtime in this composition: the change affordance is hidden without
+the permission and is marked unavailable even when the permission is present,
+and only for rows the server reports as active. Approve and revoke have no
+approved permission mapping and are structurally denied client-side;
+own-role changes are refused before any provider call because the own-role and
+last-privileged-account rules have no recorded policy decision. No password,
+MFA secret, token, credential hash, or permission editor is ever rendered;
+the allowed grant set is always resolved by the backend.
 
 ## Security notes
 

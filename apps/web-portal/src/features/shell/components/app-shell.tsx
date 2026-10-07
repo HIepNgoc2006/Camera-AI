@@ -6,14 +6,19 @@ export function AppShell({
   showAttendanceNavigation = false,
   showViolationNavigation = false,
   showReportNavigation = false,
+  showAccessNavigation = false,
 }: Readonly<{
   children: ReactNode;
   showAttendanceNavigation?: boolean;
   showViolationNavigation?: boolean;
   showReportNavigation?: boolean;
+  showAccessNavigation?: boolean;
 }>) {
   const showNavigation =
-    showAttendanceNavigation || showViolationNavigation || showReportNavigation;
+    showAttendanceNavigation ||
+    showViolationNavigation ||
+    showReportNavigation ||
+    showAccessNavigation;
 
   return (
     <div className="shell">
@@ -31,6 +36,11 @@ export function AppShell({
             {showReportNavigation ? (
               <Link href="/app/reports" aria-current="page">
                 Báo cáo
+              </Link>
+            ) : null}
+            {showAccessNavigation ? (
+              <Link href="/app/access" aria-current="page">
+                Phân quyền
               </Link>
             ) : null}
           </nav>
