@@ -27,6 +27,12 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   change affordance that stays hidden or marked unavailable until the approved
   dual-control `role_assignment.correct` runtime exists. MFA-verified sessions
   are enforced for every access read.
+- Protected `/app/consent` view with bounded cursor/limit filters,
+  deterministic states, sanitized consent-record view-model types, and a
+  decision affordance that stays hidden or marked unavailable until the
+  approved `consent.correct` runtime exists. Withdrawal requests stay
+  structurally denied because the withdrawal permission codes are outside
+  `rbac_policy_v1`.
 - Public `/not-authorized` fallback.
 - Reusable UI-action visibility checks that use the same validated permission
   snapshot as route decisions.
@@ -204,6 +210,37 @@ own-role changes are refused before any provider call because the own-role and
 last-privileged-account rules have no recorded policy decision. No password,
 MFA secret, token, credential hash, or permission editor is ever rendered;
 the allowed grant set is always resolved by the backend.
+
+## Consent route
+
+`/app/consent` requires the exact server session snapshot and
+`consent.view_metadata`. The page accepts only these query parameters:
+
+| Parameter | Boundary                                 |
+| --------- | ---------------------------------------- |
+| `cursor`  | Optional opaque value, 16–512 characters |
+| `limit`   | Integer `1..100`; defaults to `25`       |
+
+School, tenant, actor, guardian and permission scope are never accepted from
+the browser. The approved API Gateway baseline defines `GET /api/v1/consents/
+{consent_id}` and `POST /api/v1/consents/{consent_id}/decisions` with no list
+operation; the checked-in provider therefore returns the stable unavailable
+state.
+
+The consent state machine (`pending/granted/denied/withdrawn/restricted/
+expired`) and the withdrawal lifecycle (`requested/identity_verified/
+effective/propagating/partially_completed/completed/rejected/superseded`)
+follow the checked-in policy sources; terminal states are never restored
+client-side. `consent.correct` has no approved runtime: the decision
+affordance is hidden without the permission and marked unavailable even with
+it, and only for granted rows. Withdrawal requests map to
+`privacy.withdrawal.request.*` codes outside `rbac_policy_v1` and are
+structurally denied; guardian, maturity and delegation authority are backend
+checks a UI confirmation can never confer. The UI copy states that an
+effective withdrawal blocks new processing immediately while disposal
+follows the backend propagation lifecycle — it never promises instant
+erasure, never renders identity-proof or biometric material, and never
+deletes media or database rows directly.
 
 ## Security notes
 

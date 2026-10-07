@@ -7,18 +7,21 @@ export function AppShell({
   showViolationNavigation = false,
   showReportNavigation = false,
   showAccessNavigation = false,
+  showConsentNavigation = false,
 }: Readonly<{
   children: ReactNode;
   showAttendanceNavigation?: boolean;
   showViolationNavigation?: boolean;
   showReportNavigation?: boolean;
   showAccessNavigation?: boolean;
+  showConsentNavigation?: boolean;
 }>) {
   const showNavigation =
     showAttendanceNavigation ||
     showViolationNavigation ||
     showReportNavigation ||
-    showAccessNavigation;
+    showAccessNavigation ||
+    showConsentNavigation;
 
   return (
     <div className="shell">
@@ -41,6 +44,11 @@ export function AppShell({
             {showAccessNavigation ? (
               <Link href="/app/access" aria-current="page">
                 Phân quyền
+              </Link>
+            ) : null}
+            {showConsentNavigation ? (
+              <Link href="/app/consent" aria-current="page">
+                Đồng ý
               </Link>
             ) : null}
           </nav>
