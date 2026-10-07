@@ -20,6 +20,8 @@ describe("AppShell", () => {
     expect(html).not.toContain("Báo cáo");
     expect(html).not.toContain("/app/access");
     expect(html).not.toContain("Phân quyền");
+    expect(html).not.toContain("/app/consent");
+    expect(html).not.toContain("Đồng ý");
   });
 
   it("renders the attendance navigation for an authorized feature page", () => {
@@ -89,5 +91,19 @@ describe("AppShell", () => {
     expect(html).toContain("Phân quyền");
     expect(html).not.toContain('href="/app/reports"');
     expect(html).not.toContain('href="/app/attendance"');
+  });
+
+  it("renders the consent navigation only for an authorized feature page", () => {
+    const html = renderToStaticMarkup(
+      AppShell({
+        showConsentNavigation: true,
+        children: createElement("p", null, "Nội dung"),
+      }),
+    );
+
+    expect(html).toContain('href="/app/consent"');
+    expect(html).toContain("Đồng ý");
+    expect(html).not.toContain('href="/app/access"');
+    expect(html).not.toContain('href="/app/reports"');
   });
 });

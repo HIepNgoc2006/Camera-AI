@@ -243,6 +243,35 @@ describe("resolveRouteAccess", () => {
     });
   });
 
+  it("allows the consent route only with the consent view permission", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/consent",
+        session: fakeAuthenticatedSession(["consent.view_metadata"]),
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/consent/00000000-0000-4000-8000-00000000007c",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/consent",
+        session: fakeAuthenticatedSession(["consent.correct"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+  });
+
   it("allows the protected shell for any recognized Web view permission", () => {
     expect(
       resolveRouteAccess({
