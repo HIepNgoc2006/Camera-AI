@@ -98,6 +98,103 @@ function explodingProvider(): ViolationReadProvider {
 }
 
 describe("queryViolationListView", () => {
+  it("accepts provider items matching the requested confirmed status", async () => {
+    const result = await queryViolationListView({
+      session: fakeSession(["violation.view_metadata"]),
+      rawQuery: {
+        occurredFrom: "2026-08-20",
+        occurredTo: "2026-08-21",
+        status: "confirmed",
+      },
+      provider: {
+        readList: async () => ({
+          kind: "success",
+          page: {
+            items: [syntheticListItem({ reviewStatus: "confirmed" })],
+            nextCursor: null,
+          },
+        }),
+        readDetail: explodingProvider().readDetail,
+      },
+      capabilities: READ_CAPABILITIES,
+      now: NOW,
+    });
+    expect(result.kind).toBe("success");
+  });
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "rejects inherited provider status without a filter (%s)",
+    async (status) => {
+      const result = await queryViolationListView({
+        session: fakeSession(["violation.view_metadata"]),
+        rawQuery: { occurredFrom: "2026-08-20", occurredTo: "2026-08-21" },
+        provider: {
+          readList: async () => ({
+            kind: "success",
+            page: {
+              items: [
+                {
+                  ...syntheticListItem(),
+                  reviewStatus: status,
+                } as ViolationListItem,
+              ],
+              nextCursor: null,
+            },
+          }),
+          readDetail: explodingProvider().readDetail,
+        },
+        capabilities: READ_CAPABILITIES,
+        now: NOW,
+      });
+      expect(result.kind).toBe("unavailable");
+    },
+  );
+
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "rejects inherited detail status (%s)",
+    async (status) => {
+      const result = await queryViolationDetailView({
+        session: fakeSession(["violation.view_metadata"]),
+        caseId: CASE_ID,
+        provider: {
+          readList: explodingProvider().readList,
+          readDetail: async () => ({
+            kind: "success",
+            detail: {
+              ...syntheticDetail(),
+              reviewStatus: status,
+            } as ViolationDetail,
+          }),
+        },
+        capabilities: READ_CAPABILITIES,
+        now: NOW,
+      });
+      expect(result.kind).toBe("unavailable");
+    },
+  );
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty", "closed"])(
+    "rejects provider status outside requested confirmed status (%s)",
+    async (status) => {
+      const item = { ...syntheticListItem(), reviewStatus: status };
+      const result = await queryViolationListView({
+        session: fakeSession(["violation.view_metadata"]),
+        rawQuery: {
+          occurredFrom: "2026-08-20",
+          occurredTo: "2026-08-21",
+          status: "confirmed",
+        },
+        provider: {
+          readList: async () => ({
+            kind: "success",
+            page: { items: [item as ViolationListItem], nextCursor: null },
+          }),
+          readDetail: explodingProvider().readDetail,
+        },
+        capabilities: READ_CAPABILITIES,
+        now: NOW,
+      });
+      expect(result.kind).toBe("unavailable");
+    },
+  );
   it.each([
     null,
     { status: "unauthenticated" },

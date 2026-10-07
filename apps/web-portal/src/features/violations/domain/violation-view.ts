@@ -176,7 +176,7 @@ export function parseViolationQuery(
   if (diffInDays(occurredFrom, occurredTo) >= MAX_RANGE_DAYS) {
     return invalidQuery();
   }
-  if (status !== null && !(status in VIOLATION_CASE_STATUS_LOOKUP)) {
+  if (status !== null && !Object.hasOwn(VIOLATION_CASE_STATUS_LOOKUP, status)) {
     return invalidQuery();
   }
   if (cursor !== null && !isValidCursor(cursor)) {
@@ -262,7 +262,7 @@ function readOptionalString(
   key: string,
 ): string | null | typeof INVALID_STRING {
   const value = input[key];
-  if (value === undefined) {
+  if (value === undefined || (key === "status" && value === "")) {
     return null;
   }
   return typeof value === "string" && value.length > 0 ? value : INVALID_STRING;

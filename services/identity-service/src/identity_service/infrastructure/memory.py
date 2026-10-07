@@ -20,6 +20,7 @@ from identity_service.domain.auth import (
     RefreshState,
     SessionRecord,
 )
+from identity_service.domain.models import UserStatus
 
 
 class InMemoryAuthRepository:
@@ -111,7 +112,7 @@ class InMemoryAuthRepository:
     def role_codes(self, user_id: UUID) -> frozenset[str]:
         with self._lock:
             for subject in self._subjects.values():
-                if subject.user_id == user_id:
+                if subject.user_id == user_id and subject.status is UserStatus.ACTIVE:
                     return subject.role_codes
             return frozenset()
 
@@ -170,10 +171,18 @@ class InMemoryAuthRepository:
                     self._refresh[digest] = replace(record, state=RefreshState.REVOKED)
             self.audit_intents.append(audit)
 
-    def revoke_session(self, *, session_id: UUID, revoked_at: datetime, audit: AuditIntent) -> bool:
+    def revoke_session(
+        self,
+        *,
+        session_id: UUID,
+        tenant_id: UUID,
+        school_id: UUID | None,
+        revoked_at: datetime,
+        audit: AuditIntent,
+    ) -> bool:
         with self._lock:
             session = self._sessions.get(session_id)
-            if session is None:
+            if session is None or session.tenant_id != tenant_id or session.school_id != school_id:
                 return False
             if session.revoked_at is None:
                 self._sessions[session_id] = replace(session, revoked_at=revoked_at)

@@ -172,11 +172,21 @@ def test_composite_drain_sums_results_in_order() -> None:
 
     combined = CompositeDrain(
         (
-            Static(BatchDrainResult(claimed=3, published=2, retry_scheduled=1, dead_lettered=0)),
-            Static(BatchDrainResult(claimed=2, published=2, retry_scheduled=0, dead_lettered=0)),
+            Static(
+                BatchDrainResult(
+                    claimed=5, published=2, retry_scheduled=1, dead_lettered=1, refused=1
+                )
+            ),
+            Static(
+                BatchDrainResult(
+                    claimed=3, published=2, retry_scheduled=0, dead_lettered=0, refused=1
+                )
+            ),
         )
     ).execute()
 
-    assert combined == BatchDrainResult(claimed=5, published=4, retry_scheduled=1, dead_lettered=0)
+    assert combined == BatchDrainResult(
+        claimed=8, published=4, retry_scheduled=1, dead_lettered=1, refused=2
+    )
     with pytest.raises(ValueError, match="at least one"):
         CompositeDrain(())

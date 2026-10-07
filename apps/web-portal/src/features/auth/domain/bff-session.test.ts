@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  evaluateLogoutResponse,
   evaluateBffSessionSnapshot,
   toRouteSession,
   type BffSessionEvaluation,
@@ -12,6 +13,46 @@ import {
 } from "./route-access";
 
 const NOW = new Date("2026-08-02T03:00:00.000Z");
+
+describe("logout response", () => {
+  const confirmed = {
+    policyVersion: WEB_BFF_SESSION_POLICY_VERSION,
+    status: "unauthenticated",
+    errorCode: "AUTH_REQUIRED",
+    redirectTo: "/login",
+  };
+  it("accepts completion only for a successful matching response", () => {
+    expect(evaluateLogoutResponse(true, confirmed)).toBe("confirmed");
+  });
+  it.each([
+    null,
+    {},
+    { ...confirmed, status: "authenticated" },
+    { ...confirmed, policyVersion: "unknown" },
+    { ...confirmed, redirectTo: "https://evil.invalid" },
+  ])("rejects misleading or malformed response %j", (value) => {
+    expect(evaluateLogoutResponse(true, value)).toBe("unconfirmed");
+  });
+  it("does not turn an HTTP failure with a redirect into success", () => {
+    expect(evaluateLogoutResponse(false, confirmed)).toBe("unconfirmed");
+  });
+  it("requires reauthentication after local session loss without remote confirmation", () => {
+    expect(
+      evaluateLogoutResponse(false, {
+        policyVersion: WEB_BFF_SESSION_POLICY_VERSION,
+        status: "unavailable",
+        errorCode: "SESSION_UNAVAILABLE",
+      }),
+    ).toBe("reauthentication_required");
+    expect(
+      evaluateLogoutResponse(false, {
+        policyVersion: WEB_BFF_SESSION_POLICY_VERSION,
+        status: "unauthenticated",
+        errorCode: "REQUEST_REJECTED",
+      }),
+    ).toBe("reauthentication_required");
+  });
+});
 
 function validAuthenticatedSnapshot(): AuthenticatedSessionSnapshot {
   return {

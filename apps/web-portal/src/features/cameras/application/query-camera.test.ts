@@ -72,6 +72,13 @@ function providerReturning(
 
 const VIEW_ONLY: readonly PermissionCode[] = ["camera_status.view_metadata"];
 
+it("cannot claim healthy without an observation timestamp", () => {
+  expect(
+    summarizeCameraHealth(syntheticView({ lastObservedAt: null })).reasonCode,
+  ).toBe("health_unknown");
+  expect(summarizeCameraHealth(syntheticView()).reasonCode).toBe("health_ok");
+});
+
 describe("session gate", () => {
   it.each([null, undefined, {}, { status: "unknown" }, "session"])(
     "denies without a valid session (%j)",

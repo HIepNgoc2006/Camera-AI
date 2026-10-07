@@ -59,6 +59,8 @@ class RevokeAtMutationRepository(InMemoryAuthRepository):
             self.revoke_before_touch = False
             self.revoke_session(
                 session_id=expected.session_id,
+                tenant_id=expected.tenant_id,
+                school_id=expected.school_id,
                 revoked_at=observed_at,
                 audit=_audit_placeholder(),
             )
@@ -75,6 +77,8 @@ class RevokeAtMutationRepository(InMemoryAuthRepository):
             self.revoke_before_touch = False
             self.revoke_session(
                 session_id=expected.session_id,
+                tenant_id=expected.tenant_id,
+                school_id=expected.school_id,
                 revoked_at=activity_at,
                 audit=_audit_placeholder(),
             )
@@ -97,6 +101,8 @@ class RevokeAtMutationRepository(InMemoryAuthRepository):
             self.revoke_before_rotate = False
             self.revoke_session(
                 session_id=previous.session_id,
+                tenant_id=expected_session.tenant_id,
+                school_id=expected_session.school_id,
                 revoked_at=rotated_at,
                 audit=_audit_placeholder(),
             )
@@ -320,6 +326,69 @@ def test_admin_requires_totp_and_secret_only_round_trips_through_encv1() -> None
     assert code not in combined
 
 
+@pytest.mark.parametrize(
+    "target_tenant,target_school",
+    [
+        (OTHER_TENANT, SCHOOL),
+        (TENANT, UUID("00000000-0000-4000-8000-000000000202")),
+        (TENANT, None),
+    ],
+)
+def test_admin_cannot_revoke_a_session_outside_its_scope(
+    target_tenant: UUID,
+    target_school: UUID | None,
+) -> None:
+    service, repository, _, _, protector = _build(roles=frozenset({"school_admin"}))
+    factor_id = UUID("00000000-0000-4000-8000-000000000401")
+    repository.save_mfa_factor(
+        factor=MfaFactor(
+            factor_id=factor_id,
+            user_id=USER,
+            tenant_id=TENANT,
+            secret_ciphertext=protector.protect(
+                factor_id=factor_id, tenant_id=TENANT, secret=TOTP_SECRET
+            ),
+            state=MfaState.ACTIVE,
+            created_at=NOW,
+            verified_at=NOW,
+        ),
+        audit=_audit_placeholder(),
+    )
+    admin = _login(service, mfa_code=pyotp.TOTP(TOTP_SECRET).at(NOW))
+    original = repository.session(admin.session_id)
+    assert original is not None
+    target = replace(
+        original,
+        session_id=UUID("00000000-0000-4000-8000-000000000501"),
+        tenant_id=target_tenant,
+        school_id=target_school,
+    )
+    repository.create_session(
+        session=target,
+        refresh=RefreshRecord(
+            refresh_id=UUID("00000000-0000-4000-8000-000000000601"),
+            session_id=target.session_id,
+            family_id=target.family_id,
+            token_hash=b"x" * 32,
+            issued_at=NOW,
+            expires_at=target.expires_at,
+        ),
+        audit=_audit_placeholder(),
+    )
+    audit_count = len(repository.audit_intents)
+    assert (
+        service.administrative_revoke(
+            admin.access_token,
+            session_id=target.session_id,
+            request_id=REQUEST_ID,
+            now=NOW,
+        )
+        is False
+    )
+    assert repository.session(target.session_id) == target
+    assert len(repository.audit_intents) == audit_count
+
+
 def test_rate_limit_boundary_and_dependency_loss_fail_closed() -> None:
     limiter = InMemoryLoginRateLimiter(account_limit=1, source_limit=10)
     service, _, _, _, _ = _build(limiter=limiter)
@@ -497,6 +566,39 @@ def test_snapshot_http_contract_is_canonical_and_excludes_credentials() -> None:
     serialized = response.text
     assert pair.access_token not in serialized
     assert pair.refresh_token not in serialized
+
+
+@pytest.mark.parametrize("status", [UserStatus.DISABLED, UserStatus.LOCKED, UserStatus.PENDING])
+def test_existing_tokens_cannot_access_or_refresh_after_account_deactivation(
+    status: UserStatus,
+) -> None:
+    service, repository, lookup, _, _ = _build()
+    pair = _login(service)
+    digest = lookup.digest(IDENTIFIER, tenant_id=TENANT)
+    subject = repository.login_subject(tenant_id=TENANT, login_digest=digest)
+    assert subject is not None
+    repository.seed_subject(
+        tenant_id=TENANT, login_digest=digest, subject=replace(subject, status=status)
+    )
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.verify_access(pair.access_token, now=NOW)
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.refresh(refresh_token=pair.refresh_token, request_id=REQUEST_ID, now=NOW)
+
+
+def test_access_token_cannot_retain_roles_removed_from_live_assignment() -> None:
+    service, repository, lookup, _, _ = _build()
+    pair = _login(service)
+    digest = lookup.digest(IDENTIFIER, tenant_id=TENANT)
+    subject = repository.login_subject(tenant_id=TENANT, login_digest=digest)
+    assert subject is not None
+    repository.seed_subject(
+        tenant_id=TENANT,
+        login_digest=digest,
+        subject=replace(subject, role_codes=frozenset({"guardian"})),
+    )
+    with pytest.raises(AuthenticationError, match="AUTHENTICATION_REQUIRED"):
+        service.verify_access(pair.access_token, now=NOW)
 
 
 def _audit_placeholder() -> AuditIntent:

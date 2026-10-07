@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { WEB_BFF_SESSION_POLICY_VERSION } from "@/features/auth/domain/route-access";
+import { evaluateLogoutResponse } from "@/features/auth/domain/bff-session";
 
 type Challenge = Readonly<{ csrfToken: string }>;
 
@@ -19,6 +21,7 @@ export function SessionControls({
   const [warning, setWarning] = useState(warningInitially);
   const [busy, setBusy] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [needsReauthentication, setNeedsReauthentication] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,7 +37,7 @@ export function SessionControls({
   }, [expiresAt, warningStartsAt]);
 
   async function endSession(allDevices: boolean) {
-    if (busy) return;
+    if (busy || needsReauthentication) return;
     setBusy(true);
     setUnavailable(false);
     try {
@@ -48,14 +51,13 @@ export function SessionControls({
         },
       );
       const body: unknown = await response.json();
-      if (
-        typeof body !== "object" ||
-        body === null ||
-        Array.isArray(body) ||
-        (body as Record<string, unknown>).policyVersion !==
-          WEB_BFF_SESSION_POLICY_VERSION ||
-        (body as Record<string, unknown>).redirectTo !== "/login"
-      ) {
+      const outcome = evaluateLogoutResponse(response.ok, body);
+      if (outcome === "reauthentication_required") {
+        setNeedsReauthentication(true);
+        setUnavailable(true);
+        return;
+      }
+      if (outcome !== "confirmed") {
         throw new Error("BFF_LOGOUT_RESPONSE_INVALID");
       }
       router.push("/login");
@@ -75,15 +77,31 @@ export function SessionControls({
       ) : null}
       {unavailable ? (
         <p className="notice error">
-          Chưa thể xác nhận đăng xuất ở máy chủ. Quyền truy cập cục bộ đã bị từ
-          chối; vui lòng thử lại.
+          Chưa xác nhận kết quả đăng xuất ở máy chủ.
+          {needsReauthentication ? (
+            <>
+              {" "}
+              Hãy <Link href="/login">đăng nhập lại</Link> để thực hiện đăng
+              xuất mọi thiết bị.
+            </>
+          ) : (
+            " Vui lòng thử lại."
+          )}
         </p>
       ) : null}
       <div className="session-actions">
-        <button type="button" disabled={busy} onClick={() => endSession(false)}>
+        <button
+          type="button"
+          disabled={busy || needsReauthentication}
+          onClick={() => endSession(false)}
+        >
           Đăng xuất
         </button>
-        <button type="button" disabled={busy} onClick={() => endSession(true)}>
+        <button
+          type="button"
+          disabled={busy || needsReauthentication}
+          onClick={() => endSession(true)}
+        >
           Đăng xuất mọi thiết bị
         </button>
       </div>

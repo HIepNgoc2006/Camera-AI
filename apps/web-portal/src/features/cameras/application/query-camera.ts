@@ -265,6 +265,7 @@ export function summarizeCameraHealth(view: CameraHealthView): Readonly<{
     return { headline: "Sự kiện bị trễ", reasonCode: "event_delayed" };
   }
   if (
+    view.lastObservedAt === null ||
     view.connectivity === "unknown" ||
     view.taskState === "unknown" ||
     view.eventDelay === "unknown" ||

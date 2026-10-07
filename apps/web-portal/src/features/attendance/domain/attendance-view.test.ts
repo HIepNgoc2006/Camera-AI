@@ -11,6 +11,17 @@ const RECORD_ID = "00000000-0000-4000-8000-000000000073";
 const CURSOR = "cursor_fake_00001";
 
 describe("parseAttendanceQuery", () => {
+  it("accepts an unselected class submitted by a native GET form", () => {
+    const query = Object.fromEntries(
+      new URLSearchParams("day=2026-08-22&classId="),
+    );
+    expect(parseAttendanceQuery(query, NOW)).toEqual(
+      parseAttendanceQuery({}, NOW),
+    );
+    expect(parseAttendanceQuery({ classId: ["", CLASS_ID] }, NOW).kind).toBe(
+      "invalid",
+    );
+  });
   it("defaults to the current UTC day and a bounded page size", () => {
     expect(parseAttendanceQuery({}, NOW)).toEqual({
       kind: "valid",

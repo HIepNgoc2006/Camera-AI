@@ -63,7 +63,13 @@ class AuthRepository(Protocol):
     ) -> None: ...
 
     def revoke_session(
-        self, *, session_id: UUID, revoked_at: datetime, audit: AuditIntent
+        self,
+        *,
+        session_id: UUID,
+        tenant_id: UUID,
+        school_id: UUID | None,
+        revoked_at: datetime,
+        audit: AuditIntent,
     ) -> bool: ...
 
     def revoke_user_sessions(
