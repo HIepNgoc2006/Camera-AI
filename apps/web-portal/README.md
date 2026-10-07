@@ -13,6 +13,11 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   deterministic loading/empty/unavailable/validation/denied/success states,
   sanitized attendance view-model types, and permission-aware correction entry
   points.
+- Protected `/app/violations` view with bounded occurred-window/status/cursor/
+  limit filters, the same deterministic state set, sanitized violation
+  case view-model types, independent legal-hold and appeal/correction overlays,
+  and permission-gated review affordances. AI output is presented as
+  suspected-only and never as a final disciplinary conclusion.
 - Public `/not-authorized` fallback.
 - Reusable UI-action visibility checks that use the same validated permission
   snapshot as route decisions.
@@ -101,6 +106,37 @@ is exercised with synthetic providers in tests only; no fixture is presented as
 live data. Correction and linked-child UI remain hidden until both their exact
 permissions/contracts and an approved runtime activation are present.
 
+## Violations route
+
+`/app/violations` requires the exact server session snapshot and
+`violation.view_metadata`. The page accepts only these query parameters:
+
+| Parameter      | Boundary                                                                   |
+| -------------- | -------------------------------------------------------------------------- |
+| `occurredFrom` | Canonical `YYYY-MM-DD`; defaults to the current UTC day; max 31-day window |
+| `occurredTo`   | Canonical `YYYY-MM-DD`; `>= occurredFrom`, no future date                  |
+| `status`       | Optional canonical case status from `VIOLATION_CASE_STATUSES`              |
+| `cursor`       | Optional opaque value, 16–512 characters                                   |
+| `limit`        | Integer `1..100`; defaults to `25`                                         |
+
+School, tenant, actor, kitchen-zone, guardian and permission scope are never
+accepted from the browser; they resolve only inside the server session/provider
+boundary. The approved API Gateway baseline defines `GET /api/v1/violations/
+{case_id}` with opaque `resource_id`/`request_id` envelopes only; it does not
+define a list operation or the case metadata fields required by the screen. The
+checked-in provider therefore returns the stable unavailable state for list and
+detail reads.
+
+Review statuses (`suspected`, `pending_review`, `needs_evidence`, `confirmed`,
+`rejected`, `closed`) come from the canonical backend lifecycle. Appeal and
+correction overlays and the legal-hold badge (`none/active/released/
+unavailable`) render independently and never replace the case status. Review,
+correction and export affordances render only when the session grants the exact
+`violation.review`/`violation.correct`/`violation.export` permission AND the
+matching runtime capability is active — both are false in the checked-in
+composition. No appeal/hold/evidence action code is invented; evidence media,
+thumbnails, downloads and signed URLs are prohibited on this screen.
+
 ## Security notes
 
 - `readSessionSnapshot` now reads only the server BFF boundary. The checked-in
@@ -145,6 +181,11 @@ permissions/contracts and an approved runtime activation are present.
 - Attendance records use a strict sanitized allowlist. Face/biometric fields,
   evidence/media, raw ANSVIS data, internal producer identifiers, credentials
   and browser persistence are prohibited.
+- Violation case items use the same strict allowlist discipline: opaque
+  `caseRef` values (no URLs, paths, traversal or control characters), canonical
+  categories/statuses, and rejected unknown or sensitive fields such as face
+  embeddings, evidence URLs or object keys. A detail payload must match the
+  requested case id and is revalidated server-side before rendering.
 - Do not persist access tokens or sensitive records in browser storage.
 - Do not render untrusted HTML or add real people, face, camera or evidence data
   to fixtures.
