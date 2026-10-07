@@ -18,6 +18,10 @@ Minimal Next.js foundation for the AI Camera School Web Portal.
   case view-model types, independent legal-hold and appeal/correction overlays,
   and permission-gated review affordances. AI output is presented as
   suspected-only and never as a final disciplinary conclusion.
+- Protected `/app/reports` view with bounded day/class/cursor/limit filters,
+  deterministic states, sanitized report summary types, and an export
+  affordance that stays hidden or marked unavailable until the approved
+  dual-control `report.export` runtime exists.
 - Public `/not-authorized` fallback.
 - Reusable UI-action visibility checks that use the same validated permission
   snapshot as route decisions.
@@ -137,6 +141,35 @@ matching runtime capability is active — both are false in the checked-in
 composition. No appeal/hold/evidence action code is invented; evidence media,
 thumbnails, downloads and signed URLs are prohibited on this screen.
 
+## Reports route
+
+`/app/reports` requires the exact server session snapshot and
+`report.view_metadata`. The page accepts only these query parameters:
+
+| Parameter | Boundary                                                                |
+| --------- | ----------------------------------------------------------------------- |
+| `day`     | Canonical `YYYY-MM-DD`, no future date; defaults to the current UTC day |
+| `classId` | Optional canonical UUID; narrowing only                                 |
+| `cursor`  | Optional opaque value, 16–512 characters                                |
+| `limit`   | Integer `1..100`; defaults to `25`                                      |
+
+School, tenant, actor and permission scope are never accepted from the
+browser. The approved API Gateway baseline defines `GET /api/v1/reports/
+{report_id}` and `POST /api/v1/report-exports` with opaque envelopes only; it
+does not define a list operation or the label/status fields required by the
+screen. The checked-in provider therefore returns the stable unavailable
+state.
+
+`report.export` is dual-control in `rbac_policy_v1` and has no approved
+runtime in this composition: the export affordance is hidden without the
+permission and is marked unavailable even when the permission is present. No
+format/reason/cohort parameter is accepted from the browser, no signed URL or
+artifact reference is ever produced client-side, and export job states
+(`requested/processing/failed/completed/expired`) remain a backend lifecycle.
+Report Service policy requires the minimum cohort threshold; aggregates below
+it are suppressed server-side and the UI must never render a zero for a
+suppressed value.
+
 ## Security notes
 
 - `readSessionSnapshot` now reads only the server BFF boundary. The checked-in
@@ -186,6 +219,10 @@ thumbnails, downloads and signed URLs are prohibited on this screen.
   categories/statuses, and rejected unknown or sensitive fields such as face
   embeddings, evidence URLs or object keys. A detail payload must match the
   requested case id and is revalidated server-side before rendering.
+- Report summaries use the same strict allowlist: opaque report ids, bounded
+  labels, canonical day equal to the query day, and no row-level personal or
+  aggregate values. Export submissions are denied by the checked-in provider;
+  no quota polling, signed URL, or artifact reference exists in browser code.
 - Do not persist access tokens or sensitive records in browser storage.
 - Do not render untrusted HTML or add real people, face, camera or evidence data
   to fixtures.

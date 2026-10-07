@@ -176,6 +176,44 @@ describe("resolveRouteAccess", () => {
     ).toEqual({ kind: "allow" });
   });
 
+  it("allows the violations route only with the violation view permission", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/violations",
+        session: fakeAuthenticatedSession(["violation.view_metadata"]),
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/violations",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+  });
+
+  it("allows the reports route only with the report view permission", () => {
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/reports",
+        session: fakeAuthenticatedSession(["report.view_metadata"]),
+      }),
+    ).toEqual({ kind: "allow" });
+    expect(
+      resolveRouteAccess({
+        pathname: "/app/reports",
+        session: fakeAuthenticatedSession(["attendance.view_metadata"]),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      destination: "/not-authorized",
+      reason: "forbidden",
+    });
+  });
+
   it("allows the protected shell for any recognized Web view permission", () => {
     expect(
       resolveRouteAccess({
