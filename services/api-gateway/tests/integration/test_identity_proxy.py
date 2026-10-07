@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from uuid import UUID
 
 import httpx
 import pytest
+from api_gateway.application.identity import IdentityUpstreamResponse
 from api_gateway.config import Settings as GatewaySettings
 from api_gateway.infrastructure.identity import HttpxIdentityUpstream
 from api_gateway.main import create_app as create_gateway
@@ -27,6 +29,7 @@ from identity_service.infrastructure.security import (
     PyotpTotpVerifier,
 )
 from identity_service.main import create_app as create_identity
+from starlette.types import Message, Scope
 
 TENANT = UUID("00000000-0000-4000-8000-000000000101")
 SCHOOL = UUID("00000000-0000-4000-8000-000000000201")
@@ -163,3 +166,80 @@ def test_gateway_fails_closed_without_identity_upstream() -> None:
         )
     assert response.status_code == 503
     assert response.json()["error_code"] == "AUTH_DEPENDENCY_UNAVAILABLE"
+
+
+@pytest.mark.parametrize(
+    "declared_length,expected_reads",
+    [
+        (None, 9),
+        ("12288", 0),
+        ("-1", 0),
+        ("invalid", 0),
+        ("8192,8192", 0),
+    ],
+)
+def test_gateway_bounds_stream_before_buffering_or_forwarding(
+    declared_length: str | None,
+    expected_reads: int,
+) -> None:
+    gateway = create_gateway(GatewaySettings(environment="test", log_level="CRITICAL"))
+    reads = 0
+    messages: list[Message] = []
+
+    async def receive() -> Message:
+        nonlocal reads
+        reads += 1
+        return {"type": "http.request", "body": b"x" * 1024, "more_body": reads < 12}
+
+    async def send(message: Message) -> None:
+        messages.append(message)
+
+    headers = [(b"x-request-id", REQUEST_ID.encode())]
+    if declared_length is not None:
+        headers.append((b"content-length", declared_length.encode()))
+    scope: Scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/api/v1/auth/login",
+        "raw_path": b"/api/v1/auth/login",
+        "query_string": b"",
+        "root_path": "",
+        "headers": headers,
+        "client": ("127.0.0.1", 1234),
+        "server": ("127.0.0.1", 80),
+    }
+    asyncio.run(gateway(scope, receive, send))
+    assert messages[0]["status"] == 400
+    assert reads == expected_reads
+    assert b'"BAD_REQUEST"' in b"".join(m.get("body", b"") for m in messages)
+
+
+def test_gateway_exact_body_limit_forwarding_and_invalid_framing() -> None:
+    received: list[bytes] = []
+
+    class Upstream:
+        async def forward(self, **kwargs: object) -> IdentityUpstreamResponse:
+            body = kwargs["body"]
+            assert isinstance(body, bytes)
+            received.append(body)
+            return IdentityUpstreamResponse(status_code=200, content=b"{}")
+
+    gateway = create_gateway(
+        GatewaySettings(environment="test", log_level="CRITICAL"), identity_upstream=Upstream()
+    )
+    with TestClient(gateway) as client:
+        payload = b"x" * 8192
+        assert client.post("/api/v1/auth/login", content=payload).status_code == 200
+        assert received == [payload]
+        for headers in (
+            [("Content-Length", "2"), ("Content-Length", "2")],
+            [("Content-Length", "1")],
+            [("Content-Length", "3")],
+        ):
+            response = client.post("/api/v1/auth/login", content=b"{}", headers=headers)
+            assert response.status_code == 400
+            assert response.json()["error_code"] == "BAD_REQUEST"
+        assert received == [payload]

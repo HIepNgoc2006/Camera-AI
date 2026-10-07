@@ -38,17 +38,36 @@ def _authorization(request: Request) -> str | None:
     return None if not values else values[0]
 
 
+class InvalidAuthBody(ValueError):
+    """Invalid size or framing without exposing request data."""
+
+
+async def _bounded_body(request: Request) -> bytes:
+    lengths = request.headers.getlist("content-length")
+    if len(lengths) > 1:
+        raise InvalidAuthBody
+    declared: int | None = None
+    if lengths:
+        value = lengths[0]
+        if not value.isascii() or not value.isdecimal() or len(value) > 10:
+            raise InvalidAuthBody
+        declared = int(value)
+        if declared > MAX_AUTH_BODY_BYTES:
+            raise InvalidAuthBody
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_AUTH_BODY_BYTES:
+            raise InvalidAuthBody
+        body.extend(chunk)
+    if declared is not None and declared != len(body):
+        raise InvalidAuthBody
+    return bytes(body)
+
+
 async def _forward(request: Request, path: str) -> Response:
     request_id = request_id_from(request)
     try:
-        body = await request.body()
-        if len(body) > MAX_AUTH_BODY_BYTES:
-            return error_response(
-                status_code=400,
-                error_code="BAD_REQUEST",
-                message="The request is invalid.",
-                request_id=request_id,
-            )
+        body = await _bounded_body(request)
         upstream_response = await _upstream(request).forward(
             path=path,
             body=body,
@@ -60,6 +79,13 @@ async def _forward(request: Request, path: str) -> Response:
             content=upstream_response.content,
             status_code=upstream_response.status_code,
             headers=dict(upstream_response.headers),
+        )
+    except InvalidAuthBody:
+        return error_response(
+            status_code=400,
+            error_code="BAD_REQUEST",
+            message="The request is invalid.",
+            request_id=request_id,
         )
     except ValueError:
         return error_response(

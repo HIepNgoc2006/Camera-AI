@@ -227,12 +227,13 @@ class PostgresAuthRepository:
                     .select_from(
                         user_role_assignments.join(
                             roles, roles.c.role_id == user_role_assignments.c.role_id
-                        )
+                        ).join(users, users.c.user_id == user_role_assignments.c.user_id)
                     )
                     .where(
                         user_role_assignments.c.user_id == user_id,
                         user_role_assignments.c.revoked_at.is_(None),
                         roles.c.status == "active",
+                        users.c.status == UserStatus.ACTIVE.value,
                     )
                 ).scalars()
                 return frozenset(str(value) for value in values)
@@ -330,12 +331,24 @@ class PostgresAuthRepository:
         except Exception:
             raise AuthenticationError("AUTH_DEPENDENCY_UNAVAILABLE") from None
 
-    def revoke_session(self, *, session_id: UUID, revoked_at: datetime, audit: AuditIntent) -> bool:
+    def revoke_session(
+        self,
+        *,
+        session_id: UUID,
+        tenant_id: UUID,
+        school_id: UUID | None,
+        revoked_at: datetime,
+        audit: AuditIntent,
+    ) -> bool:
         try:
             with self._engine.begin() as connection:
                 found = connection.execute(
                     sessions.update()
-                    .where(sessions.c.session_id == session_id)
+                    .where(
+                        sessions.c.session_id == session_id,
+                        sessions.c.tenant_id == tenant_id,
+                        sessions.c.school_id.is_not_distinct_from(school_id),
+                    )
                     .values(revoked_at=sa.func.coalesce(sessions.c.revoked_at, revoked_at))
                 )
                 if found.rowcount != 1:

@@ -34,6 +34,9 @@ refresh, logout, logout-all, the authoritative session snapshot, MFA enrollment,
 pseudonymous source key from the transport client address and overwrites any caller-supplied
 `X-Client-Source`. Only request ID, that source key, optional Authorization, JSON body, and three safe
 upstream response headers cross the service boundary. Bodies are capped at 8 KiB and never logged.
+The cap is enforced incrementally before buffering each stream chunk. Oversized or invalid,
+duplicated, or mismatched Content-Length is rejected with the existing 400 `BAD_REQUEST` response
+before forwarding to Identity.
 
 ## Events and database
 

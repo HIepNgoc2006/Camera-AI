@@ -294,6 +294,9 @@ class AuthenticationService:
             or (expected_tenant_id is not None and tenant_id != expected_tenant_id)
         ):
             raise AuthenticationError("AUTHENTICATION_REQUIRED")
+        current_roles = self._repository.role_codes(user_id)
+        if not current_roles or current_roles != roles:
+            raise AuthenticationError("AUTHENTICATION_REQUIRED")
         if extend_inactivity:
             session = self._touched_session(session, at=at)
             persisted = self._repository.touch_session_activity(
@@ -342,6 +345,8 @@ class AuthenticationService:
         principal = self.verify_access(access_token, now=at)
         self._repository.revoke_session(
             session_id=principal.session_id,
+            tenant_id=principal.tenant_id,
+            school_id=principal.school_id,
             revoked_at=at,
             audit=_session_revoke_audit(principal.session_id, request_id=request_id, now=at),
         )
@@ -369,6 +374,8 @@ class AuthenticationService:
             raise AuthenticationError("AUTHZ_DENIED")
         return self._repository.revoke_session(
             session_id=session_id,
+            tenant_id=principal.tenant_id,
+            school_id=principal.school_id,
             revoked_at=at,
             audit=_session_revoke_audit(session_id, request_id=request_id, now=at),
         )

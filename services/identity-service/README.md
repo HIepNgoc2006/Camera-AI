@@ -121,6 +121,14 @@ Snapshot reads validate live state but do not update activity or either expiry. 
 Web policy rule that display-only warning polls cannot keep a session alive. Only an authenticated
 operation recorded as activity or a successful refresh may move the inactivity boundary.
 
+Access and snapshot verification also require an active account and exact equality between token
+roles and current active role assignments. Disabled, locked or pending accounts cannot retain
+access or refresh; a rejected refresh revokes its token family. Lifecycle handlers still own
+explicit revocation on password/account/role changes. Administrative revoke requires verified MFA
+and an admin role, and its mutation is bound to the caller's tenant and exact school scope in both
+repositories. Missing or out-of-scope targets share the existing denial response; no cross-school
+or cross-tenant override is inferred from the role name.
+
 Rollback must not restore the older absolute-only behavior for a live session. Downgrading the
 session-expiry migration first revokes every remaining session, then removes the inactivity fields;
 operators must expect mandatory reauthentication and must not bypass that step with manual DDL.

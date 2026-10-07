@@ -9,13 +9,14 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from camera_ai_audit import AuditIntent, IntentResult
 from identity_service.domain.auth import (
     RefreshRecord,
     RefreshRotationResult,
     SessionRecord,
 )
 from identity_service.infrastructure.repository import PostgresAuthRepository
-from identity_service.infrastructure.tables import refresh_tokens, sessions
+from identity_service.infrastructure.tables import audit_outbox, refresh_tokens, sessions
 from sqlalchemy.engine import make_url
 
 SERVICE_ROOT = Path(__file__).resolve().parents[2]
@@ -204,11 +205,76 @@ def test_identity_migration_applies_and_rolls_back_in_isolated_database() -> Non
         )
         assert replay is RefreshRotationResult.REPLAYED
 
-        with engine.begin() as connection:
-            connection.execute(
-                sessions.update()
-                .where(sessions.c.session_id == active_session.session_id)
-                .values(revoked_at=issued_at + timedelta(minutes=8))
+        revoke_at = issued_at + timedelta(minutes=8)
+        audit = AuditIntent(
+            source_service="identity-service",
+            source_event_id=UUID("00000000-0000-4000-8000-000000000701"),
+            action="SESSION_REVOKED",
+            resource_type="session",
+            request_id="req_scope_test_0001",
+            result=IntentResult.SUCCESS,
+            occurred_at=revoke_at,
+            resource_id=active_session.session_id,
+        )
+        with engine.connect() as connection:
+            audits_before = connection.execute(
+                sa.select(sa.func.count()).select_from(audit_outbox)
+            ).scalar_one()
+        for wrong_tenant, wrong_school in (
+            (UUID("00000000-0000-4000-8000-000000000102"), None),
+            (tenant_id, UUID("00000000-0000-4000-8000-000000000201")),
+        ):
+            assert not repository.revoke_session(
+                session_id=active_session.session_id,
+                tenant_id=wrong_tenant,
+                school_id=wrong_school,
+                revoked_at=revoke_at,
+                audit=audit,
+            )
+            with engine.connect() as connection:
+                assert (
+                    connection.execute(
+                        sa.select(sessions.c.revoked_at).where(
+                            sessions.c.session_id == active_session.session_id
+                        )
+                    ).scalar_one()
+                    is None
+                )
+                assert (
+                    connection.execute(
+                        sa.select(refresh_tokens.c.state).where(
+                            refresh_tokens.c.refresh_id == replacement_refresh.refresh_id
+                        )
+                    ).scalar_one()
+                    == "active"
+                )
+                assert (
+                    connection.execute(
+                        sa.select(sa.func.count()).select_from(audit_outbox)
+                    ).scalar_one()
+                    == audits_before
+                )
+        assert repository.revoke_session(
+            session_id=active_session.session_id,
+            tenant_id=tenant_id,
+            school_id=None,
+            revoked_at=revoke_at,
+            audit=audit,
+        )
+        with engine.connect() as connection:
+            assert (
+                connection.execute(
+                    sa.select(refresh_tokens.c.state).where(
+                        refresh_tokens.c.refresh_id == replacement_refresh.refresh_id
+                    )
+                ).scalar_one()
+                == "revoked"
+            )
+            assert (
+                connection.execute(
+                    sa.select(sa.func.count()).select_from(audit_outbox)
+                ).scalar_one()
+                == audits_before + 1
             )
         assert (
             repository.touch_session_activity(
